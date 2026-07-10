@@ -7,6 +7,7 @@ import {
   PlusCircle,
   Briefcase,
   ClipboardList,
+  MessageSquare,
   Star,
   LogOut,
   Menu,
@@ -24,6 +25,7 @@ const navItems = [
   { href: '/dashboard/provider/services/new', label: 'Xidmət ver', icon: PlusCircle },
   { href: '/dashboard/provider/services', label: 'Xidmətlərim', icon: Briefcase },
   { href: '/dashboard/provider/bookings', label: 'Sifarişlər', icon: ClipboardList },
+  { href: '/dashboard/provider/messages', label: 'Mesajlarım', icon: MessageSquare },
   { href: '/dashboard/provider/ratings', label: 'Reytinq', icon: Star },
 ];
 

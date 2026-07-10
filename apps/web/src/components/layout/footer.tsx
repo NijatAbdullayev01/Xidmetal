@@ -4,8 +4,7 @@ import { APP } from '@xidmetal/shared';
 
 const footerLinks = {
   platform: [
-    { href: '/services', label: 'Xidmətlər' },
-    { href: '/categories', label: 'Kateqoriyalar' },
+    { href: '/faq', label: 'Tez-tez verilən suallar' },
     { href: '/how-it-works', label: 'Necə işləyir?' },
   ],
   provider: [
@@ -22,7 +21,7 @@ const footerLinks = {
 export function Footer() {
   return (
     <footer className="border-t border-border bg-muted/50">
-      <div className="mx-auto max-w-7xl px-4 pt-12 pb-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 pt-12 sm:px-6 lg:px-8">
         <div className="grid gap-10 lg:grid-cols-12 lg:gap-16">
           <div className="flex flex-col gap-[6px] lg:col-span-4">
             <Link href="/" className="inline-flex w-fit shrink-0 items-center">
@@ -54,7 +53,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-6 border-t border-border pt-4 text-center text-sm text-muted-foreground">
+        <div className="mt-6 mb-0 border-t border-border pt-4 pb-2 text-center text-sm text-muted-foreground">
           © {new Date().getFullYear()} Xidmetal. Bütün hüquqlar qorunur.
         </div>
       </div>
