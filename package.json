@@ -1,0 +1,29 @@
+{
+  "name": "xidmetal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Xidmət verənlərlə xidmət alanları bir araya gətirən platforma",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\"",
+    "db:generate": "pnpm --filter @xidmetal/database generate",
+    "db:migrate": "pnpm --filter @xidmetal/database migrate",
+    "db:push": "pnpm --filter @xidmetal/database push",
+    "db:studio": "pnpm --filter @xidmetal/database studio",
+    "clean": "turbo clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3",
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3"
+  },
+  "packageManager": "pnpm@9.2.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

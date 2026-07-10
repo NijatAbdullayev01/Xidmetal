@@ -1,0 +1,19 @@
+{
+  "name": "@xidmetal/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@xidmetal/typescript-config": "workspace:*",
+    "typescript": "^5.8.3"
+  }
+}

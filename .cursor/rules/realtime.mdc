@@ -1,0 +1,32 @@
+---
+description: Real-time (WebSocket), tracking və dispatch kodu üçün qaydalar
+globs: apps/api/src/modules/{realtime,tracking,dispatch}/**,apps/web/src/**/*map*,apps/web/src/**/*track*
+alwaysApply: false
+---
+
+# Real-time & Tracking Qaydaları
+
+Dizayn mənbəyi: `docs/REALTIME_TRACKING.md`, `docs/BOOKING_LIFECYCLE.md`.
+
+## WebSocket (NestJS)
+- Socket.IO + `@nestjs/websockets`; miqyaslama üçün Redis adapter.
+- Handshake-də **JWT auth məcburi**; mövcud JWT məntiqini paylaş, təkrar yazma.
+- Otaqlar: `booking:{id}`, `user:{id}`, `provider:{id}`. Üzvlük **server-side** yoxlanır — client-in göndərdiyi `bookingId`-yə etibar etmə.
+
+## Lokasiya axını
+- Canlı lokasiya WS ilə (REST polling **yox**).
+- Provider tərəf `watchPosition` ~3-5 san throttle; DB-yə yalnız seçilmiş `LocationPing`.
+- Koordinat validasiyası (aralıq, sürət sanity) server-də.
+- Provider yalnız aktiv sifarişdə (EN_ROUTE/IN_PROGRESS) lokasiya göndərir.
+
+## Status keçidləri
+- Status dəyişikliyi mərkəzi `assertTransition(from, to, role)`-dən keçir (BOOKING_LIFECYCLE.md matrisi).
+- Hər keçid **transaction** daxilində: status + timestamp + event yayımı + notification (BullMQ).
+
+## Xəritə / ETA
+- Xəritə API açarı client-ə sızmır; ETA server tərəfdə hesablanıb cache olunur (Redis, qısa TTL).
+
+## Qadağan
+- Auth-suz WS event qəbulu.
+- Hər location update-i DB-yə yazmaq (performans).
+- Client-in bildirdiyi status/otağa kor-koranə etibar.

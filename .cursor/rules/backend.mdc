@@ -1,0 +1,44 @@
+---
+description: NestJS backend development qaydaları
+globs: apps/api/**
+alwaysApply: false
+---
+
+# NestJS Backend Qaydaları
+
+## Modul strukturu
+
+```
+modules/{name}/
+├── {name}.module.ts
+├── {name}.controller.ts
+├── {name}.service.ts
+└── dto/index.ts
+```
+
+## Controller
+
+- Yalnız HTTP mapping — biznes məntiq service-də
+- DTO validation: class-validator
+- Swagger: `@ApiTags`, `@ApiOperation`, `@ApiBearerAuth`
+- Auth: `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles()`
+
+## Service
+
+- NestJS exceptions: `NotFoundException`, `ForbiddenException`, `ConflictException`
+- Error mesajları AZ dilində
+- Prisma birbaşa service-də (repository pattern gələcəkdə)
+
+## Common
+
+- Guards: `src/common/guards/`
+- Decorators: `src/common/decorators/` — `@Public()`, `@Roles()`, `@CurrentUser()`
+- Database: `PrismaService` global module
+
+## Yeni modul əlavə etmək
+
+1. `src/modules/{name}/` yarat
+2. Module, Controller, Service, DTO-lar
+3. `app.module.ts`-ə import et
+4. Prisma schema-ya model əlavə et (lazımsa)
+5. Shared package-ə type/schema əlavə et

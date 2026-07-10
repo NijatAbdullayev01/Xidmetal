@@ -1,0 +1,181 @@
+'use client';
+
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+import { Briefcase, ClipboardList, Star, PlusCircle, ArrowRight } from 'lucide-react';
+import { BookingStatus, ServiceStatus } from '@xidmetal/shared';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { buttonStyles } from '@/components/ui/button';
+import { api } from '@/lib/api';
+import { useAuthToken } from '@/hooks/use-auth-token';
+import { formatPrice } from '@/lib/utils';
+
+export default function ProviderOverviewPage() {
+  const token = useAuthToken();
+
+  const { data: profile } = useQuery({
+    queryKey: ['users', 'me'],
+    queryFn: () => api.users.me(token),
+  });
+
+  const { data: services } = useQuery({
+    queryKey: ['services', 'mine'],
+    queryFn: () => api.myServices(token, { limit: '100' }),
+  });
+
+  const { data: bookings } = useQuery({
+    queryKey: ['bookings', 'all'],
+    queryFn: () => api.bookings(token, { limit: '100' }),
+  });
+
+  const activeServices = services?.items.filter((s) => s.status === ServiceStatus.ACTIVE).length ?? 0;
+  const pendingBookings =
+    bookings?.items.filter((b) => b.status === BookingStatus.PENDING).length ?? 0;
+  const completedBookings =
+    bookings?.items.filter((b) => b.status === BookingStatus.COMPLETED).length ?? 0;
+  const rating = profile?.providerProfile?.rating ?? 0;
+  const reviewCount = profile?.providerProfile?.reviewCount ?? 0;
+
+  const stats = [
+    {
+      label: 'Aktiv xidmətlər',
+      value: activeServices,
+      icon: Briefcase,
+      href: '/dashboard/provider/services',
+    },
+    {
+      label: 'Gözləyən sifarişlər',
+      value: pendingBookings,
+      icon: ClipboardList,
+      href: '/dashboard/provider/bookings',
+    },
+    {
+      label: 'Tamamlanan sifarişlər',
+      value: completedBookings,
+      icon: ClipboardList,
+      href: '/dashboard/provider/bookings',
+    },
+    {
+      label: 'Reytinq',
+      value: reviewCount > 0 ? `${rating.toFixed(1)} ★` : '—',
+      icon: Star,
+      href: '/dashboard/provider/ratings',
+    },
+  ];
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Kabinetinizə xoş gəlmisiniz
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            Xidmətlərinizi, sifarişlərinizi və reytinqinizi bir baxışda izləyin.
+          </p>
+        </div>
+        <Link href="/dashboard/provider/services/new" className={buttonStyles()}>
+          <PlusCircle className="h-4 w-4" />
+          Yeni xidmət
+        </Link>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <Link key={stat.label} href={stat.href}>
+              <Card className="transition-colors hover:border-brand/50">
+                <CardContent className="flex items-center gap-4 p-6">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/15">
+                    <Icon className="h-5 w-5 text-brand-dark" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">{stat.label}</p>
+                    <p className="text-2xl font-bold">{stat.value}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Son sifarişlər</CardTitle>
+              <CardDescription>Ən son daxil olan sifarişlər</CardDescription>
+            </div>
+            <Link
+              href="/dashboard/provider/bookings"
+              className={buttonStyles('ghost', 'sm')}
+            >
+              Hamısı
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {bookings?.items.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Hələ sifariş yoxdur
+              </p>
+            )}
+            <ul className="divide-y divide-border">
+              {bookings?.items.slice(0, 5).map((booking) => (
+                <li key={booking.id} className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-sm font-medium">{booking.serviceTitle}</p>
+                    <p className="text-xs text-muted-foreground">{booking.customerName}</p>
+                  </div>
+                  <p className="text-sm font-medium">{formatPrice(booking.totalPrice)}</p>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Xidmətlərim</CardTitle>
+              <CardDescription>Yaratdığınız xidmətlər</CardDescription>
+            </div>
+            <Link
+              href="/dashboard/provider/services"
+              className={buttonStyles('ghost', 'sm')}
+            >
+              Hamısı
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {services?.items.length === 0 && (
+              <div className="py-8 text-center">
+                <p className="text-sm text-muted-foreground">Hələ xidmət yoxdur</p>
+                <Link
+                  href="/dashboard/provider/services/new"
+                  className={buttonStyles('default', 'sm') + ' mt-3'}
+                >
+                  İlk xidməti yarat
+                </Link>
+              </div>
+            )}
+            <ul className="divide-y divide-border">
+              {services?.items.slice(0, 5).map((service) => (
+                <li key={service.id} className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-sm font-medium">{service.title}</p>
+                    <p className="text-xs text-muted-foreground">{service.categoryName}</p>
+                  </div>
+                  <p className="text-sm font-medium">{formatPrice(service.price)}</p>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,35 @@
+---
+description: Kod dəyişikliyi zamanı digər kodu sındırmamaq üçün qaydalar
+alwaysApply: true
+---
+
+# Təhlükəsiz Dəyişiklik Qaydaları
+
+Bir yeri dəyişdikdə **digərinə zərər vermə**. Dəyişiklik additive və geriyə uyğun (backward-compatible) olsun.
+
+## Əvvəl yoxla
+- Dəyişdirəcəyin funksiya/tip/endpoint-in **bütün istifadə yerlərini** tap (Grep). Sonra dəyiş.
+- `packages/shared` və `packages/database` **contract**-dır: dəyişiklik həm `apps/api`, həm `apps/web`-ə təsir edir. Əvvəl asılılıqları yoxla.
+
+## Additive dəyişiklik
+- Yeni sahə/parametr → **optional** (`?`) və ya `@default`. Mövcud imzaları pozma.
+- Enum-a dəyər əlavə et, mövcud dəyəri silmə/adını dəyişmə.
+- Public API imzasını (route path, DTO, response şəkli) dəyişdirmək lazımdırsa, versiyala (`/api/v2`) və ya köhnəni saxla.
+
+## Prisma / DB
+- Migration additive olsun; sütun/model silmək data itkisi riskidir — əvvəl xəbərdar et.
+- Schema dəyişdikdən sonra `pnpm db:generate` və shared tipləri sinxronlaşdır.
+
+## Yoxlama (dəyişiklikdən sonra məcburi)
+- `pnpm typecheck` və `pnpm lint` keçməlidir.
+- Refaktordan sonra köhnə davranışa güvənən çağırış yerlərini yenilə.
+
+## Qadağan
+- Əlaqəsi olmayan kodu "yol boyu" dəyişmə — scope minimal.
+- İşləyən kodu izahsız silmə; mövcud faydalı şərhləri saxla.
+- Bir bug düzəldərkən başqa modulun davranışını səssizcə dəyişmə.
+
+<example>
+Yaxşı: `Booking`-ə `type BookingType @default(SCHEDULED)` əlavə et → köhnə sətirlər/kod işləməyə davam edir.
+Pis: `scheduledAt`-ı `required`-dan silib bütün mövcud sifarişləri sındırmaq.
+</example>

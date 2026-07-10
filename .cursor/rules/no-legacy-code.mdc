@@ -1,0 +1,36 @@
+---
+description: Köhnə/deprecated kod yazmamaq, müasir stabil API-lərdən istifadə
+alwaysApply: true
+---
+
+# Köhnə Kod Qadağası
+
+Yalnız **müasir, stabil** API və pattern-lər istifadə et. Deprecated və ya köhnəlmiş üsullardan çəkin.
+
+## Ümumi
+- Ən son stabil sintaksis: `async/await` (callback/`.then` zənciri deyil), `import`/`export` (CommonJS `require` deyil).
+- TypeScript strict: `any`/`@ts-ignore` yox → `unknown` + type guard.
+- Deprecated paket və API çağırmadan əvvəl mövcud stabil alternativi yoxla.
+
+## Frontend (Next.js 15 / React 19)
+- App Router (`app/`), Server Components default. `pages/` router yaratma.
+- `next/navigation` (köhnə `next/router` deyil), `next/image`, `next/link` (əl ilə `<a>` naviqasiya deyil).
+- Data: Server Component-də birbaşa fetch və ya TanStack Query. Sinifli komponent yazma.
+
+## Backend (NestJS 11)
+- Standalone decorator-lar + DI. Köhnə custom boilerplate yox.
+- DTO validation: class-validator/class-transformer. Əl ilə yoxlama zənciri yox.
+- Prisma client-in cari API-si (`$transaction`, typed queries).
+
+## Prisma / DB
+- Cari Prisma sxem sintaksisi; deprecated preview flag-ları işlətmə.
+
+## Qadağan
+- Deprecated lifecycle/method/paket (məs. `moment.js` yerinə `date-fns`/native `Intl`).
+- Köhnə auth pattern-ləri (plain-text parol, `md5`) — yalnız `bcrypt`/`argon2`.
+- Kopyalanmış köhnə kod nümunələrini olduğu kimi yapışdırma; cari layihə konvensiyasına uyğunlaşdır.
+
+<example>
+Yaxşı: `import { useRouter } from 'next/navigation'`
+Pis: `import { useRouter } from 'next/router'` (App Router-da köhnəlib)
+</example>

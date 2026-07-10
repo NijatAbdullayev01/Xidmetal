@@ -1,0 +1,54 @@
+---
+description: Next.js frontend development qaydaları
+globs: apps/web/**
+alwaysApply: false
+---
+
+# Next.js Frontend Qaydaları
+
+## Struktur
+
+```
+src/
+├── app/           # App Router pages
+├── components/
+│   ├── ui/        # Atomic komponentlər (Button, Input, Card)
+│   └── layout/    # Header, Footer, Sidebar
+├── lib/           # utils, api client
+└── store/         # Zustand stores
+```
+
+## Komponent qaydaları
+
+- Server Component default — `'use client'` yalnız state/event lazım olduqda
+- Props interface-ləri explicit
+- Tailwind utility classes, `cn()` helper ilə merge
+- Brend rəngləri: `bg-brand`, `hover:bg-brand-dark`, `text-brand-foreground`
+
+## Styling
+
+- Mobile-first responsive: `sm:`, `md:`, `lg:`
+- CSS variables: `globals.css` @theme block
+- Shadow/border: `border-border`, `bg-card`, `text-muted-foreground`
+
+## API çağırışları
+
+- `src/lib/api.ts` — centralized API client
+- Server Components: birbaşa fetch
+- Client Components: TanStack Query (gələcək)
+
+## State
+
+- Auth: `useAuthStore` (Zustand + persist)
+- Server data: TanStack Query
+- Form: React Hook Form + Zod (shared schemas)
+
+## Accessibility
+
+- Semantic HTML
+- `aria-label` icon button-larda
+- Focus visible styles (`focus-visible:ring-brand`)
+
+## UI mətn
+
+Bütün istifadəçiyə görünən mətnlər **Azərbaycan dilində**.

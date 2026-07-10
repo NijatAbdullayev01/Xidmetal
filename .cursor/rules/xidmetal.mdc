@@ -1,0 +1,53 @@
+---
+description: Xidmetal layihəsinin əsas qaydaları — marketplace platforması
+globs:
+alwaysApply: true
+---
+
+# Xidmetal Layihə Qaydaları
+
+## Kontekst
+
+Xidmət verən (PROVIDER) və xidmət alan (CUSTOMER) rollarını birləşdirən veb marketplace.
+Monorepo: `apps/web` (Next.js 15), `apps/api` (NestJS 11), `packages/shared`, `packages/database`.
+
+## Brend
+
+- Əsas rəng: `#FFCC00` → Tailwind: `bg-brand`, `text-brand`, `border-brand`
+- Tünd: `brand-dark` (#E6B800), Açıq: `brand-light` (#FFD633)
+- Foreground: `brand-foreground` (#1A1A1A)
+
+## Kod standartları
+
+- TypeScript strict, `any` qadağandır
+- User-facing mesajlar **Azərbaycan dilində**
+- Shared types/schemas: `@xidmetal/shared` package-dən import et
+- Backend: Controller → Service → Prisma pattern
+- Frontend: Server Components default, client yalnız interaktiv UI
+- Minimal diff — yalnız tələb olunan dəyişikliklər
+
+## API
+
+- Prefix: `/api/v1`
+- Auth: JWT Bearer token
+- RBAC: `@Roles(UserRole.PROVIDER)` decorator
+- Public endpoint-lər: `@Public()` decorator
+- Swagger: yeni endpoint-lərə `@ApiOperation` əlavə et
+
+## Database
+
+- Schema: `packages/database/prisma/schema.prisma`
+- Dəyişiklikdən sonra: `pnpm db:generate && pnpm db:push`
+
+## Import qaydası
+
+1. External packages
+2. `@xidmetal/shared` / `@xidmetal/database`
+3. Relative imports (`../../common/...`)
+
+## Qadağanlar
+
+- `.env` commit
+- Controller-də biznes məntiq
+- Hardcoded URL/API keys
+- İngilis dilində UI mesajları
