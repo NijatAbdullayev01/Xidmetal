@@ -62,17 +62,42 @@ export class UpdateServiceDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MinLength(3)
+  @MaxLength(200)
   title?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MinLength(10)
+  @MaxLength(5000)
   description?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsNumber()
+  @Min(0)
   price?: number;
+
+  @ApiPropertyOptional({ enum: ['FIXED', 'HOURLY', 'DAILY'] })
+  @IsOptional()
+  @IsEnum(['FIXED', 'HOURLY', 'DAILY'])
+  priceUnit?: 'FIXED' | 'HOURLY' | 'DAILY';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  location?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isRemote?: boolean;
 
   @ApiPropertyOptional({ enum: ServiceStatus })
   @IsOptional()

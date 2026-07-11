@@ -58,7 +58,11 @@ export const createReviewSchema = z.object({
 export const updateServiceSchema = z.object({
   title: z.string().min(3).max(200).optional(),
   description: z.string().min(10).max(5000).optional(),
+  categoryId: z.string().uuid().optional(),
   price: z.number().positive().optional(),
+  priceUnit: z.enum(['FIXED', 'HOURLY', 'DAILY']).optional(),
+  location: z.string().optional(),
+  isRemote: z.boolean().optional(),
   status: z.enum(['DRAFT', 'ACTIVE', 'PAUSED', 'ARCHIVED']).optional(),
 });
 

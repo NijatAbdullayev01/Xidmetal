@@ -29,12 +29,14 @@ export default function ProviderRatingsPage() {
 
   const { data: profile } = useQuery({
     queryKey: ['users', 'me'],
-    queryFn: () => api.users.me(token),
+    queryFn: () => api.users.me(token!),
+    enabled: !!token,
   });
 
   const { data: reviews, isLoading } = useQuery({
     queryKey: ['reviews', 'received'],
-    queryFn: () => api.reviewsReceived(token, { limit: '50' }),
+    queryFn: () => api.reviewsReceived(token!, { limit: '50' }),
+    enabled: !!token,
   });
 
   const rating = profile?.providerProfile?.rating ?? 0;

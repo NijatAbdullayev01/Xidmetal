@@ -55,6 +55,7 @@ export interface ServiceSummary {
   location?: string;
   isRemote: boolean;
   createdAt: string;
+  bookingCount?: number;
 }
 
 export interface BookingSummary {

@@ -47,7 +47,11 @@ export async function apiClient<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Xəta baş verdi' }));
-    throw new ApiError(error.message ?? 'Xəta baş verdi', response.status);
+    const rawMessage = error.message;
+    const message = Array.isArray(rawMessage)
+      ? rawMessage.join(', ')
+      : (rawMessage ?? 'Xəta baş verdi');
+    throw new ApiError(message, response.status);
   }
 
   return response.json();
@@ -80,6 +84,8 @@ export const api = {
 
   categories: () => apiClient<CategorySummary[]>('/categories'),
 
+  category: (slug: string) => apiClient<CategorySummary>(`/categories/${slug}`),
+
   services: (params?: Record<string, string>) => {
     const query = params ? `?${new URLSearchParams(params)}` : '';
     return apiClient<PaginatedResponse<ServiceSummary>>(`/services${query}`);
@@ -104,6 +110,12 @@ export const api = {
       method: 'PATCH',
       token,
       body: JSON.stringify(data),
+    }),
+
+  deleteService: (token: string, id: string) =>
+    apiClient<{ message: string }>(`/services/${id}`, {
+      method: 'DELETE',
+      token,
     }),
 
   bookings: (token: string, params?: Record<string, string>) => {

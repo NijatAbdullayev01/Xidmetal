@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { UserRole } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
+import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 import { getDashboardPath } from '@/lib/auth';
 
 interface RequireRoleProps {
@@ -15,7 +16,7 @@ interface RequireRoleProps {
 export function RequireRole({ role, children }: RequireRoleProps) {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
-  const hydrated = useAuthStore.persist.hasHydrated();
+  const hydrated = useAuthHydrated();
 
   useEffect(() => {
     if (hydrated && user && user.role !== role) {

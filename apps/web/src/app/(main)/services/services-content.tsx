@@ -4,167 +4,20 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Search,
-  Star,
-  MapPin,
-  Wifi,
   ArrowRight,
   Sparkles,
   SlidersHorizontal,
   X,
-  User,
 } from 'lucide-react';
 import type { CategorySummary, ServiceSummary } from '@xidmetal/shared';
 import { buttonStyles } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { formatPrice } from '@/lib/utils';
+import { ServiceCard } from '@/components/services/service-card';
 import { getCategoryIcon } from '@/lib/category-icons';
-import { PRICE_UNIT_LABELS } from '@/lib/provider-labels';
 import { cn } from '@/lib/utils';
 
 interface ServicesContentProps {
   categories: CategorySummary[];
   services: ServiceSummary[];
-}
-
-function StarRating({ rating, count }: { rating: number; count: number }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="flex items-center gap-0.5">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Star
-            key={i}
-            className={cn(
-              'h-3.5 w-3.5',
-              i < Math.round(rating)
-                ? 'fill-brand text-brand'
-                : 'fill-muted text-muted-foreground/30',
-            )}
-            aria-hidden
-          />
-        ))}
-      </div>
-      <span className="text-xs font-medium text-foreground">{rating.toFixed(1)}</span>
-      {count > 0 && (
-        <span className="text-xs text-muted-foreground">({count} rəy)</span>
-      )}
-    </div>
-  );
-}
-
-function ProviderAvatar({
-  name,
-  avatarUrl,
-}: {
-  name: string;
-  avatarUrl?: string;
-}) {
-  const initials = name
-    .split(' ')
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-
-  if (avatarUrl) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={avatarUrl}
-        alt={name}
-        className="h-9 w-9 rounded-full object-cover ring-2 ring-background"
-      />
-    );
-  }
-
-  return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand/40 to-brand/15 text-xs font-semibold text-brand-foreground ring-2 ring-background">
-      {initials || <User className="h-4 w-4" aria-hidden />}
-    </div>
-  );
-}
-
-function ServiceCard({
-  service,
-  categorySlug,
-}: {
-  service: ServiceSummary;
-  categorySlug?: string;
-}) {
-  const Icon = getCategoryIcon(categorySlug ?? '');
-
-  return (
-    <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-brand/40 hover:shadow-lg hover:shadow-brand/5">
-      <div
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand/0 via-brand to-brand/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-      />
-
-      <div className="relative p-5 pb-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand/30 to-brand/10 ring-1 ring-brand/20 transition-transform duration-300 group-hover:scale-105">
-            <Icon className="h-5 w-5 text-foreground" strokeWidth={1.75} aria-hidden />
-          </div>
-          <Badge variant="muted" className="shrink-0">
-            {service.categoryName}
-          </Badge>
-        </div>
-
-        <h3 className="mt-4 line-clamp-2 text-base font-semibold leading-snug transition-colors group-hover:text-brand-dark">
-          {service.title}
-        </h3>
-        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-          {service.description}
-        </p>
-
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {service.isRemote ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-medium text-brand-foreground">
-              <Wifi className="h-3 w-3" aria-hidden />
-              Onlayn
-            </span>
-          ) : service.location ? (
-            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <MapPin className="h-3 w-3 shrink-0" aria-hidden />
-              {service.location}
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="mt-auto border-t border-border/60 bg-muted/30 px-5 py-4">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="text-lg font-bold text-foreground">
-              {formatPrice(service.price)}
-              <span className="ml-1 text-xs font-normal text-muted-foreground">
-                / {PRICE_UNIT_LABELS[service.priceUnit] ?? service.priceUnit}
-              </span>
-            </p>
-            <div className="mt-1.5">
-              <StarRating rating={service.averageRating} count={service.reviewCount} />
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/50 pt-4">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <ProviderAvatar
-              name={service.providerName}
-              avatarUrl={service.providerAvatarUrl}
-            />
-            <span className="truncate text-sm font-medium">{service.providerName}</span>
-          </div>
-          <Link
-            href="/register"
-            className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-brand-dark transition-colors hover:text-brand-foreground"
-          >
-            Sifariş et
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Link>
-        </div>
-      </div>
-    </article>
-  );
 }
 
 export function ServicesContent({ categories, services }: ServicesContentProps) {
@@ -212,7 +65,7 @@ export function ServicesContent({ categories, services }: ServicesContentProps) 
               <Sparkles className="h-4 w-4 text-brand-dark" aria-hidden />
               Minlərlə etibarlı xidmət bir yerdə
             </div>
-            <h1 className="text-4xl font-bold tracking-tight text-balance sm:text-5xl lg:text-6xl">
+            <h1 className="text-3xl font-bold tracking-tight text-balance sm:text-5xl lg:text-6xl">
               Xidmətləri{' '}
               <span className="bg-gradient-to-r from-brand-dark to-brand bg-clip-text text-transparent">
                 kəşf edin
@@ -250,18 +103,18 @@ export function ServicesContent({ categories, services }: ServicesContentProps) 
           </div>
 
           {/* Stats */}
-          <div className="mx-auto mt-10 grid max-w-lg grid-cols-2 gap-4 sm:max-w-none sm:grid-cols-3">
-            <div className="rounded-xl border border-border/60 bg-card/60 px-5 py-4 text-center backdrop-blur-sm">
-              <p className="text-2xl font-bold text-brand-dark">{services.length}+</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Aktiv xidmət</p>
+          <div className="mx-auto mt-8 grid max-w-lg grid-cols-3 gap-3 sm:mt-10 sm:max-w-none sm:gap-4">
+            <div className="rounded-xl border border-border/60 bg-card/60 px-3 py-3 text-center backdrop-blur-sm sm:px-5 sm:py-4">
+              <p className="text-xl font-bold text-brand-dark sm:text-2xl">{services.length}+</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">Aktiv xidmət</p>
             </div>
-            <div className="rounded-xl border border-border/60 bg-card/60 px-5 py-4 text-center backdrop-blur-sm">
-              <p className="text-2xl font-bold text-brand-dark">{categories.length}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Kateqoriya</p>
+            <div className="rounded-xl border border-border/60 bg-card/60 px-3 py-3 text-center backdrop-blur-sm sm:px-5 sm:py-4">
+              <p className="text-xl font-bold text-brand-dark sm:text-2xl">{categories.length}</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">Kateqoriya</p>
             </div>
-            <div className="col-span-2 rounded-xl border border-border/60 bg-card/60 px-5 py-4 text-center backdrop-blur-sm sm:col-span-1">
-              <p className="text-2xl font-bold text-brand-dark">4.8 ★</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Orta reytinq</p>
+            <div className="rounded-xl border border-border/60 bg-card/60 px-3 py-3 text-center backdrop-blur-sm sm:px-5 sm:py-4">
+              <p className="text-xl font-bold text-brand-dark sm:text-2xl">4.8 ★</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">Orta reytinq</p>
             </div>
           </div>
         </div>
@@ -286,7 +139,7 @@ export function ServicesContent({ categories, services }: ServicesContentProps) 
             )}
           </div>
 
-          <div className="scrollbar-none -mx-4 mt-4 overflow-x-auto px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+          <div className="scrollbar-none scroll-hint-right -mx-4 mt-4 overflow-x-auto overscroll-x-contain px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
             <div className="flex w-max gap-2.5 pb-1">
               <button
                 type="button"
@@ -468,7 +321,7 @@ export function ServicesContent({ categories, services }: ServicesContentProps) 
       {/* CTA */}
       <section className="py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand via-brand to-brand-light px-8 py-12 text-center sm:px-16 sm:py-16">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand via-brand to-brand-light px-5 py-10 text-center sm:px-16 sm:py-16">
             <div
               aria-hidden
               className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/20 blur-2xl"
@@ -478,11 +331,11 @@ export function ServicesContent({ categories, services }: ServicesContentProps) 
               className="pointer-events-none absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-brand-foreground/10 blur-2xl"
             />
             <div className="relative">
-              <h2 className="text-3xl font-bold text-brand-foreground sm:text-4xl">
+              <h2 className="text-2xl font-bold text-brand-foreground sm:text-3xl lg:text-4xl">
                 Öz xidmətinizi təklif edin
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-brand-foreground/80">
-                Provider kimi qeydiyyatdan keçin, xidmətinizi əlavə edin və minlərlə
+                Xidmət verən kimi qeydiyyatdan keçin, xidmətinizi əlavə edin və minlərlə
                 potensial müştəriyə çatın.
               </p>
               <Link

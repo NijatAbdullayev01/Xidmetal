@@ -1,11 +1,15 @@
 'use client';
 
 import { useAuthStore } from '@/store/auth.store';
+import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 
-export function useAuthToken(): string {
-  const tokens = useAuthStore((state) => state.tokens);
-  if (!tokens?.accessToken) {
-    throw new Error('Autentifikasiya tələb olunur');
+export function useAuthToken(): string | null {
+  const hydrated = useAuthHydrated();
+  const accessToken = useAuthStore((state) => state.tokens?.accessToken ?? null);
+
+  if (!hydrated) {
+    return null;
   }
-  return tokens.accessToken;
+
+  return accessToken;
 }

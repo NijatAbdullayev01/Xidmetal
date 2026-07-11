@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../common/database/prisma.service';
 import { CreateServiceDto, UpdateServiceDto, ServiceQueryDto } from './dto';
 import { UserRole } from '@xidmetal/shared';
-import { ServiceStatus } from '@prisma/client';
+import { BookingStatus, ServiceStatus } from '@prisma/client';
 
 @Injectable()
 export class ServicesService {
@@ -31,13 +36,20 @@ export class ServicesService {
         orderBy: { createdAt: 'desc' },
         include: {
           category: { select: { id: true, name: true, slug: true } },
+          _count: { select: { bookings: true } },
         },
       }),
       this.prisma.service.count({ where }),
     ]);
 
     return {
-      items: items.map((service) => this.mapService({ ...service, provider: undefined })),
+      items: items.map((service) =>
+        this.mapService({
+          ...service,
+          provider: undefined,
+          bookingCount: service._count.bookings,
+        }),
+      ),
       total,
       page,
       limit,
@@ -141,6 +153,34 @@ export class ServicesService {
     return this.mapService({ ...updated, provider: undefined });
   }
 
+  async remove(id: string, userId: string, role: string) {
+    const service = await this.prisma.service.findUnique({ where: { id } });
+    if (!service) throw new NotFoundException('Xidmət tapılmadı');
+    if (service.providerId !== userId && role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Bu xidməti silmək icazəniz yoxdur');
+    }
+
+    const activeBookings = await this.prisma.booking.count({
+      where: {
+        serviceId: id,
+        status: {
+          in: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS],
+        },
+      },
+    });
+    if (activeBookings > 0) {
+      throw new ConflictException('Aktiv sifarişləri olan xidməti silmək olmaz');
+    }
+
+    const bookingCount = await this.prisma.booking.count({ where: { serviceId: id } });
+    if (bookingCount > 0) {
+      throw new ConflictException('Sifariş tarixçəsi olan xidməti silmək olmaz. Arxivləyin.');
+    }
+
+    await this.prisma.service.delete({ where: { id } });
+    return { message: 'Xidmət silindi' };
+  }
+
   private mapService(service: {
     id: string;
     title: string;
@@ -153,6 +193,7 @@ export class ServicesService {
     location: string | null;
     isRemote: boolean;
     createdAt: Date;
+    bookingCount?: number;
     category?: { id: string; name: string; slug?: string };
     provider?: {
       id: string;
@@ -182,6 +223,7 @@ export class ServicesService {
       location: service.location ?? undefined,
       isRemote: service.isRemote,
       createdAt: service.createdAt.toISOString(),
+      ...(service.bookingCount !== undefined && { bookingCount: service.bookingCount }),
     };
   }
 }

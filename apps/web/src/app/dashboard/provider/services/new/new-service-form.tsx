@@ -111,8 +111,12 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
   const values = watch();
 
   const createMutation = useMutation({
-    mutationFn: (data: ServiceFormValues) => api.createService(token, data),
+    mutationFn: (data: ServiceFormValues) => {
+      if (!token) throw new ApiError('Autentifikasiya tələb olunur', 401);
+      return api.createService(token, data);
+    },
     onSuccess: async (service) => {
+      if (!token) return;
       await api.updateService(token, service.id, { status: 'ACTIVE' });
       queryClient.invalidateQueries({ queryKey: ['services', 'mine'] });
       router.push('/dashboard/provider/services');

@@ -33,15 +33,18 @@ export default function ProviderBookingsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['bookings', activeTab],
     queryFn: () =>
-      api.bookings(token, {
+      api.bookings(token!, {
         limit: '50',
         ...(currentTab.status && { status: currentTab.status }),
       }),
+    enabled: !!token,
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: BookingStatus }) =>
-      api.updateBookingStatus(token, id, status),
+    mutationFn: ({ id, status }: { id: string; status: BookingStatus }) => {
+      if (!token) throw new Error('Autentifikasiya tələb olunur');
+      return api.updateBookingStatus(token, id, status);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       setActionId(null);

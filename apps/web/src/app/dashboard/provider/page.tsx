@@ -15,17 +15,20 @@ export default function ProviderOverviewPage() {
 
   const { data: profile } = useQuery({
     queryKey: ['users', 'me'],
-    queryFn: () => api.users.me(token),
+    queryFn: () => api.users.me(token!),
+    enabled: !!token,
   });
 
   const { data: services } = useQuery({
     queryKey: ['services', 'mine'],
-    queryFn: () => api.myServices(token, { limit: '100' }),
+    queryFn: () => api.myServices(token!, { limit: '100' }),
+    enabled: !!token,
   });
 
   const { data: bookings } = useQuery({
     queryKey: ['bookings', 'all'],
-    queryFn: () => api.bookings(token, { limit: '100' }),
+    queryFn: () => api.bookings(token!, { limit: '100' }),
+    enabled: !!token,
   });
 
   const activeServices = services?.items.filter((s) => s.status === ServiceStatus.ACTIVE).length ?? 0;
@@ -103,7 +106,7 @@ export default function ProviderOverviewPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>Son sifarişlər</CardTitle>
               <CardDescription>Ən son daxil olan sifarişlər</CardDescription>
@@ -137,7 +140,7 @@ export default function ProviderOverviewPage() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>Xidmətlərim</CardTitle>
               <CardDescription>Yaratdığınız xidmətlər</CardDescription>

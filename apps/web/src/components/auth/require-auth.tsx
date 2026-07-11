@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
+import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 
 interface RequireAuthProps {
   children: React.ReactNode;
@@ -12,7 +13,7 @@ interface RequireAuthProps {
 export function RequireAuth({ children }: RequireAuthProps) {
   const router = useRouter();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const hydrated = useAuthStore.persist.hasHydrated();
+  const hydrated = useAuthHydrated();
 
   useEffect(() => {
     if (hydrated && !isAuthenticated()) {

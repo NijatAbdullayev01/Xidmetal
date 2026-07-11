@@ -17,6 +17,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
+import { ProviderGuideHeroCta } from './provider-guide-hero-cta';
 
 export const metadata: Metadata = {
   title: 'Xidmət verən bələdçisi | Xidmetal',
@@ -187,15 +188,7 @@ export default function ProviderGuidePage() {
               Xidmetal-da xidmət verən kimi necə başlamaq, xidmət yaratmaq, sifarişləri
               idarə etmək və reytinqinizi artırmaq — hamısını addım-addım öyrənin.
             </p>
-            <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link href="/register?role=provider" className={buttonStyles('default', 'lg')}>
-                İndi qeydiyyatdan keç
-                <ArrowRight className="h-5 w-5" />
-              </Link>
-              <Link href="/dashboard/provider" className={buttonStyles('outline', 'lg')}>
-                Kabinetə keç
-              </Link>
-            </div>
+            <ProviderGuideHeroCta />
           </div>
         </div>
       </section>

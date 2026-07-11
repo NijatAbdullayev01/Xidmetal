@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PlusCircle, Loader2, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, Loader2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { ServiceStatus } from '@xidmetal/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button, buttonStyles } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { formatPrice, formatDate } from '@/lib/utils';
 import {
@@ -21,24 +21,61 @@ export default function MyServicesPage() {
   const token = useAuthToken();
   const queryClient = useQueryClient();
   const [actionId, setActionId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['services', 'mine'],
-    queryFn: () => api.myServices(token, { limit: '50' }),
+    queryFn: () => api.myServices(token!, { limit: '50' }),
+    enabled: !!token,
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: ServiceStatus }) =>
-      api.updateService(token, id, { status }),
+    mutationFn: ({ id, status }: { id: string; status: ServiceStatus }) => {
+      if (!token) throw new ApiError('Autentifikasiya tələb olunur', 401);
+      return api.updateService(token, id, { status });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services', 'mine'] });
       setActionId(null);
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => {
+      if (!token) throw new ApiError('Autentifikasiya tələb olunur', 401);
+      return api.deleteService(token, id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['services', 'mine'] });
+      setActionId(null);
+      setDeleteError(null);
+    },
+    onError: (error) => {
+      setActionId(null);
+      if (error instanceof ApiError) {
+        setDeleteError(error.message);
+      } else if (error instanceof Error) {
+        setDeleteError(error.message);
+      } else {
+        setDeleteError('Xidmət silinərkən xəta baş verdi');
+      }
+    },
+  });
+
   const handleStatusChange = (id: string, status: ServiceStatus) => {
     setActionId(id);
     updateMutation.mutate({ id, status });
+  };
+
+  const handleDelete = (id: string, title: string) => {
+    const confirmed = window.confirm(
+      `"${title}" xidmətini silmək istədiyinizə əminsiniz? Bu əməliyyat geri qaytarıla bilməz.`,
+    );
+    if (!confirmed) return;
+
+    setDeleteError(null);
+    setActionId(id);
+    deleteMutation.mutate(id);
   };
 
   return (
@@ -55,6 +92,12 @@ export default function MyServicesPage() {
           Yeni xidmət
         </Link>
       </div>
+
+      {deleteError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {deleteError}
+        </div>
+      )}
 
       {isLoading && (
         <div className="flex justify-center py-16">
@@ -74,7 +117,10 @@ export default function MyServicesPage() {
       )}
 
       <div className="grid gap-4">
-        {data?.items.map((service) => (
+        {data?.items.map((service) => {
+          const hasBookingHistory = (service.bookingCount ?? 0) > 0;
+
+          return (
           <Card key={service.id}>
             <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 flex-1">
@@ -97,6 +143,14 @@ export default function MyServicesPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/dashboard/provider/services/${service.id}/edit`}
+                  className={buttonStyles('outline', 'sm')}
+                  aria-label={`${service.title} xidmətini düzəliş et`}
+                >
+                  <Pencil className="h-4 w-4" />
+                  Düzəliş et
+                </Link>
                 {service.status === ServiceStatus.DRAFT && (
                   <Button
                     size="sm"
@@ -140,10 +194,30 @@ export default function MyServicesPage() {
                     Arxivlə
                   </Button>
                 )}
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={actionId === service.id || hasBookingHistory}
+                  title={
+                    hasBookingHistory
+                      ? 'Sifariş tarixçəsi olan xidmət silinə bilməz. Əvəzində arxivləyin.'
+                      : undefined
+                  }
+                  aria-label={`${service.title} xidmətini sil`}
+                  onClick={() => handleDelete(service.id, service.title)}
+                >
+                  {actionId === service.id && deleteMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Sil
+                </Button>
               </div>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -21,7 +21,11 @@ export function Logo({ className, priority = false, variant = 'brand' }: LogoPro
       height={LOGO_HEIGHT}
       quality={100}
       sizes="(max-width: 768px) 120px, 130px"
-      className={cn('block h-12 w-auto', className)}
+      className={cn(
+        'block h-12 w-auto',
+        variant === 'transparent' && 'dark:brightness-0 dark:invert',
+        className,
+      )}
       priority={priority}
     />
   );

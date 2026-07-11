@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/database/prisma.service';
 
 @Injectable()
@@ -23,9 +23,22 @@ export class CategoriesService {
   }
 
   async findBySlug(slug: string) {
-    return this.prisma.category.findUnique({
+    const category = await this.prisma.category.findUnique({
       where: { slug },
       include: { _count: { select: { services: true } } },
     });
+
+    if (!category || !category.isActive) {
+      throw new NotFoundException('Kateqoriya tapılmadı');
+    }
+
+    return {
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+      description: category.description ?? undefined,
+      icon: category.icon ?? undefined,
+      serviceCount: category._count.services,
+    };
   }
 }
