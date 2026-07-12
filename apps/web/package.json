@@ -25,6 +25,7 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
     "@tailwindcss/postcss": "^4.1.11",
     "@types/node": "^22.15.32",
     "@types/react": "^19.1.8",
@@ -33,6 +34,6 @@
     "eslint": "^9.29.0",
     "eslint-config-next": "^15.3.4",
     "tailwindcss": "^4.1.11",
-    "typescript": "^5.8.3"
+    "typescript": "^6.0.3"
   }
 }

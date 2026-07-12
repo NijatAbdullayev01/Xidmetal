@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createServiceSchema } from '@xidmetal/shared';
-import type { CategorySummary } from '@xidmetal/shared';
+import { createServiceSchema, PRICE_UNIT_VALUES, PriceUnit, ServiceVenue, requiresServiceVenue } from '@xidmetal/shared';
 import { z } from 'zod';
 import { ArrowLeft, Loader2, Save } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,26 +17,30 @@ import { Select } from '@/components/ui/select';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { useAuthStore } from '@/store/auth.store';
-import { PRICE_UNIT_LABELS } from '@/lib/provider-labels';
+import { PRICE_UNIT_LABELS, getPriceUnitsForCategorySlug } from '@/lib/provider-labels';
 import { formatPrice } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { getServiceTypesForCategory } from '@/lib/service-types';
+import { ServiceVenueSelector } from '@/components/services/service-venue-selector';
+import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 
 const editServiceFormSchema = createServiceSchema.extend({
-  priceUnit: z.enum(['FIXED', 'HOURLY', 'DAILY']),
+  priceUnit: z.enum(PRICE_UNIT_VALUES),
   isRemote: z.boolean(),
+  serviceVenue: z.nativeEnum(ServiceVenue).optional(),
 });
 
 type EditServiceFormValues = z.infer<typeof editServiceFormSchema>;
 
 interface EditServiceFormProps {
   serviceId: string;
-  categories: CategorySummary[];
 }
 
-export function EditServiceForm({ serviceId, categories }: EditServiceFormProps) {
+export function EditServiceForm({ serviceId }: EditServiceFormProps) {
   const router = useRouter();
   const token = useAuthToken();
   const userId = useAuthStore((state) => state.user?.id);
+  const hydrated = useAuthHydrated();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -47,7 +50,15 @@ export function EditServiceForm({ serviceId, categories }: EditServiceFormProps)
     error: loadError,
   } = useQuery({
     queryKey: ['services', serviceId],
-    queryFn: () => api.service(serviceId),
+    queryFn: () => api.service(serviceId, token ?? undefined),
+  });
+  const {
+    data: categories = [],
+    isLoading: categoriesLoading,
+    error: categoriesError,
+  } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => api.categories(),
   });
 
   const {
@@ -55,6 +66,9 @@ export function EditServiceForm({ serviceId, categories }: EditServiceFormProps)
     handleSubmit,
     reset,
     watch,
+    setValue,
+    setError,
+    clearErrors,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<EditServiceFormValues>({
     resolver: zodResolver(editServiceFormSchema),
@@ -63,9 +77,10 @@ export function EditServiceForm({ serviceId, categories }: EditServiceFormProps)
       description: '',
       categoryId: '',
       price: 0,
-      priceUnit: 'FIXED',
+      priceUnit: PriceUnit.FIXED,
       location: '',
       isRemote: false,
+      serviceVenue: undefined,
     },
   });
 
@@ -80,12 +95,14 @@ export function EditServiceForm({ serviceId, categories }: EditServiceFormProps)
       priceUnit: service.priceUnit as EditServiceFormValues['priceUnit'],
       location: service.location ?? '',
       isRemote: service.isRemote,
+      serviceVenue: service.serviceVenue as EditServiceFormValues['serviceVenue'],
     });
   }, [service, reset]);
 
   const updateMutation = useMutation({
     mutationFn: (data: EditServiceFormValues) => {
       if (!token) throw new ApiError('Autentifikasiya tələb olunur', 401);
+      const category = categories.find((cat) => cat.id === data.categoryId);
       return api.updateService(token, serviceId, {
         title: data.title,
         description: data.description,
@@ -94,6 +111,7 @@ export function EditServiceForm({ serviceId, categories }: EditServiceFormProps)
         priceUnit: data.priceUnit,
         location: data.location?.trim() || undefined,
         isRemote: data.isRemote,
+        serviceVenue: requiresServiceVenue(category?.slug) ? data.serviceVenue : undefined,
       });
     },
     onSuccess: () => {
@@ -111,18 +129,62 @@ export function EditServiceForm({ serviceId, categories }: EditServiceFormProps)
   });
 
   const onSubmit = (data: EditServiceFormValues) => {
+    if (requiresServiceVenue(selectedCategory?.slug) && !data.serviceVenue) {
+      setError('serviceVenue', { type: 'manual', message: 'Xidmət yerini seçin' });
+      return;
+    }
+    clearErrors('serviceVenue');
     setServerError(null);
     updateMutation.mutate(data);
   };
 
+  const categoryId = watch('categoryId');
+  const title = watch('title');
   const price = watch('price');
   const priceUnit = watch('priceUnit');
+  const selectedCategory = categories.find((cat) => cat.id === categoryId);
+  const serviceTypes = selectedCategory
+    ? getServiceTypesForCategory(selectedCategory.slug)
+    : undefined;
+  const serviceTypeOptions =
+    serviceTypes && title && !serviceTypes.includes(title)
+      ? [title, ...serviceTypes]
+      : serviceTypes;
+  const showServiceTypeField = !!categoryId;
+  const showServiceVenueField = requiresServiceVenue(selectedCategory?.slug);
+  const availablePriceUnits = getPriceUnitsForCategorySlug(selectedCategory?.slug);
+  const prevCategoryIdRef = useRef<string | null>(null);
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!categoryId) {
+      prevCategoryIdRef.current = null;
+      return;
+    }
+    if (prevCategoryIdRef.current !== null && prevCategoryIdRef.current !== categoryId) {
+      setValue('title', '', { shouldValidate: false, shouldDirty: true });
+      setValue('serviceVenue', undefined, { shouldValidate: false, shouldDirty: true });
+      if (priceUnit === PriceUnit.PER_SQM) {
+        setValue('priceUnit', PriceUnit.FIXED, { shouldValidate: false, shouldDirty: true });
+      }
+    }
+    prevCategoryIdRef.current = categoryId;
+  }, [categoryId, setValue, priceUnit]);
+
+  if (isLoading || categoriesLoading || !hydrated) {
     return (
       <div className="flex justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-brand" />
       </div>
+    );
+  }
+
+  if (categoriesError) {
+    return (
+      <Card>
+        <CardContent className="py-16 text-center text-muted-foreground">
+          Kateqoriyalar yüklənmədi. Səhifəni yeniləyin.
+        </CardContent>
+      </Card>
     );
   }
 
@@ -140,7 +202,7 @@ export function EditServiceForm({ serviceId, categories }: EditServiceFormProps)
     );
   }
 
-  if (userId && service.providerId !== userId) {
+  if (service.providerId !== userId) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
@@ -173,40 +235,11 @@ export function EditServiceForm({ serviceId, categories }: EditServiceFormProps)
         <CardHeader>
           <CardTitle>Xidmət məlumatları</CardTitle>
           <CardDescription>
-            Başlıq, təsvir, kateqoriya, qiymət və yer məlumatlarını dəyişdirin.
+            Xidmət növü, təsvir, kateqoriya, qiymət və yer məlumatlarını dəyişdirin.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
-            <div className="space-y-2">
-              <Label htmlFor="title">Başlıq</Label>
-              <Input
-                id="title"
-                placeholder="Məs: Ev təmiri xidməti"
-                error={!!errors.title}
-                disabled={isSubmitting}
-                {...register('title')}
-              />
-              {errors.title && (
-                <p className="text-sm text-destructive">{errors.title.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Təsvir</Label>
-              <Textarea
-                id="description"
-                placeholder="Xidmətiniz haqqında ətraflı məlumat yazın..."
-                className="min-h-[140px]"
-                error={!!errors.description}
-                disabled={isSubmitting}
-                {...register('description')}
-              />
-              {errors.description && (
-                <p className="text-sm text-destructive">{errors.description.message}</p>
-              )}
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="categoryId">Kateqoriya</Label>
               <Select
@@ -224,6 +257,74 @@ export function EditServiceForm({ serviceId, categories }: EditServiceFormProps)
               </Select>
               {errors.categoryId && (
                 <p className="text-sm text-destructive">{errors.categoryId.message}</p>
+              )}
+            </div>
+
+            {showServiceVenueField && (
+              <div className="space-y-2">
+                <Label>Xidmət yeri</Label>
+                <ServiceVenueSelector
+                  value={watch('serviceVenue')}
+                  onChange={(venue) => {
+                    setValue('serviceVenue', venue, { shouldValidate: true, shouldDirty: true });
+                    clearErrors('serviceVenue');
+                  }}
+                  disabled={isSubmitting}
+                  error={!!errors.serviceVenue}
+                />
+                {errors.serviceVenue && (
+                  <p className="text-sm text-destructive">{errors.serviceVenue.message}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Gözəllik xidməti üçün xidmətin ünvanda və ya salonda göstərildiyini seçin.
+                </p>
+              </div>
+            )}
+
+            {showServiceTypeField && (
+              <div className="space-y-2">
+                <Label htmlFor="title">Xidmətin növü</Label>
+                {serviceTypeOptions ? (
+                  <Select
+                    id="title"
+                    error={!!errors.title}
+                    disabled={isSubmitting}
+                    {...register('title')}
+                  >
+                    <option value="">Xidmət növünü seçin</option>
+                    {serviceTypeOptions.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </Select>
+                ) : (
+                  <Input
+                    id="title"
+                    placeholder="Məs: Ev təmiri xidməti"
+                    error={!!errors.title}
+                    disabled={isSubmitting}
+                    {...register('title')}
+                  />
+                )}
+                {errors.title && (
+                  <p className="text-sm text-destructive">{errors.title.message}</p>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Təsvir</Label>
+              <Textarea
+                id="description"
+                placeholder="Xidmətiniz haqqında ətraflı məlumat yazın..."
+                className="min-h-[140px]"
+                error={!!errors.description}
+                disabled={isSubmitting}
+                {...register('description')}
+              />
+              {errors.description && (
+                <p className="text-sm text-destructive">{errors.description.message}</p>
               )}
             </div>
 
@@ -248,9 +349,9 @@ export function EditServiceForm({ serviceId, categories }: EditServiceFormProps)
               <div className="space-y-2">
                 <Label htmlFor="priceUnit">Qiymət növü</Label>
                 <Select id="priceUnit" disabled={isSubmitting} {...register('priceUnit')}>
-                  {Object.entries(PRICE_UNIT_LABELS).map(([value, label]) => (
+                  {availablePriceUnits.map((value) => (
                     <option key={value} value={value}>
-                      {label}
+                      {PRICE_UNIT_LABELS[value]}
                     </option>
                   ))}
                 </Select>

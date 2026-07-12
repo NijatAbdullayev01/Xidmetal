@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { RegisterForm } from '@/components/auth/register-form';
 import { GuestOnly } from '@/components/auth/guest-only';
-import { AuthCloseButton } from '@/components/auth/auth-close-button';
+import { AuthPageShell } from '@/components/auth/auth-page-shell';
 import { parseRoleFromQuery } from '@/lib/auth';
 
 export const metadata: Metadata = {
@@ -18,24 +18,13 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
   const defaultRole = parseRoleFromQuery(params.role);
 
   return (
-    <section className="flex min-h-[100dvh] items-center justify-center bg-gradient-to-b from-brand/5 to-background px-4 py-8 safe-bottom sm:px-6 sm:py-12">
-      <div className="w-full max-w-lg">
-        <div className="relative rounded-2xl border border-border bg-card p-6 shadow-lg sm:p-8">
-          <AuthCloseButton />
-          <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Qeydiyyat</h1>
-            <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-              Hesab növünü seçin və məlumatlarınızı daxil edin
-            </p>
-          </div>
-
-          <div className="mt-8">
-            <GuestOnly>
-              <RegisterForm defaultRole={defaultRole} />
-            </GuestOnly>
-          </div>
-        </div>
-      </div>
-    </section>
+    <AuthPageShell
+      title="Qeydiyyat"
+      description="Hesab növünü seçin və məlumatlarınızı daxil edin"
+    >
+      <GuestOnly>
+        <RegisterForm defaultRole={defaultRole} />
+      </GuestOnly>
+    </AuthPageShell>
   );
 }

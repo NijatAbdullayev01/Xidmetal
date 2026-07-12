@@ -19,6 +19,7 @@ Bu layihə xidmət verənlərlə xidmət alanları birləşdirən marketplace pl
 4. **TypeScript strict** — `any` istifadə etmə
 5. **Error mesajları Azərbaycan dilində** olsun (user-facing)
 6. **Swagger decorator-ları** yeni API endpoint-lərə əlavə et
+7. **Responsivlik mütləqdir** — UI kodu yazılarkən mobil və desktop dizaynları düzgün yığılmalıdır
 
 ## Arxitektura
 
@@ -33,7 +34,7 @@ Bu layihə xidmət verənlərlə xidmət alanları birləşdirən marketplace pl
 - Server Components default, `'use client'` yalnız interaktiv UI üçün
 - Tailwind brend rəngləri: `bg-brand`, `text-brand-foreground`, `hover:bg-brand-dark`
 - State: Zustand (auth), TanStack Query (server data)
-- Responsive: mobile-first
+- **Responsivlik mütləqdir:** mobile-first (`sm:`, `md:`, `lg:`), mobil (~375px) və desktop (~1280px) görünüşlər düzgün yığılmalıdır; touch-friendly düymələr, overflow idarəsi, `max-w-*` ilə geniş ekran məhdudiyyəti
 
 ## Database
 

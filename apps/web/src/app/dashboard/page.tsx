@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserRole } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
 import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 import { getDashboardPath } from '@/lib/auth';
@@ -14,9 +13,8 @@ export default function DashboardPage() {
   const hydrated = useAuthHydrated();
 
   useEffect(() => {
-    if (hydrated && user) {
-      router.replace(getDashboardPath(user.role));
-    }
+    if (!hydrated) return;
+    router.replace(user ? getDashboardPath(user.role) : '/login');
   }, [hydrated, user, router]);
 
   return (

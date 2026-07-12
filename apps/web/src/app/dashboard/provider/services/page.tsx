@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PlusCircle, Loader2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { PlusCircle, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { ServiceStatus } from '@xidmetal/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button, buttonStyles } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { formatPrice, formatDate } from '@/lib/utils';
 import {
   SERVICE_STATUS_LABELS,
   SERVICE_STATUS_VARIANTS,
-  PRICE_UNIT_LABELS,
+  getPriceUnitLabel,
 } from '@/lib/provider-labels';
 import { useState } from 'react';
 
@@ -21,7 +21,7 @@ export default function MyServicesPage() {
   const token = useAuthToken();
   const queryClient = useQueryClient();
   const [actionId, setActionId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['services', 'mine'],
@@ -37,6 +37,15 @@ export default function MyServicesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services', 'mine'] });
       setActionId(null);
+      setActionError(null);
+    },
+    onError: (error) => {
+      setActionId(null);
+      if (error instanceof ApiError) {
+        setActionError(error.message);
+      } else {
+        setActionError('Status yenilənərkən xəta baş verdi');
+      }
     },
   });
 
@@ -48,32 +57,35 @@ export default function MyServicesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services', 'mine'] });
       setActionId(null);
-      setDeleteError(null);
+      setActionError(null);
     },
     onError: (error) => {
       setActionId(null);
       if (error instanceof ApiError) {
-        setDeleteError(error.message);
+        setActionError(error.message);
       } else if (error instanceof Error) {
-        setDeleteError(error.message);
+        setActionError(error.message);
       } else {
-        setDeleteError('Xidmət silinərkən xəta baş verdi');
+        setActionError('Xidmət silinərkən xəta baş verdi');
       }
     },
   });
 
   const handleStatusChange = (id: string, status: ServiceStatus) => {
+    setActionError(null);
     setActionId(id);
     updateMutation.mutate({ id, status });
   };
 
-  const handleDelete = (id: string, title: string) => {
-    const confirmed = window.confirm(
-      `"${title}" xidmətini silmək istədiyinizə əminsiniz? Bu əməliyyat geri qaytarıla bilməz.`,
-    );
+  const handleDelete = (id: string, title: string, hasBookingHistory: boolean) => {
+    const message = hasBookingHistory
+      ? `"${title}" xidmətini silmək istədiyinizə əminsiniz? Sifariş tarixçəsi saxlanılacaq və xidmət arxivlənəcək.`
+      : `"${title}" xidmətini silmək istədiyinizə əminsiniz? Bu əməliyyat geri qaytarıla bilməz.`;
+
+    const confirmed = window.confirm(message);
     if (!confirmed) return;
 
-    setDeleteError(null);
+    setActionError(null);
     setActionId(id);
     deleteMutation.mutate(id);
   };
@@ -93,9 +105,9 @@ export default function MyServicesPage() {
         </Link>
       </div>
 
-      {deleteError && (
+      {actionError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {deleteError}
+          {actionError}
         </div>
       )}
 
@@ -119,6 +131,7 @@ export default function MyServicesPage() {
       <div className="grid gap-4">
         {data?.items.map((service) => {
           const hasBookingHistory = (service.bookingCount ?? 0) > 0;
+          const hasActiveBookings = (service.activeBookingCount ?? 0) > 0;
 
           return (
           <Card key={service.id}>
@@ -136,7 +149,7 @@ export default function MyServicesPage() {
                 <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                   <span>{service.categoryName}</span>
                   <span>
-                    {formatPrice(service.price)} / {PRICE_UNIT_LABELS[service.priceUnit] ?? service.priceUnit}
+                    {formatPrice(service.price)} / {getPriceUnitLabel(service.priceUnit)}
                   </span>
                   <span>{formatDate(service.createdAt)}</span>
                 </div>
@@ -183,28 +196,17 @@ export default function MyServicesPage() {
                     Aktiv et
                   </Button>
                 )}
-                {service.status !== ServiceStatus.ARCHIVED && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={actionId === service.id}
-                    onClick={() => handleStatusChange(service.id, ServiceStatus.ARCHIVED)}
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                    Arxivlə
-                  </Button>
-                )}
                 <Button
                   size="sm"
                   variant="destructive"
-                  disabled={actionId === service.id || hasBookingHistory}
+                  disabled={actionId === service.id || hasActiveBookings}
                   title={
-                    hasBookingHistory
-                      ? 'Sifariş tarixçəsi olan xidmət silinə bilməz. Əvəzində arxivləyin.'
+                    hasActiveBookings
+                      ? 'Aktiv sifarişləri olan xidmət silinə bilməz.'
                       : undefined
                   }
                   aria-label={`${service.title} xidmətini sil`}
-                  onClick={() => handleDelete(service.id, service.title)}
+                  onClick={() => handleDelete(service.id, service.title, hasBookingHistory)}
                 >
                   {actionId === service.id && deleteMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

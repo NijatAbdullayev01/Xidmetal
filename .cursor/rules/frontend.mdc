@@ -27,9 +27,28 @@ src/
 
 ## Styling
 
-- Mobile-first responsive: `sm:`, `md:`, `lg:`
 - CSS variables: `globals.css` @theme block
 - Shadow/border: `border-border`, `bg-card`, `text-muted-foreground`
+
+## Responsivlik (mütləq)
+
+UI kodu yazılarkən responsivlik **vacib tələbdir** — mobil və desktop dizaynları düzgün yığılmalıdır.
+
+- **Mobile-first:** default mobil, sonra `sm:`, `md:`, `lg:`, `xl:` ilə genişləndir
+- **Layout:** grid/flex sütunları, sidebar və naviqasiya ekrana uyğun dəyişsin
+- **Touch:** mobil düymələr min `44×44px`; yalnız hover-a bağlı funksionallıq yox
+- **Overflow:** cədvəl/form/uzun mətn kiçik ekranda kəsilməsin
+- **Şəkillər:** `next/image` + `sizes` prop
+- **Yoxlama:** ~375px (mobil) və ~1280px (desktop) görünüşləri nəzərə al
+
+```tsx
+// ✅
+<div className="flex flex-col gap-4 md:flex-row md:gap-6">
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+
+// ❌ Sabit desktop layout
+<div className="w-[1200px] grid-cols-3">
+```
 
 ## API çağırışları
 

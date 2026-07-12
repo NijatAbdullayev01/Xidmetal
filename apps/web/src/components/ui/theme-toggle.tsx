@@ -5,7 +5,12 @@ import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
-export function ThemeToggle({ className }: { className?: string }) {
+type ThemeToggleProps = {
+  className?: string;
+  variant?: 'icon' | 'switch';
+};
+
+export function ThemeToggle({ className, variant = 'icon' }: ThemeToggleProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -14,6 +19,51 @@ export function ThemeToggle({ className }: { className?: string }) {
   }, []);
 
   const isDark = resolvedTheme === 'dark';
+
+  if (variant === 'switch') {
+    return (
+      <div
+        role="group"
+        aria-label="Tema seçimi"
+        className={cn(
+          'inline-flex h-9 overflow-hidden rounded-lg border border-border bg-muted/80 p-0.5 shadow-inner',
+          className,
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setTheme('light')}
+          className={cn(
+            'flex min-w-9 flex-1 items-center justify-center gap-1 rounded-md px-2 transition-all',
+            !isDark
+              ? 'bg-card text-brand-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+          aria-label="Gündüz rejimi"
+          aria-pressed={!isDark}
+          disabled={!mounted}
+        >
+          <Sun className={cn('h-4 w-4', !isDark && 'text-brand')} />
+        </button>
+        <div className="w-px shrink-0 self-stretch bg-border" aria-hidden="true" />
+        <button
+          type="button"
+          onClick={() => setTheme('dark')}
+          className={cn(
+            'flex min-w-9 flex-1 items-center justify-center gap-1 rounded-md px-2 transition-all',
+            isDark
+              ? 'bg-card text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+          aria-label="Gecə rejimi"
+          aria-pressed={isDark}
+          disabled={!mounted}
+        >
+          <Moon className={cn('h-4 w-4', isDark && 'text-brand')} />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <button

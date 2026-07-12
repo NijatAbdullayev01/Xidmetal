@@ -1,11 +1,15 @@
 {
-  "extends": "@xidmetal/typescript-config/nestjs.json",
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../packages/typescript-config/nestjs.json",
   "compilerOptions": {
     "baseUrl": "./",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@xidmetal/shared": ["../../packages/shared/src/index.ts"],
+      "@xidmetal/database": ["../../packages/database/src/index.ts"]
     },
-    "noEmit": true
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.tsbuildinfo"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

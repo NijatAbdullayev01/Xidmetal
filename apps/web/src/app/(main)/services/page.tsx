@@ -3,6 +3,8 @@ import type { CategorySummary, ServiceSummary } from '@xidmetal/shared';
 import { api } from '@/lib/api';
 import { ServicesContent } from './services-content';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Xidmətlər | Xidmetal',
   description:
@@ -16,7 +18,7 @@ async function loadServicesData(): Promise<{
   try {
     const [categories, servicesResponse] = await Promise.all([
       api.categories(),
-      api.services({ limit: '50' }),
+      api.services({ limit: '100' }),
     ]);
 
     return {

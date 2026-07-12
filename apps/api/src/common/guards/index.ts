@@ -35,6 +35,18 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 }
 
+/**
+ * JWT olsa istifadəçini `request.user`-ə əlavə edir, olmasa və ya etibarsız
+ * olsa belə sorğunu rədd etmir (asılı endpoint özü icazəni yoxlayır).
+ * Məs: `GET /services/:id` — həm qonaqlar, həm də sahibi/admin üçün açıqdır.
+ */
+@Injectable()
+export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
+  override handleRequest<T>(_err: unknown, user: T | false): T | null {
+    return (user || null) as T | null;
+  }
+}
+
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(@Inject(Reflector) private reflector: Reflector) {}

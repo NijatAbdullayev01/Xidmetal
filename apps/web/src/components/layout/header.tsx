@@ -7,11 +7,13 @@ import { buttonStyles } from '@/components/ui/button';
 import { getDashboardPath } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
+import { useLogout } from '@/hooks/use-logout';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 export function Header() {
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
+  const logout = useLogout();
 
   const profileHref = isAuthenticated()
     ? user

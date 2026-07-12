@@ -9,31 +9,67 @@ import {
   ClipboardList,
   MessageSquare,
   Star,
+  Settings,
   LogOut,
   Menu,
   X,
   ArrowLeft,
+  Search,
+  type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { UserRole } from '@xidmetal/shared';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth.store';
+import { useLogout } from '@/hooks/use-logout';
 import { cn } from '@/lib/utils';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
 
-const navItems = [
+type DashboardVariant = 'provider' | 'customer';
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  exact?: boolean;
+}
+
+const PROVIDER_NAV: NavItem[] = [
   { href: '/dashboard/provider', label: 'İcmal', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/provider/services/new', label: 'Xidmət ver', icon: PlusCircle },
   { href: '/dashboard/provider/services', label: 'Xidmətlərim', icon: Briefcase },
   { href: '/dashboard/provider/bookings', label: 'Sifarişlər', icon: ClipboardList },
   { href: '/dashboard/provider/messages', label: 'Mesajlarım', icon: MessageSquare },
   { href: '/dashboard/provider/ratings', label: 'Reytinq', icon: Star },
+  { href: '/dashboard/provider/settings', label: 'Tənzimləmələr', icon: Settings },
 ];
 
-export function DashboardSidebar() {
+const CUSTOMER_NAV: NavItem[] = [
+  { href: '/dashboard/customer', label: 'İcmal', icon: LayoutDashboard, exact: true },
+  { href: '/dashboard/customer/bookings', label: 'Sifarişlərim', icon: ClipboardList },
+  { href: '/dashboard/customer/messages', label: 'Mesajlarım', icon: MessageSquare },
+  { href: '/', label: 'Xidmət tap', icon: Search },
+  { href: '/dashboard/customer/settings', label: 'Tənzimləmələr', icon: Settings },
+];
+
+const ROLE_LABELS: Record<DashboardVariant, string> = {
+  provider: 'Xidmət verən',
+  customer: 'İstifadəçi',
+};
+
+interface DashboardSidebarProps {
+  variant: DashboardVariant;
+}
+
+export function DashboardSidebar({ variant }: DashboardSidebarProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, logout } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
+  const logout = useLogout();
+
+  const navItems = variant === 'provider' ? PROVIDER_NAV : CUSTOMER_NAV;
+  const roleLabel = ROLE_LABELS[variant];
 
   useScrollLock(mobileOpen);
 
@@ -42,6 +78,24 @@ export function DashboardSidebar() {
   }, [pathname]);
 
   const closeMobile = () => setMobileOpen(false);
+
+  const userAvatar = (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand/20 text-sm font-semibold text-brand-foreground">
+      {user?.avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={user.avatarUrl}
+          alt={`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <>
+          {user?.firstName?.[0]}
+          {user?.lastName?.[0]}
+        </>
+      )}
+    </div>
+  );
 
   const activeHref = navItems.reduce<string | null>((best, item) => {
     const matches = item.exact
@@ -81,15 +135,12 @@ export function DashboardSidebar() {
   const mobileUserBlock = (
     <div className="border-t border-border p-4 safe-bottom">
       <div className="mb-3 flex items-center gap-3 rounded-lg bg-muted px-3 py-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand/20 text-sm font-semibold text-brand-foreground">
-          {user?.firstName?.[0]}
-          {user?.lastName?.[0]}
-        </div>
+        {userAvatar}
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">
             {user?.firstName} {user?.lastName}
           </p>
-          <p className="text-xs text-muted-foreground">Xidmət verən</p>
+          <p className="text-xs text-muted-foreground">{roleLabel}</p>
         </div>
       </div>
       <Button
@@ -118,7 +169,7 @@ export function DashboardSidebar() {
           <span className="sm:inline">Geri qayıt</span>
         </Link>
         <div className="flex items-center gap-1">
-          <ThemeToggle />
+          <ThemeToggle variant="switch" />
           <button
             type="button"
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -150,28 +201,29 @@ export function DashboardSidebar() {
         </>
       )}
 
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-card lg:flex">
-        <div className="flex h-16 items-center border-b border-border px-4">
+      <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-border bg-card lg:flex lg:h-[100dvh] lg:overflow-hidden">
+        <div className="flex h-16 items-center justify-between gap-2 border-b border-border px-4">
           <Link
             href="/"
-            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Geri qayıt
+            <ArrowLeft className="h-4 w-4 shrink-0" />
+            <span className="truncate">Geri qayıt</span>
           </Link>
+          <ThemeToggle variant="switch" className="shrink-0" />
         </div>
 
         {navContent}
 
         <div className="mt-auto border-t border-border p-4">
-          <div className="mb-3 flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2">
+          <div className="mb-3 flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
+            {userAvatar}
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">
                 {user?.firstName} {user?.lastName}
               </p>
-              <p className="text-xs text-muted-foreground">Xidmət verən</p>
+              <p className="text-xs text-muted-foreground">{roleLabel}</p>
             </div>
-            <ThemeToggle />
           </div>
           <Button variant="outline" size="sm" className="w-full" onClick={logout}>
             <LogOut className="h-4 w-4" />
@@ -181,4 +233,8 @@ export function DashboardSidebar() {
       </aside>
     </>
   );
+}
+
+export function getDashboardVariant(role: UserRole): DashboardVariant {
+  return role === UserRole.PROVIDER ? 'provider' : 'customer';
 }

@@ -4,6 +4,7 @@
   "private": true,
   "description": "Xidmət verənlərlə xidmət alanları bir araya gətirən platforma",
   "scripts": {
+    "predev": "pnpm db:generate",
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
@@ -19,7 +20,7 @@
   "devDependencies": {
     "prettier": "^3.5.3",
     "turbo": "^2.5.4",
-    "typescript": "^5.8.3"
+    "typescript": "^6.0.3"
   },
   "packageManager": "pnpm@9.2.0",
   "engines": {

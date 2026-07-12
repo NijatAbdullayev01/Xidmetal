@@ -49,7 +49,8 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
     setServerError(null);
 
     try {
-      const { confirmPassword: _, phone, ...rest } = values;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { confirmPassword: _confirmPassword, phone, ...rest } = values;
       const payload = {
         ...rest,
         phone: phone?.trim() || undefined,
@@ -69,8 +70,8 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
-      <div className="space-y-3">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 sm:space-y-4 lg:space-y-6" noValidate>
+      <div className="space-y-2.5 sm:space-y-3">
         <Label>Hesab növü</Label>
         <Controller
           name="role"
@@ -90,8 +91,8 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
+      <div className="grid grid-cols-1 gap-3 min-w-0 sm:grid-cols-2 sm:gap-4">
+        <div className="min-w-0 space-y-2">
           <Label htmlFor="firstName">Ad</Label>
           <Input
             id="firstName"
@@ -108,7 +109,7 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           <Label htmlFor="lastName">Soyad</Label>
           <Input
             id="lastName"

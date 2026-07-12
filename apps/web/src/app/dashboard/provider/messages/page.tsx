@@ -1,7 +1,7 @@
 'use client';
 
-import { MessageSquare } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { UserRole } from '@xidmetal/shared';
+import { MessagesPanel } from '@/components/messages/messages-panel';
 
 export default function ProviderMessagesPage() {
   return (
@@ -12,18 +12,7 @@ export default function ProviderMessagesPage() {
           Müştərilərlə yazışmalarınızı buradan idarə edin.
         </p>
       </div>
-
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-brand/15">
-            <MessageSquare className="h-7 w-7 text-brand" />
-          </div>
-          <p className="font-medium">Hələ mesaj yoxdur</p>
-          <p className="max-w-sm text-sm text-muted-foreground">
-            Müştərilər sizinlə əlaqə saxladıqda yazışmalar burada görünəcək.
-          </p>
-        </CardContent>
-      </Card>
+      <MessagesPanel role={UserRole.PROVIDER} />
     </div>
   );
 }

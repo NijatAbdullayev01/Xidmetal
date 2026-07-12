@@ -24,6 +24,7 @@ Monorepo: `apps/web` (Next.js 15), `apps/api` (NestJS 11), `packages/shared`, `p
 - Shared types/schemas: `@xidmetal/shared` package-dən import et
 - Backend: Controller → Service → Prisma pattern
 - Frontend: Server Components default, client yalnız interaktiv UI
+- Frontend responsivlik **mütləqdir** — kod yazılarkən mobil və desktop görünüşlər düzgün yığılmalıdır (mobile-first Tailwind)
 - Minimal diff — yalnız tələb olunan dəyişikliklər
 
 ## API

@@ -3,6 +3,8 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
+import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
+import { getDashboardPath } from '@/lib/auth';
 
 interface GuestOnlyProps {
   children: React.ReactNode;
@@ -10,15 +12,19 @@ interface GuestOnlyProps {
 
 export function GuestOnly({ children }: GuestOnlyProps) {
   const router = useRouter();
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  // `tokens` birbaşa seçilir — `isAuthenticated()` funksiya referansı sabit
+  // olduğu üçün Zustand state dəyişikliyini aşkarlaya bilmirdi.
+  const isAuthenticated = useAuthStore((state) => !!state.tokens?.accessToken);
+  const user = useAuthStore((state) => state.user);
+  const hydrated = useAuthHydrated();
 
   useEffect(() => {
-    if (isAuthenticated()) {
-      router.replace('/');
+    if (hydrated && isAuthenticated) {
+      router.replace(user ? getDashboardPath(user.role) : '/');
     }
-  }, [isAuthenticated, router]);
+  }, [hydrated, isAuthenticated, user, router]);
 
-  if (isAuthenticated()) {
+  if (!hydrated || isAuthenticated) {
     return null;
   }
 

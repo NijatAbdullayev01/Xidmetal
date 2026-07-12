@@ -3,9 +3,12 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/database/prisma.service';
 import { RegisterDto, LoginDto } from './dto';
 import { UserRole } from '@xidmetal/shared';
+
+const UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
 
 @Injectable()
 export class AuthService {
@@ -28,19 +31,30 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        passwordHash,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        phone: dto.phone,
-        role,
-        ...(role === UserRole.PROVIDER && {
-          providerProfile: { create: {} },
-        }),
-      },
-    });
+    let user;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          email: dto.email,
+          passwordHash,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          phone: dto.phone,
+          role,
+          ...(role === UserRole.PROVIDER && {
+            providerProfile: { create: {} },
+          }),
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === UNIQUE_CONSTRAINT_VIOLATION
+      ) {
+        throw new ConflictException('Bu e-mail artıq qeydiyyatdan keçib');
+      }
+      throw error;
+    }
 
     const tokens = await this.generateTokens(user.id, user.email, user.role);
     return { user: this.sanitizeUser(user), tokens };
@@ -64,14 +78,39 @@ export class AuthService {
   async refresh(refreshToken: string) {
     const stored = await this.prisma.refreshToken.findUnique({
       where: { token: refreshToken },
-      include: { user: true },
+      select: {
+        id: true,
+        expiresAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            avatarUrl: true,
+            role: true,
+            isVerified: true,
+            isActive: true,
+            createdAt: true,
+          },
+        },
+      },
     });
 
-    if (!stored || stored.expiresAt < new Date()) {
+    if (!stored || stored.expiresAt < new Date() || !stored.user.isActive) {
       throw new UnauthorizedException('Refresh token etibarsızdır');
     }
 
-    await this.prisma.refreshToken.delete({ where: { id: stored.id } });
+    // Atomic silinmə: eyni token ilə paralel refresh sorğularının hər ikisinin
+    // yeni token cütlüyü yaratmasının (token reuse) qarşısını alır.
+    const { count } = await this.prisma.refreshToken.deleteMany({
+      where: { id: stored.id, token: refreshToken },
+    });
+    if (count === 0) {
+      throw new UnauthorizedException('Refresh token etibarsızdır');
+    }
+
     const tokens = await this.generateTokens(
       stored.user.id,
       stored.user.email,

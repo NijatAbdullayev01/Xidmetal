@@ -20,9 +20,9 @@ export function Logo({ className, priority = false, variant = 'brand' }: LogoPro
       width={LOGO_WIDTH}
       height={LOGO_HEIGHT}
       quality={100}
-      sizes="(max-width: 768px) 120px, 130px"
+      sizes="(max-width: 768px) 140px, 150px"
       className={cn(
-        'block h-12 w-auto',
+        'block h-14 w-auto',
         variant === 'transparent' && 'dark:brightness-0 dark:invert',
         className,
       )}

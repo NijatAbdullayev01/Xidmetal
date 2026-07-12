@@ -4,6 +4,8 @@ import type { CategorySummary, ServiceSummary } from '@xidmetal/shared';
 import { api, ApiError } from '@/lib/api';
 import { CategoryContent } from './category-content';
 
+export const dynamic = 'force-dynamic';
+
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
 }

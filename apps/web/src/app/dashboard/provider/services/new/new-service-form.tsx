@@ -3,9 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createServiceSchema } from '@xidmetal/shared';
-import type { CategorySummary } from '@xidmetal/shared';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createServiceSchema, PRICE_UNIT_VALUES, PriceUnit, ServiceVenue, requiresServiceVenue, SERVICE_VENUE_LABELS } from '@xidmetal/shared';
 import { z } from 'zod';
 import {
   ArrowLeft,
@@ -16,7 +15,6 @@ import {
   Loader2,
   MapPin,
   Sparkles,
-  Tag,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,13 +25,21 @@ import { Select } from '@/components/ui/select';
 import { Stepper, type StepItem } from '@/components/ui/stepper';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
-import { PRICE_UNIT_LABELS } from '@/lib/provider-labels';
+import { PRICE_UNIT_LABELS, getPriceUnitsForCategorySlug } from '@/lib/provider-labels';
 import { formatPrice } from '@/lib/utils';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { getServiceTypesForCategory } from '@/lib/service-types';
+import { ServiceVenueSelector } from '@/components/services/service-venue-selector';
 
 const serviceFormSchema = createServiceSchema.extend({
-  priceUnit: z.enum(['FIXED', 'HOURLY', 'DAILY']),
+  priceUnit: z.enum(PRICE_UNIT_VALUES),
   isRemote: z.boolean(),
+  serviceVenue: z.nativeEnum(ServiceVenue).optional(),
+  experience: z
+    .number({ invalid_type_error: 'Təcrübə müddətini daxil edin' })
+    .int('Təcrübə tam rəqəm olmalıdır')
+    .min(1, 'Təcrübə minimum 1 il olmalıdır')
+    .max(50, 'Təcrübə maksimum 50 il ola bilər'),
 });
 
 type ServiceFormValues = z.infer<typeof serviceFormSchema>;
@@ -42,51 +48,49 @@ const STEPS: StepItem[] = [
   {
     id: 1,
     title: 'Əsas məlumat',
-    description: 'Xidmətinizin adı və təsviri',
+    description: 'Kateqoriya, növ, təcrübə və təsvir',
     icon: FileText,
   },
   {
     id: 2,
-    title: 'Kateqoriya',
-    description: 'Uyğun kateqoriya seçin',
-    icon: Tag,
-  },
-  {
-    id: 3,
     title: 'Qiymət',
     description: 'Qiymət və ödəniş növü',
     icon: Briefcase,
   },
   {
-    id: 4,
+    id: 3,
     title: 'Yer',
     description: 'Xidmət ərazisi',
     icon: MapPin,
   },
   {
-    id: 5,
+    id: 4,
     title: 'Yekun',
-    description: 'Yoxlayın və dərc edin',
+    description: 'Yoxlayın və təsdiq edin',
     icon: Sparkles,
   },
 ];
 
 const STEP_FIELDS: Record<number, (keyof ServiceFormValues)[]> = {
-  1: ['title', 'description'],
-  2: ['categoryId'],
-  3: ['price', 'priceUnit'],
-  4: [],
+  1: ['categoryId', 'title', 'experience', 'description'],
+  2: ['price', 'priceUnit'],
+  3: [],
 };
 
-interface NewServiceFormProps {
-  categories: CategorySummary[];
-}
-
-export function NewServiceForm({ categories }: NewServiceFormProps) {
+export function NewServiceForm() {
   const router = useRouter();
   const token = useAuthToken();
   const queryClient = useQueryClient();
+  const {
+    data: categories = [],
+    isLoading: categoriesLoading,
+    error: categoriesError,
+  } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => api.categories(),
+  });
   const [currentStep, setCurrentStep] = useState(1);
+  const [isConfirmed, setIsConfirmed] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
   const {
@@ -94,7 +98,10 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
     handleSubmit,
     trigger,
     watch,
-    formState: { errors, isSubmitting },
+    setValue,
+    setError,
+    clearErrors,
+    formState: { errors },
   } = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceFormSchema),
     defaultValues: {
@@ -102,23 +109,36 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
       description: '',
       categoryId: '',
       price: 0,
-      priceUnit: 'FIXED',
+      priceUnit: PriceUnit.FIXED,
       location: '',
       isRemote: false,
+      serviceVenue: undefined,
+      experience: undefined,
     },
   });
 
   const values = watch();
 
   const createMutation = useMutation({
-    mutationFn: (data: ServiceFormValues) => {
+    mutationFn: async (data: ServiceFormValues) => {
       if (!token) throw new ApiError('Autentifikasiya tələb olunur', 401);
-      return api.createService(token, data);
+      const category = categories.find((cat) => cat.id === data.categoryId);
+      await api.users.updateProfile(token, { experience: data.experience });
+      const service = await api.createService(token, {
+        title: data.title,
+        description: data.description,
+        categoryId: data.categoryId,
+        price: Number(data.price),
+        priceUnit: data.priceUnit,
+        location: data.location?.trim() || undefined,
+        isRemote: data.isRemote,
+        serviceVenue: requiresServiceVenue(category?.slug) ? data.serviceVenue : undefined,
+      });
+      return api.updateService(token, service.id, { status: 'ACTIVE' });
     },
-    onSuccess: async (service) => {
-      if (!token) return;
-      await api.updateService(token, service.id, { status: 'ACTIVE' });
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services', 'mine'] });
+      queryClient.invalidateQueries({ queryKey: ['users', 'me'] });
       router.push('/dashboard/provider/services');
     },
     onError: (error) => {
@@ -130,13 +150,12 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
     },
   });
 
+  const isSaving = createMutation.isPending;
+
   const onSubmit = (data: ServiceFormValues) => {
+    if (!isConfirmed || isSaving) return;
     setServerError(null);
-    createMutation.mutate({
-      ...data,
-      price: Number(data.price),
-      location: data.location?.trim() || undefined,
-    });
+    createMutation.mutate(data);
   };
 
   const goNext = async () => {
@@ -145,7 +164,22 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
       const valid = await trigger(fields);
       if (!valid) return;
     }
-    setCurrentStep((prev) => Math.min(prev + 1, STEPS.length));
+
+    if (
+      currentStep === 1 &&
+      requiresServiceVenue(selectedCategory?.slug) &&
+      !values.serviceVenue
+    ) {
+      setError('serviceVenue', { type: 'manual', message: 'Xidmət yerini seçin' });
+      return;
+    }
+    clearErrors('serviceVenue');
+
+    setCurrentStep((prev) => {
+      const next = Math.min(prev + 1, STEPS.length);
+      if (next === STEPS.length) setIsConfirmed(false);
+      return next;
+    });
   };
 
   const goBack = () => {
@@ -153,11 +187,53 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
       router.back();
       return;
     }
+    setIsConfirmed(false);
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
   const selectedCategory = categories.find((cat) => cat.id === values.categoryId);
+  const showServiceVenueField = requiresServiceVenue(selectedCategory?.slug);
+  const serviceTypes = selectedCategory
+    ? getServiceTypesForCategory(selectedCategory.slug)
+    : undefined;
+  const showServiceTypeField = !!values.categoryId;
+  const availablePriceUnits = getPriceUnitsForCategorySlug(selectedCategory?.slug);
   const currentStepMeta = STEPS[currentStep - 1];
+
+  const prevCategoryIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const categoryId = selectedCategory?.id ?? null;
+    if (!categoryId) {
+      prevCategoryIdRef.current = null;
+      return;
+    }
+    if (prevCategoryIdRef.current !== null && prevCategoryIdRef.current !== categoryId) {
+      setValue('title', '', { shouldValidate: false });
+      setValue('serviceVenue', undefined, { shouldValidate: false });
+      if (values.priceUnit === PriceUnit.PER_SQM) {
+        setValue('priceUnit', PriceUnit.FIXED, { shouldValidate: false });
+      }
+    }
+    prevCategoryIdRef.current = categoryId;
+  }, [selectedCategory?.id, setValue, values.priceUnit]);
+
+  if (categoriesLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-brand" />
+      </div>
+    );
+  }
+
+  if (categoriesError) {
+    return (
+      <Card>
+        <CardContent className="py-16 text-center text-muted-foreground">
+          Kateqoriyalar yüklənmədi. Səhifəni yeniləyin.
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="w-full space-y-8">
@@ -170,8 +246,8 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
         <div className="relative">
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Xidmət ver</h1>
           <p className="mt-2 max-w-xl text-muted-foreground">
-            Addım-addım formu doldurun və xidmətinizi müştərilərə təqdim edin. Yaradıldıqdan
-            sonra avtomatik aktiv olacaq.
+            Addım-addım formu doldurun, son addımda məlumatları yoxlayın və xidmətinizi
+            təsdiqləyərək dərc edin.
           </p>
         </div>
       </div>
@@ -205,51 +281,11 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
             {currentStep === 1 && (
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="title">Başlıq</Label>
-                  <Input
-                    id="title"
-                    placeholder="Məs: Ev təmiri xidməti"
-                    error={!!errors.title}
-                    disabled={isSubmitting}
-                    {...register('title')}
-                  />
-                  {errors.title && (
-                    <p className="text-sm text-destructive">{errors.title.message}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Qısa və aydın başlıq müştərilərin diqqətini cəlb edir.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Təsvir</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Xidmətiniz haqqında ətraflı məlumat yazın..."
-                    className="min-h-[140px]"
-                    error={!!errors.description}
-                    disabled={isSubmitting}
-                    {...register('description')}
-                  />
-                  {errors.description && (
-                    <p className="text-sm text-destructive">{errors.description.message}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Nə təklif etdiyinizi, təcrübənizi və üstünlüklərinizi qeyd edin.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Addım 2: Kateqoriya */}
-            {currentStep === 2 && (
-              <div className="space-y-5">
-                <div className="space-y-2">
                   <Label htmlFor="categoryId">Kateqoriya</Label>
                   <Select
                     id="categoryId"
                     error={!!errors.categoryId}
-                    disabled={isSubmitting}
+                    disabled={isSaving}
                     {...register('categoryId')}
                   >
                     <option value="">Kateqoriya seçin</option>
@@ -262,20 +298,114 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
                   {errors.categoryId && (
                     <p className="text-sm text-destructive">{errors.categoryId.message}</p>
                   )}
-                </div>
-
-                <div className="rounded-xl border border-dashed border-brand/30 bg-brand/5 p-4">
-                  <p className="text-sm font-medium text-brand-foreground">Məsləhət</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Düzgün kateqoriya seçimi xidmətinizin axtarış nəticələrində daha yaxşı
                     görünməsinə kömək edir.
+                  </p>
+                </div>
+
+                {showServiceVenueField && (
+                  <div className="space-y-2">
+                    <Label>Xidmət yeri</Label>
+                    <ServiceVenueSelector
+                      value={values.serviceVenue}
+                      onChange={(venue) => {
+                        setValue('serviceVenue', venue, { shouldValidate: true });
+                        clearErrors('serviceVenue');
+                      }}
+                      disabled={isSaving}
+                      error={!!errors.serviceVenue}
+                    />
+                    {errors.serviceVenue && (
+                      <p className="text-sm text-destructive">{errors.serviceVenue.message}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Gözəllik xidməti üçün xidmətin ünvanda və ya salonda göstərildiyini seçin.
+                    </p>
+                  </div>
+                )}
+
+                {showServiceTypeField && (
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Xidmətin növü</Label>
+                    {serviceTypes ? (
+                      <Select
+                        id="title"
+                        error={!!errors.title}
+                        disabled={isSaving}
+                        {...register('title')}
+                      >
+                        <option value="">Xidmət növünü seçin</option>
+                        {serviceTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {type}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <Input
+                        id="title"
+                        placeholder="Məs: Ev təmiri xidməti"
+                        error={!!errors.title}
+                        disabled={isSaving}
+                        {...register('title')}
+                      />
+                    )}
+                    {errors.title && (
+                      <p className="text-sm text-destructive">{errors.title.message}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {serviceTypes
+                        ? 'Təklif etdiyiniz xidmət növünü seçin.'
+                        : 'Qısa və aydın xidmət növü müştərilərin diqqətini cəlb edir.'}
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="experience">Təcrübə (il)</Label>
+                  <Input
+                    id="experience"
+                    type="number"
+                    min="1"
+                    max="50"
+                    step="1"
+                    placeholder="5"
+                    autoComplete="off"
+                    error={!!errors.experience}
+                    disabled={isSaving}
+                    {...register('experience', { valueAsNumber: true })}
+                  />
+                  {errors.experience && (
+                    <p className="text-sm text-destructive">{errors.experience.message}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Bu sahədə xidmət göstərdiyiniz sahədə neçə illik təcrübəniz olduğunu qeyd edin.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Təsvir</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Xidmətiniz haqqında ətraflı məlumat yazın..."
+                    className="min-h-[140px]"
+                    error={!!errors.description}
+                    disabled={isSaving}
+                    {...register('description')}
+                  />
+                  {errors.description && (
+                    <p className="text-sm text-destructive">{errors.description.message}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Nə təklif etdiyinizi və üstünlüklərinizi qeyd edin.
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Addım 3: Qiymət */}
-            {currentStep === 3 && (
+            {/* Addım 2: Qiymət */}
+            {currentStep === 2 && (
               <div className="space-y-5">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
@@ -287,7 +417,7 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
                       step="0.01"
                       placeholder="50"
                       error={!!errors.price}
-                      disabled={isSubmitting}
+                      disabled={isSaving}
                       {...register('price', { valueAsNumber: true })}
                     />
                     {errors.price && (
@@ -299,12 +429,12 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
                     <Label htmlFor="priceUnit">Qiymət növü</Label>
                     <Select
                       id="priceUnit"
-                      disabled={isSubmitting}
+                      disabled={isSaving}
                       {...register('priceUnit')}
                     >
-                      {Object.entries(PRICE_UNIT_LABELS).map(([value, label]) => (
+                      {availablePriceUnits.map((value) => (
                         <option key={value} value={value}>
-                          {label}
+                          {PRICE_UNIT_LABELS[value]}
                         </option>
                       ))}
                     </Select>
@@ -325,15 +455,15 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
               </div>
             )}
 
-            {/* Addım 4: Yer */}
-            {currentStep === 4 && (
+            {/* Addım 3: Yer */}
+            {currentStep === 3 && (
               <div className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="location">Ünvan (istəyə bağlı)</Label>
                   <Input
                     id="location"
                     placeholder="Bakı, Nəsimi rayonu"
-                    disabled={isSubmitting}
+                    disabled={isSaving}
                     {...register('location')}
                   />
                   <p className="text-xs text-muted-foreground">
@@ -345,7 +475,7 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
                   <input
                     type="checkbox"
                     className="mt-0.5 h-4 w-4 rounded border-border accent-brand"
-                    disabled={isSubmitting}
+                    disabled={isSaving}
                     {...register('isRemote')}
                   />
                   <div>
@@ -358,23 +488,30 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
               </div>
             )}
 
-            {/* Addım 5: Yekun */}
-            {currentStep === 5 && (
+            {/* Addım 4: Yekun */}
+            {currentStep === 4 && (
               <div className="space-y-5">
                 <div className="rounded-xl border border-brand/20 bg-gradient-to-br from-brand/10 to-transparent p-5">
                   <div className="flex items-center gap-2 text-brand-dark">
                     <CheckCircle2 className="h-5 w-5" />
-                    <p className="font-semibold">Xidmətiniz hazırdır!</p>
+                    <p className="font-semibold">Son yoxlama</p>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Aşağıdakı məlumatları yoxlayın. Hər şey düzgündürsə, xidməti yaradın.
+                    Aşağıdakı məlumatları diqqətlə yoxlayın. Dərc etmək üçün məlumatların
+                    düzgünlüyünü təsdiq etməlisiniz.
                   </p>
                 </div>
 
                 <dl className="divide-y divide-border rounded-xl border border-border">
                   <div className="grid gap-1 p-4 sm:grid-cols-3">
-                    <dt className="text-sm font-medium text-muted-foreground">Başlıq</dt>
+                    <dt className="text-sm font-medium text-muted-foreground">Xidmətin növü</dt>
                     <dd className="text-sm font-medium sm:col-span-2">{values.title}</dd>
+                  </div>
+                  <div className="grid gap-1 p-4 sm:grid-cols-3">
+                    <dt className="text-sm font-medium text-muted-foreground">Təcrübə</dt>
+                    <dd className="text-sm font-medium sm:col-span-2">
+                      {values.experience ? `${values.experience} il` : '—'}
+                    </dd>
                   </div>
                   <div className="grid gap-1 p-4 sm:grid-cols-3">
                     <dt className="text-sm font-medium text-muted-foreground">Təsvir</dt>
@@ -397,14 +534,39 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
                   <div className="grid gap-1 p-4 sm:grid-cols-3">
                     <dt className="text-sm font-medium text-muted-foreground">Yer</dt>
                     <dd className="text-sm sm:col-span-2">
-                      {values.isRemote && values.location
-                        ? `${values.location} (uzaqdan da mümkündür)`
-                        : values.isRemote
-                          ? 'Uzaqdan (onlayn)'
-                          : values.location || 'Göstərilməyib'}
+                      {[
+                        values.serviceVenue
+                          ? SERVICE_VENUE_LABELS[values.serviceVenue]
+                          : null,
+                        values.isRemote && values.location
+                          ? `${values.location} (uzaqdan da mümkündür)`
+                          : values.isRemote
+                            ? 'Uzaqdan (onlayn)'
+                            : values.location || null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || 'Göstərilməyib'}
                     </dd>
                   </div>
                 </dl>
+
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-4 transition-colors hover:border-brand/40 hover:bg-brand/5 has-[:checked]:border-brand/50 has-[:checked]:bg-brand/5">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-brand"
+                    checked={isConfirmed}
+                    disabled={isSaving}
+                    onChange={(event) => setIsConfirmed(event.target.checked)}
+                  />
+                  <div>
+                    <span className="text-sm font-medium">
+                      Məlumatların düzgünlüyünü təsdiq edirəm
+                    </span>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Xidmətinizi yalnız siz təsdiqlədikdən sonra müştərilərə görünən olacaq.
+                    </p>
+                  </div>
+                </label>
 
                 {serverError && (
                   <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -419,7 +581,7 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
               <Button
                 type="button"
                 variant="outline"
-                disabled={isSubmitting}
+                disabled={isSaving}
                 onClick={goBack}
                 className="sm:min-w-[120px]"
               >
@@ -433,16 +595,20 @@ export function NewServiceForm({ categories }: NewServiceFormProps) {
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               ) : (
-                <Button type="submit" disabled={isSubmitting} className="sm:min-w-[160px]">
-                  {isSubmitting ? (
+                <Button
+                  type="submit"
+                  disabled={isSaving || !isConfirmed}
+                  className="sm:min-w-[160px]"
+                >
+                  {isSaving ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Yaradılır...
+                      Dərc edilir...
                     </>
                   ) : (
                     <>
                       <CheckCircle2 className="h-4 w-4" />
-                      Xidməti yarat
+                      Təsdiq et və dərc et
                     </>
                   )}
                 </Button>

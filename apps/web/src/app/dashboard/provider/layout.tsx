@@ -16,9 +16,9 @@ export default function ProviderDashboardLayout({ children }: { children: React.
 
   return (
     <RequireRole role={UserRole.PROVIDER}>
-      <div className="flex min-h-screen flex-col lg:flex-row">
-        <DashboardSidebar />
-        <main className="flex-1 overflow-auto">
+      <div className="flex h-[100dvh] flex-col overflow-hidden lg:flex-row">
+        <DashboardSidebar variant="provider" />
+        <main className="min-h-0 flex-1 overflow-y-auto">
           <div
             className={cn(
               'px-4 py-6 sm:px-6 lg:px-8',

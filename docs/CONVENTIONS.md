@@ -103,8 +103,37 @@ export function SearchBar() { ... }
 
 - **Tailwind CSS** utility classes
 - Brend rəngləri: `bg-brand`, `text-brand-foreground`, `hover:bg-brand-dark`
-- Responsive: mobile-first (`sm:`, `md:`, `lg:`)
 - `cn()` utility ilə conditional classes
+
+### Responsivlik (mütləq)
+
+Hər yeni UI komponenti və səhifə **mobil və desktop** üçün düzgün işləməlidir. Responsivlik sonradan əlavə edilən opsiya deyil — kod yazılarkən nəzərə alınmalıdır.
+
+**Prinsiplər:**
+
+1. **Mobile-first** — əvvəlcə mobil layout, sonra `sm:`, `md:`, `lg:`, `xl:` breakpoint-ləri ilə genişləndir
+2. **Breakpoint-lər** — Tailwind standartları: `sm` (640px), `md` (768px), `lg` (1024px), `xl` (1280px)
+3. **Layout uyğunluğu** — grid/flex sütun sayı, sidebar, naviqasiya və kart ölçüləri ekrana görə dəyişməlidir
+4. **Touch-friendly** — mobil düymələr minimum `44×44px` toxunma sahəsi; hover-only interaksiya yox
+5. **Overflow** — uzun mətn, cədvəl və form sahələri kiçik ekranda kəsilməməli (`overflow-x-auto`, `truncate`, `break-words`)
+6. **Şəkillər** — `next/image` + uyğun `sizes`; sabit genişlikli konteynerlərdən çəkinin
+
+**Yoxlama (hər UI dəyişikliyindən sonra):**
+
+- Mobil görünüş (~375px) — məzmun oxunaqlı, scroll yox, düymələr əlçatan
+- Tablet (~768px) — layout keçidi məntiqlidir
+- Desktop (~1280px+) — boş sahə düzgün paylanır, məzmun çox genişlənmir (`max-w-*` istifadə edin)
+
+```tsx
+// ✅ Mobile-first grid
+<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
+// ✅ Responsive padding və tipografiya
+<section className="px-4 py-6 md:px-8 md:py-10">
+
+// ❌ Yalnız desktop üçün sabit layout
+<div className="grid grid-cols-3 gap-8 w-[1200px]">
+```
 
 ```tsx
 <div className={cn(

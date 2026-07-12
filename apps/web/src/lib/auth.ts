@@ -13,8 +13,10 @@ export function getPostAuthRedirectPath(role: UserRole): string {
     case UserRole.PROVIDER:
       return '/dashboard/provider';
     case UserRole.CUSTOMER:
+      return '/dashboard/customer';
+    case UserRole.ADMIN:
     default:
-      return '/';
+      return '/dashboard';
   }
 }
 
@@ -22,10 +24,10 @@ export function getDashboardPath(role: UserRole): string {
   switch (role) {
     case UserRole.PROVIDER:
       return '/dashboard/provider';
-    case UserRole.ADMIN:
-      return '/dashboard';
     case UserRole.CUSTOMER:
+      return '/dashboard/customer';
+    case UserRole.ADMIN:
     default:
-      return '/';
+      return '/dashboard';
   }
 }

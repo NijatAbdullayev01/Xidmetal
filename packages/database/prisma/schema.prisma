@@ -34,10 +34,34 @@ model User {
   bookingsAsCustomer Booking[]     @relation("CustomerBookings")
   bookingsAsProvider Booking[]     @relation("ProviderBookings")
   reviews         Review[]
-  refreshTokens   RefreshToken[]
-  notifications   Notification[]
+  refreshTokens          RefreshToken[]
+  notifications          Notification[]
+  emailVerificationCodes EmailVerificationCode[]
+  conversationsAsCustomer Conversation[] @relation("CustomerConversations")
+  conversationsAsProvider Conversation[] @relation("ProviderConversations")
+  sentMessages            Message[]      @relation("SentMessages")
 
   @@map("users")
+}
+
+enum EmailVerificationPurpose {
+  EMAIL_CHANGE
+}
+
+model EmailVerificationCode {
+  id        String                   @id @default(uuid())
+  userId    String                   @map("user_id")
+  email     String
+  codeHash  String                   @map("code_hash")
+  purpose   EmailVerificationPurpose @default(EMAIL_CHANGE)
+  expiresAt DateTime                 @map("expires_at")
+  createdAt DateTime                 @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@index([email, purpose])
+  @@map("email_verification_codes")
 }
 
 model ProviderProfile {
@@ -98,6 +122,12 @@ enum PriceUnit {
   FIXED
   HOURLY
   DAILY
+  PER_SQM
+}
+
+enum ServiceVenue {
+  AT_LOCATION
+  AT_SALON
 }
 
 model Service {
@@ -109,6 +139,7 @@ model Service {
   duration    Int?
   location    String?
   isRemote    Boolean       @default(false) @map("is_remote")
+  serviceVenue ServiceVenue? @map("service_venue")
   status      ServiceStatus @default(DRAFT)
   providerId  String        @map("provider_id")
   categoryId  String        @map("category_id")
@@ -151,12 +182,13 @@ enum BookingStatus {
 }
 
 model Booking {
-  id          String        @id @default(uuid())
-  serviceId   String        @map("service_id")
-  customerId  String        @map("customer_id")
-  providerId  String        @map("provider_id")
-  scheduledAt DateTime      @map("scheduled_at")
-  status      BookingStatus @default(PENDING)
+  id                  String        @id @default(uuid())
+  serviceId           String        @map("service_id")
+  customerId          String        @map("customer_id")
+  providerId          String        @map("provider_id")
+  scheduledAt         DateTime      @map("scheduled_at")
+  proposedScheduledAt DateTime?     @map("proposed_scheduled_at")
+  status              BookingStatus @default(PENDING)
   totalPrice  Decimal       @map("total_price") @db.Decimal(10, 2)
   notes       String?
   address     String?
@@ -166,12 +198,49 @@ model Booking {
   service  Service  @relation(fields: [serviceId], references: [id])
   customer User     @relation("CustomerBookings", fields: [customerId], references: [id])
   provider User     @relation("ProviderBookings", fields: [providerId], references: [id])
-  review   Review?
+  review       Review?
+  conversation Conversation?
 
   @@index([customerId])
   @@index([providerId])
   @@index([status])
   @@map("bookings")
+}
+
+// ─── Mesajlaşma ──────────────────────────────────────────────────────────────
+
+model Conversation {
+  id         String   @id @default(uuid())
+  customerId String   @map("customer_id")
+  providerId String   @map("provider_id")
+  bookingId  String?  @unique @map("booking_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  customer User      @relation("CustomerConversations", fields: [customerId], references: [id], onDelete: Cascade)
+  provider User      @relation("ProviderConversations", fields: [providerId], references: [id], onDelete: Cascade)
+  booking  Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  messages Message[]
+
+  @@unique([customerId, providerId])
+  @@index([customerId])
+  @@index([providerId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String   @map("conversation_id")
+  senderId       String   @map("sender_id")
+  content        String
+  isRead         Boolean  @default(false) @map("is_read")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
 }
 
 // ─── Rəylər ──────────────────────────────────────────────────────────────────
@@ -205,6 +274,7 @@ enum NotificationType {
   BOOKING_CONFIRMED
   BOOKING_CANCELLED
   BOOKING_COMPLETED
+  BOOKING_RESCHEDULE_PROPOSED
   REVIEW_RECEIVED
   MESSAGE_RECEIVED
 }

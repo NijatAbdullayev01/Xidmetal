@@ -13,7 +13,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ServicesService } from './services.service';
 import { CreateServiceDto, UpdateServiceDto, ServiceQueryDto } from './dto';
 import { Public, Roles } from '../../common/decorators';
-import { JwtAuthGuard, RolesGuard } from '../../common/guards';
+import { JwtAuthGuard, RolesGuard, OptionalJwtAuthGuard } from '../../common/guards';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '@xidmetal/shared';
 
@@ -39,10 +39,15 @@ export class ServicesController {
   }
 
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   @ApiOperation({ summary: 'Xidmət detalları' })
-  findOne(@Param('id') id: string) {
-    return this.servicesService.findById(id);
+  findOne(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string | undefined,
+    @CurrentUser('role') role: string | undefined,
+  ) {
+    return this.servicesService.findById(id, userId, role);
   }
 
   @ApiBearerAuth()

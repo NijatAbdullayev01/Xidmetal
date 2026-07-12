@@ -14,6 +14,7 @@ Xidmetal layihəsinə töhfə vermək istəyirsinizsə, bu bələdçini oxuyun.
 ## PR tələbləri
 
 - [ ] Kod `docs/CONVENTIONS.md` standartlarına uyğundur
+- [ ] UI dəyişiklikləri mobil (~375px) və desktop (~1280px) görünüşlərdə responsivdir
 - [ ] TypeScript xətası yoxdur (`pnpm typecheck`)
 - [ ] Lint xətası yoxdur (`pnpm lint`)
 - [ ] Yeni endpoint-lər Swagger-da sənədləşdirilib

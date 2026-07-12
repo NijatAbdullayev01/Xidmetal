@@ -10,10 +10,14 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
-import { CreateBookingDto, UpdateBookingStatusDto } from './dto';
+import {
+  CreateBookingDto,
+  RescheduleBookingDto,
+  UpdateBookingStatusDto,
+  BookingQueryDto,
+} from './dto';
 import { JwtAuthGuard } from '../../common/guards';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { BookingStatus } from '@xidmetal/shared';
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
@@ -27,11 +31,9 @@ export class BookingsController {
   findAll(
     @CurrentUser('id') userId: string,
     @CurrentUser('role') role: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-    @Query('status') status?: BookingStatus,
+    @Query() query: BookingQueryDto,
   ) {
-    return this.bookingsService.findAll(userId, role, page, limit, status);
+    return this.bookingsService.findAll(userId, role, query.page, query.limit, query.status);
   }
 
   @Post()
@@ -49,5 +51,27 @@ export class BookingsController {
     @Body() dto: UpdateBookingStatusDto,
   ) {
     return this.bookingsService.updateStatus(id, userId, role, dto);
+  }
+
+  @Patch(':id/reschedule')
+  @ApiOperation({ summary: 'Sifarişə yeni tarix təklif et (xidmət verən)' })
+  reschedule(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: RescheduleBookingDto,
+  ) {
+    return this.bookingsService.reschedule(id, userId, dto);
+  }
+
+  @Patch(':id/reschedule/confirm')
+  @ApiOperation({ summary: 'Yeni tarix təklifini təsdiqlə (müştəri)' })
+  confirmReschedule(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.bookingsService.confirmReschedule(id, userId);
+  }
+
+  @Patch(':id/reschedule/reject')
+  @ApiOperation({ summary: 'Yeni tarix təklifini rədd et (müştəri)' })
+  rejectReschedule(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.bookingsService.rejectReschedule(id, userId);
   }
 }

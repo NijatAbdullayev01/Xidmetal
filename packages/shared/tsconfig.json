@@ -1,10 +1,13 @@
 {
-  "extends": "@xidmetal/typescript-config/base.json",
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../typescript-config/base.json",
   "compilerOptions": {
+    "composite": true,
     "outDir": "./dist",
     "rootDir": "./src",
     "module": "CommonJS",
-    "moduleResolution": "Node"
+    "moduleResolution": "Node10",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

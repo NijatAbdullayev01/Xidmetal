@@ -4,7 +4,6 @@ import { APP } from '@xidmetal/shared';
 
 const footerLinks = {
   platform: [
-    { href: '/services', label: 'Xidmətlər' },
     { href: '/faq', label: 'Tez-tez verilən suallar' },
     { href: '/how-it-works', label: 'Necə işləyir?' },
   ],

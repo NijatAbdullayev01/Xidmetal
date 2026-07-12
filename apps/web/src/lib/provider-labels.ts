@@ -38,8 +38,9 @@ export const BOOKING_STATUS_VARIANTS: Record<
   [BookingStatus.REJECTED]: 'destructive',
 };
 
-export const PRICE_UNIT_LABELS: Record<string, string> = {
-  FIXED: 'Sabit',
-  HOURLY: 'Saatlıq',
-  DAILY: 'Günlük',
-};
+export {
+  PRICE_UNIT_LABELS,
+  getPriceUnitsForCategorySlug,
+  getPriceUnitLabel,
+  type PriceUnitValue,
+} from '@xidmetal/shared';

@@ -8,8 +8,10 @@ import { ServicesModule } from './modules/services/services.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
+import { MessagesModule } from './modules/messages/messages.module';
 import { HealthModule } from './modules/health/health.module';
 import { DatabaseModule } from './common/database/database.module';
+import { MailModule } from './common/mail/mail.module';
 import { JwtAuthGuard } from './common/guards';
 
 @Module({
@@ -17,6 +19,7 @@ import { JwtAuthGuard } from './common/guards';
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../../.env', '.env'] }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     DatabaseModule,
+    MailModule,
     HealthModule,
     AuthModule,
     UsersModule,
@@ -24,6 +27,7 @@ import { JwtAuthGuard } from './common/guards';
     ServicesModule,
     BookingsModule,
     ReviewsModule,
+    MessagesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { LoginForm } from '@/components/auth/login-form';
 import { GuestOnly } from '@/components/auth/guest-only';
+import { AuthPageShell } from '@/components/auth/auth-page-shell';
 
 export const metadata: Metadata = {
   title: 'Daxil ol',
@@ -9,23 +11,16 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <section className="flex min-h-[100dvh] items-center justify-center bg-gradient-to-b from-brand/5 to-background px-4 py-8 safe-bottom sm:px-6 sm:py-12">
-      <div className="w-full max-w-md">
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-lg sm:p-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Daxil ol</h1>
-            <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-              Hesabınıza daxil olun və xidmətlərdən istifadə edin
-            </p>
-          </div>
-
-          <div className="mt-8">
-            <GuestOnly>
-              <LoginForm />
-            </GuestOnly>
-          </div>
-        </div>
-      </div>
-    </section>
+    <AuthPageShell
+      title="Daxil ol"
+      description="Hesabınıza daxil olun və xidmətlərdən istifadə edin"
+      maxWidth="md"
+    >
+      <GuestOnly>
+        <Suspense fallback={null}>
+          <LoginForm />
+        </Suspense>
+      </GuestOnly>
+    </AuthPageShell>
   );
 }

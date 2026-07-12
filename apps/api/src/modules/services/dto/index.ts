@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsUUID,
   IsEnum,
+  IsPositive,
   Min,
   Max,
   MinLength,
@@ -12,7 +13,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ServiceStatus } from '@xidmetal/shared';
+import { ServiceStatus, PriceUnit, ServiceVenue } from '@xidmetal/shared';
 
 export class CreateServiceDto {
   @ApiProperty()
@@ -33,13 +34,13 @@ export class CreateServiceDto {
 
   @ApiProperty()
   @IsNumber()
-  @Min(0)
+  @IsPositive({ message: 'Qiymət müsbət olmalıdır' })
   price!: number;
 
-  @ApiPropertyOptional({ enum: ['FIXED', 'HOURLY', 'DAILY'] })
+  @ApiPropertyOptional({ enum: PriceUnit })
   @IsOptional()
-  @IsEnum(['FIXED', 'HOURLY', 'DAILY'])
-  priceUnit?: 'FIXED' | 'HOURLY' | 'DAILY';
+  @IsEnum(PriceUnit)
+  priceUnit?: PriceUnit;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -56,6 +57,11 @@ export class CreateServiceDto {
   @IsOptional()
   @IsBoolean()
   isRemote?: boolean;
+
+  @ApiPropertyOptional({ enum: ServiceVenue })
+  @IsOptional()
+  @IsEnum(ServiceVenue)
+  serviceVenue?: ServiceVenue;
 }
 
 export class UpdateServiceDto {
@@ -81,13 +87,13 @@ export class UpdateServiceDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber()
-  @Min(0)
+  @IsPositive({ message: 'Qiymət müsbət olmalıdır' })
   price?: number;
 
-  @ApiPropertyOptional({ enum: ['FIXED', 'HOURLY', 'DAILY'] })
+  @ApiPropertyOptional({ enum: PriceUnit })
   @IsOptional()
-  @IsEnum(['FIXED', 'HOURLY', 'DAILY'])
-  priceUnit?: 'FIXED' | 'HOURLY' | 'DAILY';
+  @IsEnum(PriceUnit)
+  priceUnit?: PriceUnit;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -98,6 +104,11 @@ export class UpdateServiceDto {
   @IsOptional()
   @IsBoolean()
   isRemote?: boolean;
+
+  @ApiPropertyOptional({ enum: ServiceVenue })
+  @IsOptional()
+  @IsEnum(ServiceVenue)
+  serviceVenue?: ServiceVenue;
 
   @ApiPropertyOptional({ enum: ServiceStatus })
   @IsOptional()

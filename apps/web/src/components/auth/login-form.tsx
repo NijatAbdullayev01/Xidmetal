@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,6 +16,7 @@ import { useAuthStore } from '@/store/auth.store';
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setAuth = useAuthStore((state) => state.setAuth);
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -38,7 +39,8 @@ export function LoginForm() {
     try {
       const response = await api.auth.login(values);
       setAuth(response.user, response.tokens);
-      router.push(getPostAuthRedirectPath(response.user.role));
+      const redirect = searchParams.get('redirect');
+      router.push(redirect && redirect.startsWith('/') ? redirect : getPostAuthRedirectPath(response.user.role));
       router.refresh();
     } catch (error) {
       if (error instanceof ApiError) {

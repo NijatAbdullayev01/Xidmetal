@@ -6,7 +6,13 @@ async function main() {
   console.log('🌱 Seeding database...');
 
   const categories = [
-    { name: 'Təmizlik', slug: 'temizlik', icon: '🧹', description: 'Ev və ofis təmizliyi xidmətləri' },
+    {
+      name: 'Təmizlik',
+      slug: 'temizlik',
+      icon: '🧹',
+      description:
+        'Ev və ofisiniz üçün professional təmizlik — dərin təmizlik, pəncərə yuma və müntəzəm qulluq. Etibarlı xidmət verənləri kəşf edin və bir neçə addımda sifariş verin.',
+    },
     { name: 'Təmir', slug: 'temir', icon: '🔧', description: 'Texniki təmir və quraşdırma' },
     { name: 'Gözəllik', slug: 'gozellik', icon: '💅', description: 'Gözəllik və sağlamlıq xidmətləri' },
     { name: 'Təhsil', slug: 'tehsil', icon: '📚', description: 'Repetitorluq və kurslar' },
@@ -19,7 +25,12 @@ async function main() {
   for (const [index, category] of categories.entries()) {
     await prisma.category.upsert({
       where: { slug: category.slug },
-      update: {},
+      update: {
+        name: category.name,
+        icon: category.icon,
+        description: category.description,
+        sortOrder: index,
+      },
       create: { ...category, sortOrder: index },
     });
   }

@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
@@ -7,8 +8,13 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { API } from '@xidmetal/shared';
 
+/** Base64 profil şəkli üçün (max ~1 MB fayl + JSON overhead) */
+const JSON_BODY_LIMIT = '3mb';
+
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.useBodyParser('json', { limit: JSON_BODY_LIMIT });
+  app.useBodyParser('urlencoded', { limit: JSON_BODY_LIMIT, extended: true });
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('API_PORT', 4000);

@@ -27,6 +27,9 @@ export class RegisterDto {
   @ApiPropertyOptional({ example: '+994501234567' })
   @IsOptional()
   @IsString()
+  @Matches(/^(\+994|0)[0-9]{9}$/, {
+    message: 'Düzgün telefon nömrəsi daxil edin (+994XXXXXXXXX)',
+  })
   phone?: string;
 
   @ApiPropertyOptional({ enum: UserRole, default: UserRole.CUSTOMER })

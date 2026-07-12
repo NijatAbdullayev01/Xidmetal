@@ -1,6 +1,6 @@
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-[100dvh] overflow-y-auto overscroll-y-contain">
+    <main className="flex h-[100dvh] w-full flex-col overflow-hidden">
       {children}
     </main>
   );

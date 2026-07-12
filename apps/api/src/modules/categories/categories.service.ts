@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { ServiceStatus } from '@prisma/client';
 import { PrismaService } from '../../common/database/prisma.service';
 
 @Injectable()
@@ -9,7 +10,9 @@ export class CategoriesService {
     const categories = await this.prisma.category.findMany({
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
-      include: { _count: { select: { services: true } } },
+      include: {
+        _count: { select: { services: { where: { status: ServiceStatus.ACTIVE } } } },
+      },
     });
 
     return categories.map((c: (typeof categories)[number]) => ({
@@ -25,7 +28,9 @@ export class CategoriesService {
   async findBySlug(slug: string) {
     const category = await this.prisma.category.findUnique({
       where: { slug },
-      include: { _count: { select: { services: true } } },
+      include: {
+        _count: { select: { services: { where: { status: ServiceStatus.ACTIVE } } } },
+      },
     });
 
     if (!category || !category.isActive) {

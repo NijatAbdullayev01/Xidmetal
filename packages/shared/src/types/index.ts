@@ -49,13 +49,16 @@ export interface ServiceSummary {
   providerId: string;
   providerName: string;
   providerAvatarUrl?: string;
+  providerExperience?: number;
   averageRating: number;
   reviewCount: number;
   status: ServiceStatus;
   location?: string;
   isRemote: boolean;
+  serviceVenue?: string;
   createdAt: string;
   bookingCount?: number;
+  activeBookingCount?: number;
 }
 
 export interface BookingSummary {
@@ -67,6 +70,7 @@ export interface BookingSummary {
   providerId: string;
   providerName: string;
   scheduledAt: string;
+  proposedScheduledAt?: string;
   status: BookingStatus;
   totalPrice: number;
   notes?: string;
@@ -100,6 +104,36 @@ export interface ProviderDashboardStats {
   completedBookings: number;
   rating: number;
   reviewCount: number;
+}
+
+export interface MessageSummary {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface ConversationSummary {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerAvatarUrl?: string;
+  providerId: string;
+  providerName: string;
+  providerAvatarUrl?: string;
+  bookingId?: string;
+  serviceTitle?: string;
+  lastMessage?: string;
+  lastMessageAt?: string;
+  unreadCount: number;
+  updatedAt: string;
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  messages: MessageSummary[];
 }
 
 export interface AuthTokens {
