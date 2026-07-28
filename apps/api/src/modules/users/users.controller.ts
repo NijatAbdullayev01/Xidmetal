@@ -33,7 +33,7 @@ export class UsersController {
 
   @Post('me/email/request-change')
   @Throttle({ default: { limit: 3, ttl: 60000 } })
-  @ApiOperation({ summary: 'Yeni e-mail üçün təsdiq kodu göndər' })
+  @ApiOperation({ summary: 'Yeni e-poçt üçün təsdiq kodu göndər' })
   requestEmailChange(
     @CurrentUser('id') userId: string,
     @Body() dto: RequestEmailChangeDto,
@@ -43,7 +43,7 @@ export class UsersController {
 
   @Post('me/email/confirm-change')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  @ApiOperation({ summary: 'Təsdiq kodu ilə e-maili dəyiş' })
+  @ApiOperation({ summary: 'Təsdiq kodu ilə e-poçtu dəyiş' })
   confirmEmailChange(
     @CurrentUser('id') userId: string,
     @Body() dto: ConfirmEmailChangeDto,

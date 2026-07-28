@@ -8,10 +8,14 @@ import { PrismaService } from '../../common/database/prisma.service';
 import { CreateBookingDto, RescheduleBookingDto, UpdateBookingStatusDto } from './dto';
 import { UserRole, BookingStatus, NotificationType } from '@xidmetal/shared';
 import { ServiceStatus } from '@prisma/client';
+import { AvailabilityService } from '../availability/availability.service';
 
 @Injectable()
 export class BookingsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private availabilityService: AvailabilityService,
+  ) {}
 
   async findAll(
     userId: string,
@@ -62,6 +66,18 @@ export class BookingsService {
       throw new BadRequestException('Sifariş tarixi gələcəkdə olmalıdır');
     }
 
+    if (dto.imageUrl) {
+      const isValidImage =
+        dto.imageUrl.startsWith('data:image/') ||
+        dto.imageUrl.startsWith('http://') ||
+        dto.imageUrl.startsWith('https://');
+      if (!isValidImage) {
+        throw new BadRequestException('Düzgün şəkil formatı daxil edin');
+      }
+    }
+
+    await this.availabilityService.assertSlotIsFree(dto.serviceId, scheduledAt);
+
     const booking = await this.prisma.$transaction(async (tx) => {
       const service = await tx.service.findUnique({
         where: { id: dto.serviceId },
@@ -75,6 +91,16 @@ export class BookingsService {
         throw new BadRequestException('Öz xidmətinizə sifariş verə bilməzsiniz');
       }
 
+      const notes = dto.notes?.trim();
+      if (!notes) {
+        throw new BadRequestException('Qeyd yazın');
+      }
+
+      const address = dto.address?.trim();
+      if (!service.isRemote && !address) {
+        throw new BadRequestException('Ünvan daxil edin');
+      }
+
       const created = await tx.booking.create({
         data: {
           serviceId: dto.serviceId,
@@ -82,8 +108,9 @@ export class BookingsService {
           providerId: service.providerId,
           scheduledAt,
           totalPrice: service.price,
-          notes: dto.notes,
-          address: dto.address,
+          notes,
+          address: address || null,
+          imageUrl: dto.imageUrl,
           status: BookingStatus.PENDING,
         },
         include: {
@@ -139,6 +166,10 @@ export class BookingsService {
     if (booking.proposedScheduledAt) {
       throw new BadRequestException('Müştərinin cavabı gözlənilir. Yeni təklif göndərmək olmaz');
     }
+
+    await this.availabilityService.assertSlotIsFree(booking.serviceId, scheduledAt, {
+      excludeBookingId: booking.id,
+    });
 
     const formattedDate = this.formatScheduledAt(scheduledAt);
     const conversationMessage = `${messageContent}\n\nTəklif olunan yeni tarix: ${formattedDate}`;
@@ -223,6 +254,12 @@ export class BookingsService {
     if (booking.status !== BookingStatus.PENDING) {
       throw new BadRequestException('Bu sifariş üçün tarix təklifi təsdiqlənə bilməz');
     }
+
+    await this.availabilityService.assertSlotIsFree(
+      booking.serviceId,
+      booking.proposedScheduledAt,
+      { excludeBookingId: booking.id },
+    );
 
     const formattedDate = this.formatScheduledAt(booking.proposedScheduledAt);
 
@@ -390,6 +427,8 @@ export class BookingsService {
     status: string;
     totalPrice: { toNumber(): number };
     notes: string | null;
+    address?: string | null;
+    imageUrl?: string | null;
     createdAt: Date;
   }) {
     return {
@@ -405,6 +444,8 @@ export class BookingsService {
       status: booking.status,
       totalPrice: booking.totalPrice.toNumber(),
       notes: booking.notes ?? undefined,
+      address: booking.address ?? undefined,
+      imageUrl: booking.imageUrl ?? undefined,
       createdAt: booking.createdAt.toISOString(),
     };
   }

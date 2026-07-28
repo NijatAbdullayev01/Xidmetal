@@ -1,4 +1,10 @@
-import { UserRole, BookingStatus, ServiceStatus } from '../enums';
+import {
+  UserRole,
+  BookingStatus,
+  ServiceStatus,
+  AvailabilityOverrideType,
+  AvailabilitySlotStatus,
+} from '../enums';
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -74,6 +80,8 @@ export interface BookingSummary {
   status: BookingStatus;
   totalPrice: number;
   notes?: string;
+  address?: string;
+  imageUrl?: string;
   createdAt: string;
 }
 
@@ -144,4 +152,34 @@ export interface AuthTokens {
 export interface AuthResponse {
   user: UserProfile;
   tokens: AuthTokens;
+}
+
+export interface WorkingHoursDay {
+  id?: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
+}
+
+export interface AvailabilityOverride {
+  id: string;
+  serviceId: string;
+  date: string;
+  startTime?: string;
+  endTime?: string;
+  type: AvailabilityOverrideType;
+  note?: string;
+}
+
+export interface AvailabilitySlot {
+  start: string;
+  end: string;
+  status: AvailabilitySlotStatus;
+}
+
+export interface DayAvailability {
+  date: string;
+  slots: AvailabilitySlot[];
+  hasCalendar: boolean;
 }

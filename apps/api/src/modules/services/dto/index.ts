@@ -5,7 +5,6 @@ import {
   IsOptional,
   IsUUID,
   IsEnum,
-  IsPositive,
   Min,
   Max,
   MinLength,
@@ -32,9 +31,9 @@ export class CreateServiceDto {
   @IsUUID()
   categoryId!: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: '0 = razılaşma ilə' })
   @IsNumber()
-  @IsPositive({ message: 'Qiymət müsbət olmalıdır' })
+  @Min(0, { message: 'Qiymət mənfi ola bilməz' })
   price!: number;
 
   @ApiPropertyOptional({ enum: PriceUnit })
@@ -84,10 +83,10 @@ export class UpdateServiceDto {
   @IsUUID()
   categoryId?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: '0 = razılaşma ilə' })
   @IsOptional()
   @IsNumber()
-  @IsPositive({ message: 'Qiymət müsbət olmalıdır' })
+  @Min(0, { message: 'Qiymət mənfi ola bilməz' })
   price?: number;
 
   @ApiPropertyOptional({ enum: PriceUnit })

@@ -19,9 +19,21 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: dto.email },
+          ...(dto.phone ? [{ phone: dto.phone }] : []),
+        ],
+      },
+      select: { email: true, phone: true },
+    });
+
     if (existing) {
-      throw new ConflictException('Bu e-mail artıq qeydiyyatdan keçib');
+      if (existing.email === dto.email) {
+        throw new ConflictException('Bu e-poçt artıq qeydiyyatdan keçib');
+      }
+      throw new ConflictException('Bu telefon nömrəsi artıq qeydiyyatdan keçib');
     }
 
     const role = dto.role ?? UserRole.CUSTOMER;
@@ -51,7 +63,7 @@ export class AuthService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === UNIQUE_CONSTRAINT_VIOLATION
       ) {
-        throw new ConflictException('Bu e-mail artıq qeydiyyatdan keçib');
+        throw new ConflictException(this.uniqueConstraintMessage(error));
       }
       throw error;
     }
@@ -63,12 +75,12 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('E-mail və ya şifrə səhvdir');
+      throw new UnauthorizedException('E-poçt və ya şifrə səhvdir');
     }
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
-      throw new UnauthorizedException('E-mail və ya şifrə səhvdir');
+      throw new UnauthorizedException('E-poçt və ya şifrə səhvdir');
     }
 
     const tokens = await this.generateTokens(user.id, user.email, user.role);
@@ -146,6 +158,21 @@ export class AuthService {
       s: 1000,
     };
     return num * (multipliers[unit!] ?? 86400000);
+  }
+
+  private uniqueConstraintMessage(error: Prisma.PrismaClientKnownRequestError): string {
+    const target = error.meta?.target;
+    const fields = Array.isArray(target)
+      ? target.map(String)
+      : typeof target === 'string'
+        ? [target]
+        : [];
+
+    if (fields.some((field) => field.includes('phone'))) {
+      return 'Bu telefon nömrəsi artıq qeydiyyatdan keçib';
+    }
+
+    return 'Bu e-poçt artıq qeydiyyatdan keçib';
   }
 
   private sanitizeUser(user: {

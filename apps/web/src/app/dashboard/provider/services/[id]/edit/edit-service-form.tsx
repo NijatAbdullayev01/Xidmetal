@@ -334,7 +334,7 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
                 <Input
                   id="price"
                   type="number"
-                  min="1"
+                  min="0"
                   step="0.01"
                   placeholder="50"
                   error={!!errors.price}
@@ -343,6 +343,11 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
                 />
                 {errors.price && (
                   <p className="text-sm text-destructive">{errors.price.message}</p>
+                )}
+                {!errors.price && price === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Razılaşma ilə olacaq xidmət
+                  </p>
                 )}
               </div>
 
@@ -358,17 +363,17 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
               </div>
             </div>
 
-            {price > 0 && (
-              <div className="rounded-xl border border-border bg-muted/40 p-4">
-                <p className="text-sm text-muted-foreground">Göstəriləcək qiymət</p>
-                <p className="mt-1 text-2xl font-bold text-brand-dark">
-                  {formatPrice(price)}
+            <div className="rounded-xl border border-border bg-muted/40 p-4">
+              <p className="text-sm text-muted-foreground">Göstəriləcək qiymət</p>
+              <p className="mt-1 text-2xl font-bold text-brand-dark">
+                {formatPrice(price)}
+                {price > 0 && (
                   <span className="ml-2 text-sm font-normal text-muted-foreground">
                     / {PRICE_UNIT_LABELS[priceUnit]}
                   </span>
-                </p>
-              </div>
-            )}
+                )}
+              </p>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="location">Ünvan (istəyə bağlı)</Label>

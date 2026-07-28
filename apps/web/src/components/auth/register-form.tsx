@@ -12,9 +12,27 @@ import { registerFormSchema, type RegisterFormValues, type PublicUserRole } from
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import { api, ApiError } from '@/lib/api';
 import { getPostAuthRedirectPath } from '@/lib/auth';
 import { useAuthStore } from '@/store/auth.store';
+
+const AZ_PHONE_PREFIX = '+994';
+
+/** Yalnız rəqəmləri götürüb +994XXXXXXXXX (və ya boş) formata çevirir. Prefiks silinə bilməz. */
+function toAzPhoneValue(raw: string): string {
+  let digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('994')) digits = digits.slice(3);
+  if (digits.startsWith('0')) digits = digits.slice(1);
+  digits = digits.slice(0, 9);
+  return digits ? `${AZ_PHONE_PREFIX}${digits}` : '';
+}
+
+function azPhoneLocalPart(value: string | undefined): string {
+  if (!value) return '';
+  if (value.startsWith(AZ_PHONE_PREFIX)) return value.slice(AZ_PHONE_PREFIX.length);
+  return value.replace(/\D/g, '').slice(0, 9);
+}
 
 interface RegisterFormProps {
   defaultRole?: PublicUserRole;
@@ -70,7 +88,7 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 sm:space-y-4 lg:space-y-6" noValidate>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-2.5 sm:space-y-3" noValidate>
       <div className="space-y-2.5 sm:space-y-3">
         <Label>Hesab növü</Label>
         <Controller
@@ -91,7 +109,7 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 min-w-0 sm:grid-cols-2 sm:gap-4">
+      <div className="grid grid-cols-2 gap-3 min-w-0 sm:gap-4">
         <div className="min-w-0 space-y-2">
           <Label htmlFor="firstName">Ad</Label>
           <Input
@@ -127,105 +145,143 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="email">E-mail</Label>
-        <Input
-          id="email"
-          type="email"
-          autoComplete="email"
-          placeholder="ad@example.com"
-          error={!!errors.email}
-          disabled={isSubmitting}
-          {...register('email')}
-        />
-        {errors.email && (
-          <p className="text-sm text-destructive" role="alert">
-            {errors.email.message}
-          </p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="phone">
-          Telefon <span className="font-normal text-muted-foreground">(istəyə bağlı)</span>
-        </Label>
-        <Input
-          id="phone"
-          type="tel"
-          autoComplete="tel"
-          placeholder="+994501234567"
-          error={!!errors.phone}
-          disabled={isSubmitting}
-          {...register('phone')}
-        />
-        {errors.phone && (
-          <p className="text-sm text-destructive" role="alert">
-            {errors.phone.message}
-          </p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="password">Şifrə</Label>
-        <div className="relative">
+      <div className="grid grid-cols-2 gap-3 min-w-0 sm:gap-4">
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="email">E-poçt</Label>
           <Input
-            id="password"
-            type={showPassword ? 'text' : 'password'}
-            autoComplete="new-password"
-            placeholder="Minimum 8 simvol"
-            error={!!errors.password}
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="ad@example.com"
+            error={!!errors.email}
             disabled={isSubmitting}
-            className="pr-10"
-            {...register('password')}
+            {...register('email')}
           />
-          <button
-            type="button"
-            onClick={() => setShowPassword((prev) => !prev)}
-            className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            aria-label={showPassword ? 'Şifrəni gizlət' : 'Şifrəni göstər'}
-            tabIndex={-1}
-          >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
+          {errors.email && (
+            <p className="text-sm text-destructive" role="alert">
+              {errors.email.message}
+            </p>
+          )}
         </div>
-        {errors.password && (
-          <p className="text-sm text-destructive" role="alert">
-            {errors.password.message}
-          </p>
-        )}
-        <p className="text-xs text-muted-foreground">
-          Ən azı 8 simvol, bir böyük hərf və bir rəqəm olmalıdır.
-        </p>
+
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="phone">
+            Telefon <span className="font-normal text-muted-foreground">(istəyə bağlı)</span>
+          </Label>
+          <Controller
+            name="phone"
+            control={control}
+            render={({ field }) => (
+              <div
+                className={cn(
+                  'flex h-10 w-full overflow-hidden rounded-lg border bg-background transition-colors',
+                  'focus-within:ring-2 focus-within:ring-brand focus-within:ring-offset-2',
+                  errors.phone ? 'border-destructive' : 'border-border',
+                  isSubmitting && 'cursor-not-allowed opacity-50',
+                )}
+              >
+                <span
+                  className="flex shrink-0 items-center border-r border-border bg-muted/40 px-2.5 text-sm text-muted-foreground select-none sm:px-3"
+                  aria-hidden
+                >
+                  {AZ_PHONE_PREFIX}
+                </span>
+                <input
+                  id="phone"
+                  type="tel"
+                  autoComplete="tel"
+                  inputMode="numeric"
+                  placeholder="501234567"
+                  disabled={isSubmitting}
+                  name={field.name}
+                  ref={field.ref}
+                  onBlur={field.onBlur}
+                  value={azPhoneLocalPart(field.value)}
+                  onChange={(event) => {
+                    field.onChange(toAzPhoneValue(event.target.value));
+                  }}
+                  className={cn(
+                    'min-w-0 flex-1 bg-transparent px-2.5 py-2 text-sm outline-none sm:px-3',
+                    'placeholder:text-muted-foreground',
+                    'disabled:cursor-not-allowed',
+                  )}
+                  aria-invalid={!!errors.phone}
+                />
+              </div>
+            )}
+          />
+          {errors.phone && (
+            <p className="text-sm text-destructive" role="alert">
+              {errors.phone.message}
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Şifrəni təkrarla</Label>
-        <div className="relative">
-          <Input
-            id="confirmPassword"
-            type={showConfirmPassword ? 'text' : 'password'}
-            autoComplete="new-password"
-            placeholder="Şifrəni təkrar daxil edin"
-            error={!!errors.confirmPassword}
-            disabled={isSubmitting}
-            className="pr-10"
-            {...register('confirmPassword')}
-          />
-          <button
-            type="button"
-            onClick={() => setShowConfirmPassword((prev) => !prev)}
-            className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            aria-label={showConfirmPassword ? 'Şifrəni gizlət' : 'Şifrəni göstər'}
-            tabIndex={-1}
-          >
-            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
+      <div className="grid grid-cols-2 gap-3 min-w-0 sm:gap-4">
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="password">Şifrə</Label>
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              placeholder="Minimum 8 simvol"
+              error={!!errors.password}
+              disabled={isSubmitting}
+              className="pr-10"
+              {...register('password')}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={showPassword ? 'Şifrəni gizlət' : 'Şifrəni göstər'}
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          {errors.password ? (
+            <p className="text-sm text-destructive" role="alert">
+              {errors.password.message}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Ən azı 8 simvol, bir böyük hərf və bir rəqəm olmalıdır.
+            </p>
+          )}
         </div>
-        {errors.confirmPassword && (
-          <p className="text-sm text-destructive" role="alert">
-            {errors.confirmPassword.message}
-          </p>
-        )}
+
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="confirmPassword">Şifrəni təkrarla</Label>
+          <div className="relative">
+            <Input
+              id="confirmPassword"
+              type={showConfirmPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              placeholder="Şifrəni təkrar daxil edin"
+              error={!!errors.confirmPassword}
+              disabled={isSubmitting}
+              className="pr-10"
+              {...register('confirmPassword')}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((prev) => !prev)}
+              className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={showConfirmPassword ? 'Şifrəni gizlət' : 'Şifrəni göstər'}
+              tabIndex={-1}
+            >
+              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          {errors.confirmPassword && (
+            <p className="text-sm text-destructive" role="alert">
+              {errors.confirmPassword.message}
+            </p>
+          )}
+        </div>
       </div>
 
       {serverError && (

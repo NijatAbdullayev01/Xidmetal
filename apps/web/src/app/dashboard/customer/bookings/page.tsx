@@ -236,6 +236,19 @@ export default function CustomerBookingsPage() {
                   {booking.notes && (
                     <p className="mt-2 rounded-lg bg-muted px-3 py-2 text-sm">{booking.notes}</p>
                   )}
+                  {booking.imageUrl && (
+                    <div className="mt-3">
+                      <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                        İşin şəkli
+                      </p>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={booking.imageUrl}
+                        alt="Görüləcək işin şəkli"
+                        className="max-h-48 max-w-full rounded-xl border border-border object-contain"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-2">

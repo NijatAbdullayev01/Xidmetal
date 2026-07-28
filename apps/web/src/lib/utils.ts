@@ -6,12 +6,16 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatPrice(amount: number, currency = 'AZN'): string {
-  return new Intl.NumberFormat('az-AZ', {
-    style: 'currency',
-    currency,
+  if (amount === 0) {
+    return 'Razılaşma ilə';
+  }
+
+  const formatted = new Intl.NumberFormat('az-AZ', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(amount);
+
+  return `${formatted}${currency}`;
 }
 
 const AZ_MONTHS = [
@@ -71,11 +75,24 @@ export function toDateTimeLocalValue(date: string | Date): string {
   return local.toISOString().slice(0, 16);
 }
 
-/** Tarix + saat inputlarını ISO datetime-a çevirir */
+/** Tarix + saatı Azərbaycan vaxtı (UTC+4) ISO datetime-a çevirir */
 export function combineDateAndTime(date: string, time: string): string {
-  const combined = new Date(`${date}T${time}`);
+  const combined = new Date(`${date}T${time}:00+04:00`);
   if (Number.isNaN(combined.getTime())) {
     throw new Error('Tarix və ya saat düzgün deyil');
   }
   return combined.toISOString();
+}
+
+/** ISO datetime-dan Asia/Baku HH:mm */
+export function formatTimeInBaku(iso: string | Date): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Baku',
+  }).formatToParts(new Date(iso));
+  const hour = parts.find((part) => part.type === 'hour')?.value ?? '00';
+  const minute = parts.find((part) => part.type === 'minute')?.value ?? '00';
+  return `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
 }

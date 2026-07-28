@@ -413,7 +413,7 @@ export function NewServiceForm() {
                     <Input
                       id="price"
                       type="number"
-                      min="1"
+                      min="0"
                       step="0.01"
                       placeholder="50"
                       error={!!errors.price}
@@ -422,6 +422,11 @@ export function NewServiceForm() {
                     />
                     {errors.price && (
                       <p className="text-sm text-destructive">{errors.price.message}</p>
+                    )}
+                    {!errors.price && values.price === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Razılaşma ilə olacaq xidmət
+                      </p>
                     )}
                   </div>
 
@@ -441,17 +446,17 @@ export function NewServiceForm() {
                   </div>
                 </div>
 
-                {values.price > 0 && (
-                  <div className="rounded-xl border border-border bg-muted/40 p-4">
-                    <p className="text-sm text-muted-foreground">Göstəriləcək qiymət</p>
-                    <p className="mt-1 text-2xl font-bold text-brand-dark">
-                      {formatPrice(values.price)}
+                <div className="rounded-xl border border-border bg-muted/40 p-4">
+                  <p className="text-sm text-muted-foreground">Göstəriləcək qiymət</p>
+                  <p className="mt-1 text-2xl font-bold text-brand-dark">
+                    {formatPrice(values.price)}
+                    {values.price > 0 && (
                       <span className="ml-2 text-sm font-normal text-muted-foreground">
                         / {PRICE_UNIT_LABELS[values.priceUnit]}
                       </span>
-                    </p>
-                  </div>
-                )}
+                    )}
+                  </p>
+                </div>
               </div>
             )}
 
@@ -528,7 +533,7 @@ export function NewServiceForm() {
                     <dd className="text-sm font-medium text-brand-dark sm:col-span-2">
                       {values.price > 0
                         ? `${formatPrice(values.price)} / ${PRICE_UNIT_LABELS[values.priceUnit]}`
-                        : '—'}
+                        : 'Razılaşma ilə'}
                     </dd>
                   </div>
                   <div className="grid gap-1 p-4 sm:grid-cols-3">

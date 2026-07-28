@@ -21,7 +21,7 @@ model User {
   passwordHash  String    @map("password_hash")
   firstName     String    @map("first_name")
   lastName      String    @map("last_name")
-  phone         String?
+  phone         String?   @unique
   avatarUrl     String?   @map("avatar_url")
   role          UserRole  @default(CUSTOMER)
   isVerified    Boolean   @default(false) @map("is_verified")
@@ -150,6 +150,8 @@ model Service {
   category Category @relation(fields: [categoryId], references: [id])
   bookings Booking[]
   images   ServiceImage[]
+  workingHours          ServiceWorkingHours[]
+  availabilityOverrides ServiceAvailabilityOverride[]
 
   @@index([providerId])
   @@index([categoryId])
@@ -168,6 +170,47 @@ model ServiceImage {
   service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   @@map("service_images")
+}
+
+// ─── Xidmət təqvimi ──────────────────────────────────────────────────────────
+
+model ServiceWorkingHours {
+  id        String  @id @default(uuid())
+  serviceId String  @map("service_id")
+  dayOfWeek Int     @map("day_of_week") // 0=Bazar ... 6=Şənbə (JS getDay)
+  startTime String  @map("start_time") // "09:00"
+  endTime   String  @map("end_time") // "18:00"
+  isActive  Boolean @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceId, dayOfWeek, startTime])
+  @@index([serviceId])
+  @@map("service_working_hours")
+}
+
+enum AvailabilityOverrideType {
+  AVAILABLE
+  BLOCKED
+}
+
+model ServiceAvailabilityOverride {
+  id        String                    @id @default(uuid())
+  serviceId String                    @map("service_id")
+  date      DateTime                  @db.Date
+  startTime String?                   @map("start_time") // null = tam gün
+  endTime   String?                   @map("end_time")
+  type      AvailabilityOverrideType
+  note      String?
+  createdAt DateTime                  @default(now()) @map("created_at")
+  updatedAt DateTime                  @updatedAt @map("updated_at")
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([serviceId, date])
+  @@map("service_availability_overrides")
 }
 
 // ─── Sifarişlər ──────────────────────────────────────────────────────────────
@@ -192,6 +235,7 @@ model Booking {
   totalPrice  Decimal       @map("total_price") @db.Decimal(10, 2)
   notes       String?
   address     String?
+  imageUrl    String?       @map("image_url") @db.Text
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 

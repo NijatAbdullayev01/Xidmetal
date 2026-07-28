@@ -1,9 +1,17 @@
 import { z } from 'zod';
-import { UserRole, PriceUnit } from '../enums';
+import { UserRole, PriceUnit, AvailabilityOverrideType } from '../enums';
 import { PRICE_UNIT_VALUES } from '../price-units';
 import { SERVICE_VENUE_VALUES } from '../service-venues';
 
-export const emailSchema = z.string().email('Düzgün e-mail daxil edin');
+const timeHhMmSchema = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Saat HH:mm formatında olmalıdır');
+
+const dateYmdSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Tarix YYYY-MM-DD formatında olmalıdır');
+
+export const emailSchema = z.string().email('Düzgün e-poçt daxil edin');
 export const passwordSchema = z
   .string()
   .min(8, 'Şifrə minimum 8 simvol olmalıdır')
@@ -37,7 +45,7 @@ export const createServiceSchema = z.object({
   title: z.string().min(3, 'Xidmət növü minimum 3 simvol olmalıdır').max(200),
   description: z.string().min(10, 'Təsvir minimum 10 simvol olmalıdır').max(5000),
   categoryId: z.string().uuid('Kateqoriya seçin'),
-  price: z.number().positive('Qiymət müsbət olmalıdır'),
+  price: z.number().min(0, 'Qiymət mənfi ola bilməz'),
   priceUnit: z.enum(PRICE_UNIT_VALUES).default(PriceUnit.FIXED),
   duration: z.number().int().positive().optional(),
   location: z.string().optional(),
@@ -45,11 +53,23 @@ export const createServiceSchema = z.object({
   serviceVenue: z.enum(SERVICE_VENUE_VALUES).optional(),
 });
 
+const imageUrlSchema = z
+  .string()
+  .max(2_000_000, 'Şəkil çox böyükdür')
+  .refine(
+    (val) =>
+      val.startsWith('data:image/') ||
+      val.startsWith('http://') ||
+      val.startsWith('https://'),
+    'Düzgün şəkil formatı daxil edin',
+  );
+
 export const createBookingSchema = z.object({
   serviceId: z.string().uuid(),
   scheduledAt: z.string().datetime(),
-  notes: z.string().max(1000).optional(),
-  address: z.string().max(500).optional(),
+  notes: z.string().trim().min(1, 'Qeyd yazın').max(1000),
+  address: z.string().trim().min(1, 'Ünvan daxil edin').max(500).optional(),
+  imageUrl: imageUrlSchema.optional(),
 });
 
 export const rescheduleBookingSchema = z.object({
@@ -67,7 +87,7 @@ export const updateServiceSchema = z.object({
   title: z.string().min(3).max(200).optional(),
   description: z.string().min(10).max(5000).optional(),
   categoryId: z.string().uuid().optional(),
-  price: z.number().positive().optional(),
+  price: z.number().min(0, 'Qiymət mənfi ola bilməz').optional(),
   priceUnit: z.enum(PRICE_UNIT_VALUES).optional(),
   location: z.string().optional(),
   isRemote: z.boolean().optional(),
@@ -75,22 +95,11 @@ export const updateServiceSchema = z.object({
   status: z.enum(['DRAFT', 'ACTIVE', 'PAUSED', 'ARCHIVED']).optional(),
 });
 
-const avatarUrlSchema = z
-  .string()
-  .max(2_000_000, 'Şəkil çox böyükdür')
-  .refine(
-    (val) =>
-      val.startsWith('data:image/') ||
-      val.startsWith('http://') ||
-      val.startsWith('https://'),
-    'Düzgün şəkil formatı daxil edin',
-  );
-
 export const updateProfileSchema = z.object({
   firstName: z.string().min(2, 'Ad minimum 2 simvol olmalıdır').optional(),
   lastName: z.string().min(2, 'Soyad minimum 2 simvol olmalıdır').optional(),
   phone: z.union([phoneSchema, z.literal('')]).optional(),
-  avatarUrl: z.union([avatarUrlSchema, z.literal(''), z.null()]).optional(),
+  avatarUrl: z.union([imageUrlSchema, z.literal(''), z.null()]).optional(),
   experience: z
     .number()
     .int('Təcrübə tam rəqəm olmalıdır')
@@ -133,6 +142,55 @@ export const sendMessageSchema = z.object({
   content: z.string().min(1, 'Mesaj boş ola bilməz').max(2000),
 });
 
+export const workingHoursEntrySchema = z
+  .object({
+    dayOfWeek: z.number().int().min(0).max(6),
+    startTime: timeHhMmSchema,
+    endTime: timeHhMmSchema,
+    isActive: z.boolean().default(true),
+  })
+  .refine((data) => data.startTime < data.endTime, {
+    message: 'Başlama saati bitmə saatından əvvəl olmalıdır',
+    path: ['endTime'],
+  });
+
+export const upsertWorkingHoursSchema = z.object({
+  hours: z.array(workingHoursEntrySchema).max(21),
+});
+
+export const createAvailabilityOverrideSchema = z
+  .object({
+    date: dateYmdSchema,
+    startTime: timeHhMmSchema.optional().nullable(),
+    endTime: timeHhMmSchema.optional().nullable(),
+    type: z.nativeEnum(AvailabilityOverrideType),
+    note: z.string().max(500).optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    const hasStart = Boolean(data.startTime);
+    const hasEnd = Boolean(data.endTime);
+    if (hasStart !== hasEnd) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Başlama və bitmə saatı birlikdə daxil edilməlidir',
+        path: hasStart ? ['endTime'] : ['startTime'],
+      });
+      return;
+    }
+    if (hasStart && hasEnd && data.startTime && data.endTime && data.startTime >= data.endTime) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Başlama saati bitmə saatından əvvəl olmalıdır',
+        path: ['endTime'],
+      });
+    }
+  });
+
+export const availabilityQuerySchema = z.object({
+  from: dateYmdSchema,
+  to: dateYmdSchema,
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateServiceInput = z.infer<typeof createServiceSchema>;
@@ -147,3 +205,6 @@ export type ConfirmEmailChangeInput = z.infer<typeof confirmEmailChangeSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
+export type UpsertWorkingHoursInput = z.infer<typeof upsertWorkingHoursSchema>;
+export type CreateAvailabilityOverrideInput = z.infer<typeof createAvailabilityOverrideSchema>;
+export type AvailabilityQueryInput = z.infer<typeof availabilityQuerySchema>;

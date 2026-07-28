@@ -41,7 +41,7 @@ export function ContactForm() {
     const subjectLabel = contactSubjectLabels[values.subject];
     const body = [
       `Ad: ${values.name}`,
-      `E-mail: ${values.email}`,
+      `E-poçt: ${values.email}`,
       values.phone?.trim() ? `Telefon: ${values.phone.trim()}` : null,
       `Mövzu: ${subjectLabel}`,
       '',
@@ -110,7 +110,7 @@ export function ContactForm() {
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="contact-email">E-mail</Label>
+            <Label htmlFor="contact-email">E-poçt</Label>
             <Input
               id="contact-email"
               type="email"

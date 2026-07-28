@@ -27,7 +27,7 @@ const contactInfo: {
 }[] = [
   {
     icon: Mail,
-    title: 'E-mail',
+    title: 'E-poçt',
     value: 'info@xidmetal.az',
     href: 'mailto:info@xidmetal.az',
   },

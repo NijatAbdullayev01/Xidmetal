@@ -47,3 +47,13 @@ export enum NotificationType {
   REVIEW_RECEIVED = 'REVIEW_RECEIVED',
   MESSAGE_RECEIVED = 'MESSAGE_RECEIVED',
 }
+
+export enum AvailabilityOverrideType {
+  AVAILABLE = 'AVAILABLE',
+  BLOCKED = 'BLOCKED',
+}
+
+export enum AvailabilitySlotStatus {
+  FREE = 'FREE',
+  BUSY = 'BUSY',
+}

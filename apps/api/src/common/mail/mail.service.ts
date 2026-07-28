@@ -26,17 +26,17 @@ export class MailService {
 
   async sendEmailChangeCode(email: string, code: string): Promise<void> {
     const from = this.config.get<string>('SMTP_FROM', 'noreply@xidmetal.az');
-    const subject = 'Xidmetal — E-mail təsdiq kodu';
+    const subject = 'Xidmetal — E-poçt təsdiq kodu';
     const text =
-      `E-mail ünvanınızı dəyişdirmək üçün təsdiq kodunuz: ${code}\n\n` +
+      `E-poçt ünvanınızı dəyişdirmək üçün təsdiq kodunuz: ${code}\n\n` +
       'Kod 15 dəqiqə ərzində etibarlıdır. Bu sorğunu siz göndərməmisinizsə, bu mesajı nəzərə almayın.';
     const html =
-      `<p>E-mail ünvanınızı dəyişdirmək üçün təsdiq kodunuz:</p>` +
+      `<p>E-poçt ünvanınızı dəyişdirmək üçün təsdiq kodunuz:</p>` +
       `<p style="font-size:24px;font-weight:bold;letter-spacing:4px">${code}</p>` +
       `<p>Kod 15 dəqiqə ərzində etibarlıdır. Bu sorğunu siz göndərməmisinizsə, bu mesajı nəzərə almayın.</p>`;
 
     if (!this.transporter) {
-      this.logger.warn(`[DEV] E-mail (${email}): ${text}`);
+      this.logger.warn(`[DEV] E-poçt (${email}): ${text}`);
       return;
     }
 

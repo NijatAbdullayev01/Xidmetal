@@ -214,7 +214,7 @@ export function SettingsForm() {
       emailConfirmForm.setValue('code', '');
       setEmailChangeStep('verify');
       setEmailChangeServerError(null);
-      setEmailChangeSuccess('Təsdiq kodu yeni e-mail ünvanına göndərildi');
+      setEmailChangeSuccess('Təsdiq kodu yeni e-poçt ünvanına göndərildi');
       autoDismiss(setEmailChangeSuccess, 5000);
     },
     onError: (error) => {
@@ -235,7 +235,7 @@ export function SettingsForm() {
       emailRequestForm.reset();
       emailConfirmForm.reset();
       setEmailChangeStep('idle');
-      setEmailChangeSuccess('E-mail ünvanı uğurla dəyişdirildi');
+      setEmailChangeSuccess('E-poçt ünvanı uğurla dəyişdirildi');
       setEmailChangeServerError(null);
       autoDismiss(setEmailChangeSuccess, 4000);
     },
@@ -243,7 +243,7 @@ export function SettingsForm() {
       if (error instanceof ApiError) {
         setEmailChangeServerError(error.message);
       } else {
-        setEmailChangeServerError('E-mail dəyişdirilərkən xəta baş verdi');
+        setEmailChangeServerError('E-poçt dəyişdirilərkən xəta baş verdi');
       }
     },
   });
@@ -436,14 +436,14 @@ export function SettingsForm() {
 
       <Card>
         <CardHeader>
-          <CardTitle>E-mail ünvanı</CardTitle>
-          <CardDescription>Hesabınıza daxil olmaq üçün istifadə edilən e-mail.</CardDescription>
+          <CardTitle>E-poçt ünvanı</CardTitle>
+          <CardDescription>Hesabınıza daxil olmaq üçün istifadə edilən e-poçt.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <Label htmlFor="email">E-mail</Label>
+                <Label htmlFor="email">E-poçt</Label>
                 {emailChangeStep === 'idle' && profile?.email && (
                   <p className="mt-1 text-sm">{profile.email}</p>
                 )}
@@ -460,7 +460,7 @@ export function SettingsForm() {
                     emailRequestForm.reset({ newEmail: '' });
                   }}
                 >
-                  E-maili dəyiş
+                  E-poçtu dəyiş
                 </Button>
               )}
             </div>
@@ -474,7 +474,7 @@ export function SettingsForm() {
                 noValidate
               >
                 <div className="space-y-2">
-                  <Label htmlFor="newEmail">Yeni e-mail</Label>
+                  <Label htmlFor="newEmail">Yeni e-poçt</Label>
                   <Input
                     id="newEmail"
                     type="email"
@@ -488,7 +488,7 @@ export function SettingsForm() {
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Yeni e-mail ünvanına 6 rəqəmli təsdiq kodu göndəriləcək.
+                    Yeni e-poçt ünvanına 6 rəqəmli təsdiq kodu göndəriləcək.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -562,7 +562,7 @@ export function SettingsForm() {
                         Təsdiq edilir...
                       </>
                     ) : (
-                      'E-maili təsdiq et'
+                      'E-poçtu təsdiq et'
                     )}
                   </Button>
                   <Button

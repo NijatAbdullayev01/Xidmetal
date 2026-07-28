@@ -149,7 +149,9 @@ export default function MyServicesPage() {
                 <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                   <span>{service.categoryName}</span>
                   <span>
-                    {formatPrice(service.price)} / {getPriceUnitLabel(service.priceUnit)}
+                    {service.price > 0
+                      ? `${formatPrice(service.price)} / ${getPriceUnitLabel(service.priceUnit)}`
+                      : formatPrice(service.price)}
                   </span>
                   <span>{formatDate(service.createdAt)}</span>
                 </div>

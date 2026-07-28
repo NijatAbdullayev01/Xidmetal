@@ -4,7 +4,7 @@ import { UserRole } from '@xidmetal/shared';
 
 export class RegisterDto {
   @ApiProperty({ example: 'user@example.com' })
-  @IsEmail({}, { message: 'Düzgün e-mail daxil edin' })
+  @IsEmail({}, { message: 'Düzgün e-poçt daxil edin' })
   email!: string;
 
   @ApiProperty({ example: 'SecurePass1' })

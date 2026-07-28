@@ -69,12 +69,23 @@ export class UsersService {
       throw new BadRequestException('Təcrübə yalnız xidmət verənlər üçün yenilənə bilər');
     }
 
+    const phone = dto.phone?.trim() || null;
+    if (phone) {
+      const phoneTaken = await this.prisma.user.findFirst({
+        where: { phone, NOT: { id: userId } },
+        select: { id: true },
+      });
+      if (phoneTaken) {
+        throw new ConflictException('Bu telefon nömrəsi artıq istifadə olunur');
+      }
+    }
+
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: {
         ...(dto.firstName !== undefined && { firstName: dto.firstName }),
         ...(dto.lastName !== undefined && { lastName: dto.lastName }),
-        ...(dto.phone !== undefined && { phone: dto.phone || null }),
+        ...(dto.phone !== undefined && { phone }),
         ...(dto.avatarUrl !== undefined && {
           avatarUrl: dto.avatarUrl || null,
         }),
@@ -139,12 +150,12 @@ export class UsersService {
 
     const newEmail = dto.newEmail.trim().toLowerCase();
     if (newEmail === user.email.toLowerCase()) {
-      throw new BadRequestException('Yeni e-mail cari e-mail ilə eyni ola bilməz');
+      throw new BadRequestException('Yeni e-poçt cari e-poçt ilə eyni ola bilməz');
     }
 
     const existing = await this.prisma.user.findUnique({ where: { email: newEmail } });
     if (existing) {
-      throw new ConflictException('Bu e-mail artıq istifadə olunur');
+      throw new ConflictException('Bu e-poçt artıq istifadə olunur');
     }
 
     const code = randomInt(100000, 1000000).toString();
@@ -168,7 +179,7 @@ export class UsersService {
 
     await this.mailService.sendEmailChangeCode(newEmail, code);
 
-    return { message: 'Təsdiq kodu yeni e-mail ünvanına göndərildi' };
+    return { message: 'Təsdiq kodu yeni e-poçt ünvanına göndərildi' };
   }
 
   async confirmEmailChange(userId: string, dto: ConfirmEmailChangeDto) {
@@ -201,7 +212,7 @@ export class UsersService {
 
     const existing = await this.prisma.user.findUnique({ where: { email: newEmail } });
     if (existing && existing.id !== userId) {
-      throw new ConflictException('Bu e-mail artıq istifadə olunur');
+      throw new ConflictException('Bu e-poçt artıq istifadə olunur');
     }
 
     const updatedUser = await this.prisma.$transaction(async (tx) => {
@@ -209,7 +220,7 @@ export class UsersService {
         where: { userId, purpose: EmailVerificationPurpose.EMAIL_CHANGE },
       });
 
-      // E-mail dəyişəndə JWT-dəki köhnə `email` claim-i etibarsızlaşdığı üçün
+      // E-poçt dəyişəndə JWT-dəki köhnə `email` claim-i etibarsızlaşdığı üçün
       // mövcud sessiyaları ləğv edib istifadəçini yenidən daxil olmağa yönləndiririk.
       await tx.refreshToken.deleteMany({ where: { userId } });
 

@@ -62,13 +62,13 @@ export class ChangePasswordDto {
 
 export class RequestEmailChangeDto {
   @ApiProperty({ example: 'yeni@example.com' })
-  @IsEmail({}, { message: 'Düzgün e-mail daxil edin' })
+  @IsEmail({}, { message: 'Düzgün e-poçt daxil edin' })
   newEmail!: string;
 }
 
 export class ConfirmEmailChangeDto {
   @ApiProperty({ example: 'yeni@example.com' })
-  @IsEmail({}, { message: 'Düzgün e-mail daxil edin' })
+  @IsEmail({}, { message: 'Düzgün e-poçt daxil edin' })
   newEmail!: string;
 
   @ApiProperty({ example: '123456' })

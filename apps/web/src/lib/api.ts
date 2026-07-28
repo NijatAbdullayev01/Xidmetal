@@ -21,6 +21,11 @@ import type {
   SendMessageInput,
   CreateBookingInput,
   RescheduleBookingInput,
+  WorkingHoursDay,
+  AvailabilityOverride,
+  DayAvailability,
+  UpsertWorkingHoursInput,
+  CreateAvailabilityOverrideInput,
 } from '@xidmetal/shared';
 import { BookingStatus } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
@@ -112,7 +117,16 @@ export async function apiClient<T>(
     throw new ApiError(message, response.status);
   }
 
-  return response.json();
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+
+  return JSON.parse(text) as T;
 }
 
 export const api = {
@@ -200,6 +214,44 @@ export const api = {
 
   deleteService: (token: string, id: string) =>
     apiClient<{ message: string }>(`/services/${id}`, {
+      method: 'DELETE',
+      token,
+    }),
+
+  getServiceAvailability: (serviceId: string, from: string, to: string) =>
+    apiClient<DayAvailability[]>(
+      `/services/${serviceId}/availability?${new URLSearchParams({ from, to })}`,
+    ),
+
+  getWorkingHours: (token: string, serviceId: string) =>
+    apiClient<WorkingHoursDay[]>(`/services/${serviceId}/working-hours`, { token }),
+
+  upsertWorkingHours: (token: string, serviceId: string, data: UpsertWorkingHoursInput) =>
+    apiClient<WorkingHoursDay[]>(`/services/${serviceId}/working-hours`, {
+      method: 'PUT',
+      token,
+      body: JSON.stringify(data),
+    }),
+
+  getAvailabilityOverrides: (token: string, serviceId: string, from: string, to: string) =>
+    apiClient<AvailabilityOverride[]>(
+      `/services/${serviceId}/availability/overrides?${new URLSearchParams({ from, to })}`,
+      { token },
+    ),
+
+  createAvailabilityOverride: (
+    token: string,
+    serviceId: string,
+    data: CreateAvailabilityOverrideInput,
+  ) =>
+    apiClient<AvailabilityOverride>(`/services/${serviceId}/availability/overrides`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify(data),
+    }),
+
+  deleteAvailabilityOverride: (token: string, serviceId: string, overrideId: string) =>
+    apiClient<void>(`/services/${serviceId}/availability/overrides/${overrideId}`, {
       method: 'DELETE',
       token,
     }),
