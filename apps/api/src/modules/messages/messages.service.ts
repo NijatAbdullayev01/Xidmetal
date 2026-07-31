@@ -5,9 +5,21 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/database/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateConversationDto, SendMessageDto } from './dto';
-import { UserRole } from '@xidmetal/shared';
-import type { ConversationDetail, ConversationSummary, MessageSummary } from '@xidmetal/shared';
+import { clearTyping, isPeerTyping, setTyping } from './typing.store';
+import { NotificationType, UserRole } from '@xidmetal/shared';
+import type {
+  ConversationDetail,
+  ConversationSummary,
+  MessageSummary,
+  PeerPresence,
+  UnreadMessagesSummary,
+} from '@xidmetal/shared';
+
+const DEFAULT_MESSAGE_PAGE_SIZE = 50;
+/** Qarşı tərəf bu müddətdə heartbeat göndəribsə onlayn sayılır */
+const ONLINE_THRESHOLD_MS = 90_000;
 
 type ConversationWithRelations = {
   id: string;
@@ -24,6 +36,7 @@ type ConversationWithRelations = {
     senderId: string;
     content: string;
     isRead: boolean;
+    readAt: Date | null;
     createdAt: Date;
     sender: { firstName: string; lastName: string };
   }>;
@@ -31,16 +44,44 @@ type ConversationWithRelations = {
 
 @Injectable()
 export class MessagesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
+
+  private conversationWhereForUser(userId: string, role: string) {
+    if (role === UserRole.PROVIDER) return { providerId: userId };
+    if (role === UserRole.CUSTOMER) return { customerId: userId };
+    throw new ForbiddenException('Bu əməliyyat üçün icazəniz yoxdur');
+  }
+
+  async getUnreadSummary(userId: string, role: string): Promise<UnreadMessagesSummary> {
+    const conversationWhere = this.conversationWhereForUser(userId, role);
+    const unreadWhere = {
+      isRead: false,
+      NOT: { senderId: userId },
+      conversation: conversationWhere,
+    };
+
+    const [count, latest] = await Promise.all([
+      this.prisma.message.count({ where: unreadWhere }),
+      this.prisma.message.findFirst({
+        where: unreadWhere,
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, createdAt: true },
+      }),
+    ]);
+
+    return {
+      count,
+      latestUnreadMessageId: latest?.id ?? null,
+      latestUnreadAt: latest?.createdAt.toISOString() ?? null,
+    };
+  }
 
   async findConversations(userId: string, role: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
-    const where =
-      role === UserRole.PROVIDER
-        ? { providerId: userId }
-        : role === UserRole.ADMIN
-          ? {}
-          : { customerId: userId };
+    const where = this.conversationWhereForUser(userId, role);
 
     const [conversations, total] = await Promise.all([
       this.prisma.conversation.findMany({
@@ -62,17 +103,26 @@ export class MessagesService {
       this.prisma.conversation.count({ where }),
     ]);
 
-    const items = await Promise.all(
-      conversations.map(async (conv) => {
-        const unreadCount = await this.prisma.message.count({
-          where: {
-            conversationId: conv.id,
-            isRead: false,
-            NOT: { senderId: userId },
-          },
-        });
-        return this.mapConversation(conv, unreadCount);
-      }),
+    const conversationIds = conversations.map((c) => c.id);
+    const unreadCounts = new Map<string, number>();
+
+    if (conversationIds.length > 0) {
+      const grouped = await this.prisma.message.groupBy({
+        by: ['conversationId'],
+        where: {
+          conversationId: { in: conversationIds },
+          isRead: false,
+          NOT: { senderId: userId },
+        },
+        _count: { _all: true },
+      });
+      for (const row of grouped) {
+        unreadCounts.set(row.conversationId, row._count._all);
+      }
+    }
+
+    const items = conversations.map((conv) =>
+      this.mapConversation(conv, unreadCounts.get(conv.id) ?? 0, 'desc'),
     );
 
     return {
@@ -84,17 +134,13 @@ export class MessagesService {
     };
   }
 
-  async findConversation(id: string, userId: string) {
+  async findConversation(id: string, userId: string): Promise<ConversationDetail> {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id },
       include: {
         customer: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         provider: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         booking: { select: { service: { select: { title: true } } } },
-        messages: {
-          orderBy: { createdAt: 'asc' },
-          include: { sender: { select: { firstName: true, lastName: true } } },
-        },
       },
     });
 
@@ -104,23 +150,145 @@ export class MessagesService {
 
     this.assertParticipant(conversation, userId);
 
-    await this.prisma.message.updateMany({
+    const peerId =
+      conversation.customerId === userId
+        ? conversation.providerId
+        : conversation.customerId;
+
+    const limit = DEFAULT_MESSAGE_PAGE_SIZE;
+    const [recent, peer, unreadCount] = await Promise.all([
+      this.prisma.message.findMany({
+        where: { conversationId: id },
+        orderBy: { createdAt: 'desc' },
+        take: limit + 1,
+        include: { sender: { select: { firstName: true, lastName: true } } },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: peerId },
+        select: { lastSeenAt: true },
+      }),
+      this.prisma.message.count({
+        where: {
+          conversationId: id,
+          isRead: false,
+          NOT: { senderId: userId },
+        },
+      }),
+    ]);
+
+    const hasMore = recent.length > limit;
+    const page = hasMore ? recent.slice(0, limit) : recent;
+    const messagesAsc = [...page].reverse();
+    const nextCursor = hasMore ? messagesAsc[0]?.id ?? null : null;
+
+    const withMessages: ConversationWithRelations = {
+      ...conversation,
+      messages: messagesAsc,
+    };
+
+    const summary = this.mapConversation(withMessages, unreadCount, 'asc');
+    return {
+      ...summary,
+      messages: messagesAsc.map((m) => this.mapMessage(m)),
+      nextCursor,
+      hasMore,
+      peerPresence: this.mapPeerPresence(peer?.lastSeenAt ?? null),
+      peerTyping: isPeerTyping(id, userId),
+    };
+  }
+
+  async findMessages(
+    conversationId: string,
+    userId: string,
+    before?: string,
+    limit = DEFAULT_MESSAGE_PAGE_SIZE,
+  ) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: { id: true, customerId: true, providerId: true },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Söhbət tapılmadı');
+    }
+
+    this.assertParticipant(conversation, userId);
+
+    let beforeFilter: { createdAt: { lt: Date } } | undefined;
+    if (before) {
+      const cursorMessage = await this.prisma.message.findFirst({
+        where: { id: before, conversationId },
+        select: { createdAt: true },
+      });
+      if (!cursorMessage) {
+        throw new BadRequestException('Cursor mesajı tapılmadı');
+      }
+      beforeFilter = { createdAt: { lt: cursorMessage.createdAt } };
+    }
+
+    const rows = await this.prisma.message.findMany({
+      where: {
+        conversationId,
+        ...beforeFilter,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      include: { sender: { select: { firstName: true, lastName: true } } },
+    });
+
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const messagesAsc = [...page].reverse();
+    const nextCursor = hasMore ? messagesAsc[0]?.id ?? null : null;
+
+    return {
+      items: messagesAsc.map((m) => this.mapMessage(m)),
+      nextCursor,
+      hasMore,
+    };
+  }
+
+  async markConversationRead(id: string, userId: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id },
+      select: { id: true, customerId: true, providerId: true },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Söhbət tapılmadı');
+    }
+
+    this.assertParticipant(conversation, userId);
+
+    const now = new Date();
+    const result = await this.prisma.message.updateMany({
       where: {
         conversationId: id,
         isRead: false,
         NOT: { senderId: userId },
       },
-      data: { isRead: true },
+      data: { isRead: true, readAt: now },
     });
 
-    const unreadCount = 0;
-    const summary = this.mapConversation(conversation, unreadCount);
-    const detail: ConversationDetail = {
-      ...summary,
-      messages: conversation.messages.map((m) => this.mapMessage(m)),
-    };
+    // Mesaj oxunanda eyni söhbətin zəng bildirişi də bağlanmalıdır
+    await this.notificationsService.markMessageNotificationsRead(userId, id);
 
-    return detail;
+    return { markedCount: result.count };
+  }
+
+  async setTyping(conversationId: string, userId: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: { id: true, customerId: true, providerId: true },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Söhbət tapılmadı');
+    }
+
+    this.assertParticipant(conversation, userId);
+    setTyping(conversationId, userId);
+    return { ok: true as const };
   }
 
   async createConversation(userId: string, role: string, dto: CreateConversationDto) {
@@ -166,11 +334,29 @@ export class MessagesService {
       throw new BadRequestException('Xidmət verən tapılmadı');
     }
 
+    if (!dto.bookingId) {
+      const priorBooking = await this.prisma.booking.findFirst({
+        where: { customerId, providerId },
+        select: { id: true },
+      });
+      if (!priorBooking) {
+        throw new ForbiddenException(
+          'Söhbət yalnız mövcud sifariş əlaqəsi olan tərəflər arasında açıla bilər',
+        );
+      }
+    }
+
     const existing = await this.prisma.conversation.findUnique({
       where: { customerId_providerId: { customerId, providerId } },
     });
 
     if (existing) {
+      if (bookingId && existing.bookingId !== bookingId) {
+        await this.prisma.conversation.update({
+          where: { id: existing.id },
+          data: { bookingId },
+        });
+      }
       if (dto.initialMessage) {
         await this.sendMessage(existing.id, userId, { content: dto.initialMessage });
       }
@@ -182,16 +368,12 @@ export class MessagesService {
         customerId,
         providerId,
         bookingId,
-        ...(dto.initialMessage && {
-          messages: {
-            create: {
-              senderId: userId,
-              content: dto.initialMessage,
-            },
-          },
-        }),
       },
     });
+
+    if (dto.initialMessage) {
+      await this.sendMessage(conversation.id, userId, { content: dto.initialMessage });
+    }
 
     return this.findConversation(conversation.id, userId);
   }
@@ -207,12 +389,24 @@ export class MessagesService {
 
     this.assertParticipant(conversation, userId);
 
+    const content = dto.content.trim();
+    if (!content) {
+      throw new BadRequestException('Mesaj boş ola bilməz');
+    }
+
+    clearTyping(conversationId, userId);
+
+    const recipientId =
+      conversation.customerId === userId
+        ? conversation.providerId
+        : conversation.customerId;
+
     const message = await this.prisma.$transaction(async (tx) => {
       const created = await tx.message.create({
         data: {
           conversationId,
           senderId: userId,
-          content: dto.content.trim(),
+          content,
         },
         include: { sender: { select: { firstName: true, lastName: true } } },
       });
@@ -220,6 +414,23 @@ export class MessagesService {
       await tx.conversation.update({
         where: { id: conversationId },
         data: { updatedAt: new Date() },
+      });
+
+      const preview =
+        content.length > 120 ? `${content.slice(0, 117).trimEnd()}...` : content;
+      const senderName = `${created.sender.firstName} ${created.sender.lastName}`;
+
+      await tx.notification.create({
+        data: {
+          userId: recipientId,
+          type: NotificationType.MESSAGE_RECEIVED,
+          title: 'Yeni mesaj',
+          body: `${senderName}: ${preview}`,
+          data: {
+            conversationId,
+            messageId: created.id,
+          },
+        },
       });
 
       return created;
@@ -237,6 +448,17 @@ export class MessagesService {
     }
   }
 
+  private mapPeerPresence(lastSeenAt: Date | null): PeerPresence {
+    if (!lastSeenAt) {
+      return { isOnline: false, lastSeenAt: null };
+    }
+    const isOnline = Date.now() - lastSeenAt.getTime() < ONLINE_THRESHOLD_MS;
+    return {
+      isOnline,
+      lastSeenAt: lastSeenAt.toISOString(),
+    };
+  }
+
   private mapMessage(message: ConversationWithRelations['messages'][number]): MessageSummary {
     return {
       id: message.id,
@@ -245,6 +467,7 @@ export class MessagesService {
       senderName: `${message.sender.firstName} ${message.sender.lastName}`,
       content: message.content,
       isRead: message.isRead,
+      readAt: message.readAt?.toISOString() ?? null,
       createdAt: message.createdAt.toISOString(),
     };
   }
@@ -254,8 +477,11 @@ export class MessagesService {
       messages?: ConversationWithRelations['messages'];
     },
     unreadCount: number,
+    messageOrder: 'asc' | 'desc',
   ): ConversationSummary {
-    const lastMsg = conv.messages?.[0];
+    const messages = conv.messages ?? [];
+    const lastMsg =
+      messageOrder === 'desc' ? messages[0] : messages.length > 0 ? messages[messages.length - 1] : undefined;
     return {
       id: conv.id,
       customerId: conv.customerId,

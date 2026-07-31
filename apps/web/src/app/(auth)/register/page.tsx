@@ -1,7 +1,5 @@
 import type { Metadata } from 'next';
-import { RegisterForm } from '@/components/auth/register-form';
-import { GuestOnly } from '@/components/auth/guest-only';
-import { AuthPageShell } from '@/components/auth/auth-page-shell';
+import { RegisterView } from '@/components/auth/register-view';
 import { parseRoleFromQuery } from '@/lib/auth';
 
 export const metadata: Metadata = {
@@ -17,14 +15,5 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
   const params = await searchParams;
   const defaultRole = parseRoleFromQuery(params.role);
 
-  return (
-    <AuthPageShell
-      title="Qeydiyyat"
-      description="Hesab növünü seçin və məlumatlarınızı daxil edin"
-    >
-      <GuestOnly>
-        <RegisterForm defaultRole={defaultRole} />
-      </GuestOnly>
-    </AuthPageShell>
-  );
+  return <RegisterView defaultRole={defaultRole} />;
 }

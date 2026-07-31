@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, MessageSquare, CalendarClock } from 'lucide-react';
+import { Loader2, MessageSquare, CalendarClock, Star } from 'lucide-react';
 import { BookingStatus } from '@xidmetal/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ReviewDialog } from '@/components/bookings/review-dialog';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { formatPrice, formatDateTime } from '@/lib/utils';
@@ -32,6 +33,10 @@ export default function CustomerBookingsPage() {
   const [actionId, setActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [messageLoadingId, setMessageLoadingId] = useState<string | null>(null);
+  const [reviewBooking, setReviewBooking] = useState<{
+    id: string;
+    serviceTitle: string;
+  } | null>(null);
 
   const currentTab = TABS.find((t) => t.key === activeTab)!;
 
@@ -43,6 +48,8 @@ export default function CustomerBookingsPage() {
         ...(currentTab.status && { status: currentTab.status }),
       }),
     enabled: !!token,
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
   });
 
   const updateMutation = useMutation({
@@ -70,10 +77,10 @@ export default function CustomerBookingsPage() {
       if (!token) throw new Error('Autentifikasiya tələb olunur');
       return api.messages.createConversation(token, { bookingId });
     },
-    onSuccess: () => {
+    onSuccess: (conversation) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       setMessageLoadingId(null);
-      router.push('/dashboard/customer/messages');
+      router.push(`/dashboard/customer/messages?conversationId=${conversation.id}`);
     },
     onError: (error) => {
       setMessageLoadingId(null);
@@ -147,6 +154,11 @@ export default function CustomerBookingsPage() {
     setActionError(null);
     setMessageLoadingId(bookingId);
     startConversationMutation.mutate(bookingId);
+  };
+
+  const handleReviewSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    setReviewBooking(null);
   };
 
   return (
@@ -294,6 +306,23 @@ export default function CustomerBookingsPage() {
                       )}
                     </Button>
                   )}
+                  {booking.status === BookingStatus.COMPLETED && !booking.hasReview && (
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        setReviewBooking({
+                          id: booking.id,
+                          serviceTitle: booking.serviceTitle,
+                        })
+                      }
+                    >
+                      <Star className="h-4 w-4" />
+                      İşi təsdiqlə və rəy yaz
+                    </Button>
+                  )}
+                  {booking.status === BookingStatus.COMPLETED && booking.hasReview && (
+                    <Badge variant="success">Rəy verildi</Badge>
+                  )}
                   <Button
                       size="sm"
                       variant="outline"
@@ -315,6 +344,17 @@ export default function CustomerBookingsPage() {
           </Card>
         ))}
       </div>
+
+      {token && reviewBooking && (
+        <ReviewDialog
+          open={!!reviewBooking}
+          onClose={() => setReviewBooking(null)}
+          bookingId={reviewBooking.id}
+          serviceTitle={reviewBooking.serviceTitle}
+          token={token}
+          onSuccess={handleReviewSuccess}
+        />
+      )}
     </div>
   );
 }

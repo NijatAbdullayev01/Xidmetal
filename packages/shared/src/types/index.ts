@@ -82,6 +82,7 @@ export interface BookingSummary {
   notes?: string;
   address?: string;
   imageUrl?: string;
+  hasReview?: boolean;
   createdAt: string;
 }
 
@@ -121,7 +122,14 @@ export interface MessageSummary {
   senderName: string;
   content: string;
   isRead: boolean;
+  /** Oxunma vaxtı (WhatsApp tipli oxundu) */
+  readAt?: string | null;
   createdAt: string;
+}
+
+export interface PeerPresence {
+  isOnline: boolean;
+  lastSeenAt: string | null;
 }
 
 export interface ConversationSummary {
@@ -142,6 +150,39 @@ export interface ConversationSummary {
 
 export interface ConversationDetail extends ConversationSummary {
   messages: MessageSummary[];
+  /** Köhnə mesajlar üçün cursor (ən köhnə yüklənmiş mesajın id-si) */
+  nextCursor?: string | null;
+  hasMore?: boolean;
+  /** Qarşı tərəfin onlayn / son görülmə statusu */
+  peerPresence?: PeerPresence;
+  /** Qarşı tərəf hazırda yazır */
+  peerTyping?: boolean;
+}
+
+export interface MessagesPage {
+  items: MessageSummary[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export interface NotificationSummary {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  data?: Record<string, unknown> | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface UnreadNotificationsSummary {
+  count: number;
+}
+
+export interface UnreadMessagesSummary {
+  count: number;
+  latestUnreadMessageId: string | null;
+  latestUnreadAt: string | null;
 }
 
 export interface AuthTokens {

@@ -24,6 +24,8 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth.store';
 import { useLogout } from '@/hooks/use-logout';
+import { useMessageNotifications } from '@/hooks/use-message-notifications';
+import { NotificationsBell } from '@/components/notifications/notifications-bell';
 import { cn } from '@/lib/utils';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
 
@@ -64,11 +66,40 @@ interface DashboardSidebarProps {
   variant: DashboardVariant;
 }
 
+function isMessagesNavItem(href: string) {
+  return href.endsWith('/messages');
+}
+
+function UnreadBadge({
+  count,
+  active,
+}: {
+  count: number;
+  active: boolean;
+}) {
+  if (count <= 0) return null;
+
+  return (
+    <span
+      className={cn(
+        'ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-semibold',
+        active
+          ? 'bg-brand-foreground/15 text-brand-foreground'
+          : 'bg-brand text-brand-foreground',
+      )}
+      aria-label={`${count} oxunmamış mesaj`}
+    >
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
 export function DashboardSidebar({ variant }: DashboardSidebarProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const user = useAuthStore((state) => state.user);
   const logout = useLogout();
+  const { unreadCount } = useMessageNotifications(!!user);
 
   const navItems = variant === 'provider' ? PROVIDER_NAV : CUSTOMER_NAV;
   const roleLabel = ROLE_LABELS[variant];
@@ -114,6 +145,7 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
       {navItems.map((item) => {
         const Icon = item.icon;
         const active = item.href === activeHref;
+        const showUnread = isMessagesNavItem(item.href);
         return (
           <Link
             key={item.href}
@@ -127,7 +159,8 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
             )}
           >
             <Icon className="h-4 w-4 shrink-0" />
-            {item.label}
+            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            {showUnread && <UnreadBadge count={unreadCount} active={active} />}
           </Link>
         );
       })}
@@ -171,6 +204,7 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
           <span className="sm:inline">Geri qayıt</span>
         </Link>
         <div className="flex items-center gap-1">
+          <NotificationsBell />
           <ThemeToggle variant="switch" />
           <button
             type="button"
@@ -212,7 +246,10 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
             <ArrowLeft className="h-4 w-4 shrink-0" />
             <span className="truncate">Geri qayıt</span>
           </Link>
-          <ThemeToggle variant="switch" className="shrink-0" />
+          <div className="flex shrink-0 items-center gap-1">
+            <NotificationsBell />
+            <ThemeToggle variant="switch" />
+          </div>
         </div>
 
         {navContent}

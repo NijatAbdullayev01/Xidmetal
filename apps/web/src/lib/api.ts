@@ -8,6 +8,7 @@ import type {
   CategorySummary,
   ReviewSummary,
   PaginatedResponse,
+  CreateReviewInput,
   CreateServiceInput,
   UpdateServiceInput,
   UpdateProfileInput,
@@ -17,6 +18,10 @@ import type {
   ConversationSummary,
   ConversationDetail,
   MessageSummary,
+  MessagesPage,
+  UnreadMessagesSummary,
+  NotificationSummary,
+  UnreadNotificationsSummary,
   CreateConversationInput,
   SendMessageInput,
   CreateBookingInput,
@@ -152,6 +157,11 @@ export const api = {
 
   users: {
     me: (token: string) => apiClient<UserProfile>('/users/me', { token }),
+    heartbeat: (token: string) =>
+      apiClient<{ lastSeenAt: string }>('/users/me/heartbeat', {
+        method: 'POST',
+        token,
+      }),
     updateProfile: (token: string, data: UpdateProfileInput) =>
       apiClient<UserProfile>('/users/me', {
         method: 'PATCH',
@@ -294,12 +304,21 @@ export const api = {
       token,
     }),
 
+  createReview: (token: string, data: CreateReviewInput) =>
+    apiClient<ReviewSummary>('/reviews', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(data),
+    }),
+
   reviewsReceived: (token: string, params?: Record<string, string>) => {
     const query = params ? `?${new URLSearchParams(params)}` : '';
     return apiClient<PaginatedResponse<ReviewSummary>>(`/reviews/received${query}`, { token });
   },
 
   messages: {
+    unreadCount: (token: string) =>
+      apiClient<UnreadMessagesSummary>('/messages/unread-count', { token }),
     conversations: (token: string, params?: Record<string, string>) => {
       const query = params ? `?${new URLSearchParams(params)}` : '';
       return apiClient<PaginatedResponse<ConversationSummary>>(
@@ -309,6 +328,23 @@ export const api = {
     },
     conversation: (token: string, id: string) =>
       apiClient<ConversationDetail>(`/messages/conversations/${id}`, { token }),
+    messages: (token: string, conversationId: string, params?: Record<string, string>) => {
+      const query = params ? `?${new URLSearchParams(params)}` : '';
+      return apiClient<MessagesPage>(
+        `/messages/conversations/${conversationId}/messages${query}`,
+        { token },
+      );
+    },
+    markRead: (token: string, conversationId: string) =>
+      apiClient<{ markedCount: number }>(`/messages/conversations/${conversationId}/read`, {
+        method: 'POST',
+        token,
+      }),
+    setTyping: (token: string, conversationId: string) =>
+      apiClient<{ ok: true }>(`/messages/conversations/${conversationId}/typing`, {
+        method: 'POST',
+        token,
+      }),
     createConversation: (token: string, data: CreateConversationInput) =>
       apiClient<ConversationDetail>('/messages/conversations', {
         method: 'POST',
@@ -320,6 +356,27 @@ export const api = {
         method: 'POST',
         token,
         body: JSON.stringify(data),
+      }),
+  },
+
+  notifications: {
+    list: (token: string, params?: Record<string, string>) => {
+      const query = params ? `?${new URLSearchParams(params)}` : '';
+      return apiClient<PaginatedResponse<NotificationSummary>>(`/notifications${query}`, {
+        token,
+      });
+    },
+    unreadCount: (token: string) =>
+      apiClient<UnreadNotificationsSummary>('/notifications/unread-count', { token }),
+    markRead: (token: string, id: string) =>
+      apiClient<NotificationSummary>(`/notifications/${id}/read`, {
+        method: 'PATCH',
+        token,
+      }),
+    markAllRead: (token: string) =>
+      apiClient<{ markedCount: number }>('/notifications/read-all', {
+        method: 'POST',
+        token,
       }),
   },
 };

@@ -19,6 +19,13 @@ export class UsersController {
     return this.usersService.findById(userId);
   }
 
+  @Post('me/heartbeat')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @ApiOperation({ summary: 'Onlayn statusu yenilə (presence heartbeat)' })
+  heartbeat(@CurrentUser('id') userId: string) {
+    return this.usersService.heartbeat(userId);
+  }
+
   @Patch('me')
   @ApiOperation({ summary: 'Profil məlumatlarını yenilə' })
   updateMe(@CurrentUser('id') userId: string, @Body() dto: UpdateProfileDto) {

@@ -21,12 +21,16 @@ export default function CustomerOverviewPage() {
     queryKey: ['bookings', 'all'],
     queryFn: () => api.bookings(token!, { limit: '100' }),
     enabled: !!token,
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: conversations } = useQuery({
     queryKey: ['conversations'],
     queryFn: () => api.messages.conversations(token!, { limit: '100' }),
     enabled: !!token,
+    refetchInterval: 5_000,
+    refetchOnWindowFocus: true,
   });
 
   const activeBookings =
@@ -161,18 +165,23 @@ export default function CustomerOverviewPage() {
             )}
             <ul className="divide-y divide-border">
               {conversations?.items.slice(0, 5).map((conv) => (
-                <li key={conv.id} className="flex items-center justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{conv.providerName}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {conv.lastMessage ?? 'Yeni söhbət'}
-                    </p>
-                  </div>
-                  {conv.unreadCount > 0 && (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-medium text-brand-foreground">
-                      {conv.unreadCount}
-                    </span>
-                  )}
+                <li key={conv.id}>
+                  <Link
+                    href={`/dashboard/customer/messages?conversationId=${conv.id}`}
+                    className="flex min-h-[44px] items-center justify-between gap-3 py-3 transition-colors hover:text-foreground"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{conv.providerName}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {conv.lastMessage ?? 'Yeni söhbət'}
+                      </p>
+                    </div>
+                    {conv.unreadCount > 0 && (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-medium text-brand-foreground">
+                        {conv.unreadCount}
+                      </span>
+                    )}
+                  </Link>
                 </li>
               ))}
             </ul>

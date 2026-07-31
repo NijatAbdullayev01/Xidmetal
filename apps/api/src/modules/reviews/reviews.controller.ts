@@ -1,7 +1,7 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ReviewsService } from './reviews.service';
-import { ReviewQueryDto } from './dto';
+import { CreateReviewDto, ReviewQueryDto } from './dto';
 import { JwtAuthGuard, RolesGuard } from '../../common/guards';
 import { Roles } from '../../common/decorators';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -13,6 +13,13 @@ import { UserRole } from '@xidmetal/shared';
 @Controller('reviews')
 export class ReviewsController {
   constructor(private reviewsService: ReviewsService) {}
+
+  @Roles(UserRole.CUSTOMER, UserRole.PROVIDER)
+  @Post()
+  @ApiOperation({ summary: 'Tamamlanmış sifarişə rəy və reytinq yaz' })
+  create(@CurrentUser('id') userId: string, @Body() dto: CreateReviewDto) {
+    return this.reviewsService.create(userId, dto);
+  }
 
   @Roles(UserRole.PROVIDER)
   @Get('received')

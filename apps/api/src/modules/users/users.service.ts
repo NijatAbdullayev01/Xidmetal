@@ -47,6 +47,16 @@ export class UsersService {
     return this.mapUserProfile(user);
   }
 
+  /** Dashboard açıq olanda periodik çağırılır — onlayn / son görülmə üçün */
+  async heartbeat(userId: string) {
+    const now = new Date();
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { lastSeenAt: now },
+    });
+    return { lastSeenAt: now.toISOString() };
+  }
+
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({ where: { email } });
   }

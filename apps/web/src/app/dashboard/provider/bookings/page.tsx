@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, Loader2 } from 'lucide-react';
+import { CalendarClock, Loader2, MessageSquare } from 'lucide-react';
 import { BookingStatus } from '@xidmetal/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -143,6 +143,7 @@ function RescheduleForm({
 export default function ProviderBookingsPage() {
   const token = useAuthToken();
   const userId = useAuthStore((state) => state.user?.id);
+  const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>('all');
@@ -152,6 +153,7 @@ export default function ProviderBookingsPage() {
   const [actionId, setActionId] = useState<string | null>(null);
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [messageLoadingId, setMessageLoadingId] = useState<string | null>(null);
 
   const currentTab = TABS.find((t) => t.key === activeTab)!;
 
@@ -163,6 +165,8 @@ export default function ProviderBookingsPage() {
         ...(currentTab.status && { status: currentTab.status }),
       }),
     enabled: !!token,
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
   });
 
   const visibleBookings =
@@ -191,11 +195,37 @@ export default function ProviderBookingsPage() {
     },
   });
 
+  const startConversationMutation = useMutation({
+    mutationFn: (bookingId: string) => {
+      if (!token) throw new Error('Autentifikasiya tələb olunur');
+      return api.messages.createConversation(token, { bookingId });
+    },
+    onSuccess: (conversation) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      setMessageLoadingId(null);
+      router.push(`/dashboard/provider/messages?conversationId=${conversation.id}`);
+    },
+    onError: (error) => {
+      setMessageLoadingId(null);
+      if (error instanceof ApiError) {
+        setActionError(error.message);
+      } else {
+        setActionError('Söhbət açılarkən xəta baş verdi');
+      }
+    },
+  });
+
   const handleAction = (id: string, status: BookingStatus) => {
     setActionError(null);
     setRescheduleId(null);
     setActionId(id);
     updateMutation.mutate({ id, status });
+  };
+
+  const handleMessage = (bookingId: string) => {
+    setActionError(null);
+    setMessageLoadingId(bookingId);
+    startConversationMutation.mutate(bookingId);
   };
 
   return (
@@ -372,6 +402,21 @@ export default function ProviderBookingsPage() {
                       Tamamla
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={messageLoadingId === booking.id}
+                    onClick={() => handleMessage(booking.id)}
+                  >
+                    {messageLoadingId === booking.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <MessageSquare className="h-4 w-4" />
+                        Mesaj yaz
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
 

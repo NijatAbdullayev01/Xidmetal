@@ -10,6 +10,13 @@ import { UserRole, BookingStatus, NotificationType } from '@xidmetal/shared';
 import { ServiceStatus } from '@prisma/client';
 import { AvailabilityService } from '../availability/availability.service';
 
+const bookingSummaryInclude = {
+  service: { select: { id: true, title: true } },
+  customer: { select: { id: true, firstName: true, lastName: true } },
+  provider: { select: { id: true, firstName: true, lastName: true } },
+  review: { select: { id: true } },
+} as const;
+
 @Injectable()
 export class BookingsService {
   constructor(
@@ -42,11 +49,7 @@ export class BookingsService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
-          service: { select: { id: true, title: true } },
-          customer: { select: { id: true, firstName: true, lastName: true } },
-          provider: { select: { id: true, firstName: true, lastName: true } },
-        },
+        include: bookingSummaryInclude,
       }),
       this.prisma.booking.count({ where }),
     ]);
@@ -113,11 +116,7 @@ export class BookingsService {
           imageUrl: dto.imageUrl,
           status: BookingStatus.PENDING,
         },
-        include: {
-          service: { select: { id: true, title: true } },
-          customer: { select: { id: true, firstName: true, lastName: true } },
-          provider: { select: { id: true, firstName: true, lastName: true } },
-        },
+        include: bookingSummaryInclude,
       });
 
       await tx.notification.create({
@@ -178,11 +177,7 @@ export class BookingsService {
       const result = await tx.booking.update({
         where: { id },
         data: { proposedScheduledAt: scheduledAt },
-        include: {
-          service: { select: { id: true, title: true } },
-          customer: { select: { id: true, firstName: true, lastName: true } },
-          provider: { select: { id: true, firstName: true, lastName: true } },
-        },
+        include: bookingSummaryInclude,
       });
 
       const conversation = await tx.conversation.upsert({
@@ -271,11 +266,7 @@ export class BookingsService {
           proposedScheduledAt: null,
           status: BookingStatus.CONFIRMED,
         },
-        include: {
-          service: { select: { id: true, title: true } },
-          customer: { select: { id: true, firstName: true, lastName: true } },
-          provider: { select: { id: true, firstName: true, lastName: true } },
-        },
+        include: bookingSummaryInclude,
       });
 
       await tx.notification.create({
@@ -320,11 +311,7 @@ export class BookingsService {
       const result = await tx.booking.update({
         where: { id },
         data: { proposedScheduledAt: null },
-        include: {
-          service: { select: { id: true, title: true } },
-          customer: { select: { id: true, firstName: true, lastName: true } },
-          provider: { select: { id: true, firstName: true, lastName: true } },
-        },
+        include: bookingSummaryInclude,
       });
 
       await tx.notification.create({
@@ -367,11 +354,7 @@ export class BookingsService {
       const result = await tx.booking.update({
         where: { id },
         data: { status: dto.status },
-        include: {
-          service: { select: { id: true, title: true } },
-          customer: { select: { id: true, firstName: true, lastName: true } },
-          provider: { select: { id: true, firstName: true, lastName: true } },
-        },
+        include: bookingSummaryInclude,
       });
 
       if (dto.status === BookingStatus.CONFIRMED && isProvider) {
@@ -429,6 +412,7 @@ export class BookingsService {
     notes: string | null;
     address?: string | null;
     imageUrl?: string | null;
+    review?: { id: string } | null;
     createdAt: Date;
   }) {
     return {
@@ -446,6 +430,7 @@ export class BookingsService {
       notes: booking.notes ?? undefined,
       address: booking.address ?? undefined,
       imageUrl: booking.imageUrl ?? undefined,
+      hasReview: !!booking.review,
       createdAt: booking.createdAt.toISOString(),
     };
   }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { Briefcase, ClipboardList, Star, PlusCircle, ArrowRight } from 'lucide-react';
+import { Briefcase, ClipboardList, Star, PlusCircle, ArrowRight, MessageSquare } from 'lucide-react';
 import { BookingStatus, ServiceStatus } from '@xidmetal/shared';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { buttonStyles } from '@/components/ui/button';
@@ -29,15 +29,25 @@ export default function ProviderOverviewPage() {
     queryKey: ['bookings', 'all'],
     queryFn: () => api.bookings(token!, { limit: '100' }),
     enabled: !!token,
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
+  });
+
+  const { data: conversations } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: () => api.messages.conversations(token!, { limit: '100' }),
+    enabled: !!token,
+    refetchInterval: 5_000,
+    refetchOnWindowFocus: true,
   });
 
   const activeServices = services?.items.filter((s) => s.status === ServiceStatus.ACTIVE).length ?? 0;
   const pendingBookings =
     bookings?.items.filter((b) => b.status === BookingStatus.PENDING).length ?? 0;
-  const completedBookings =
-    bookings?.items.filter((b) => b.status === BookingStatus.COMPLETED).length ?? 0;
   const rating = profile?.providerProfile?.rating ?? 0;
   const reviewCount = profile?.providerProfile?.reviewCount ?? 0;
+  const unreadMessages =
+    conversations?.items.reduce((sum, c) => sum + c.unreadCount, 0) ?? 0;
 
   const stats = [
     {
@@ -53,10 +63,10 @@ export default function ProviderOverviewPage() {
       href: '/dashboard/provider/bookings',
     },
     {
-      label: 'Tamamlanan sifarişlər',
-      value: completedBookings,
-      icon: ClipboardList,
-      href: '/dashboard/provider/bookings',
+      label: 'Oxunmamış mesaj',
+      value: unreadMessages,
+      icon: MessageSquare,
+      href: '/dashboard/provider/messages',
     },
     {
       label: 'Reytinq',
@@ -142,11 +152,11 @@ export default function ProviderOverviewPage() {
         <Card>
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle>Xidmətlərim</CardTitle>
-              <CardDescription>Yaratdığınız xidmətlər</CardDescription>
+              <CardTitle>Son mesajlar</CardTitle>
+              <CardDescription>Müştərilərlə yazışmalar</CardDescription>
             </div>
             <Link
-              href="/dashboard/provider/services"
+              href="/dashboard/provider/messages"
               className={buttonStyles('ghost', 'sm')}
             >
               Hamısı
@@ -154,31 +164,76 @@ export default function ProviderOverviewPage() {
             </Link>
           </CardHeader>
           <CardContent>
-            {services?.items.length === 0 && (
-              <div className="py-8 text-center">
-                <p className="text-sm text-muted-foreground">Hələ xidmət yoxdur</p>
-                <Link
-                  href="/dashboard/provider/services/new"
-                  className={buttonStyles('default', 'sm') + ' mt-3'}
-                >
-                  İlk xidməti yarat
-                </Link>
-              </div>
+            {conversations?.items.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Hələ mesaj yoxdur
+              </p>
             )}
             <ul className="divide-y divide-border">
-              {services?.items.slice(0, 5).map((service) => (
-                <li key={service.id} className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="text-sm font-medium">{service.title}</p>
-                    <p className="text-xs text-muted-foreground">{service.categoryName}</p>
-                  </div>
-                  <p className="text-sm font-medium">{formatPrice(service.price)}</p>
+              {conversations?.items.slice(0, 5).map((conv) => (
+                <li key={conv.id}>
+                  <Link
+                    href={`/dashboard/provider/messages?conversationId=${conv.id}`}
+                    className="flex min-h-[44px] items-center justify-between gap-3 py-3 transition-colors hover:text-foreground"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{conv.customerName}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {conv.lastMessage ?? 'Yeni söhbət'}
+                      </p>
+                    </div>
+                    {conv.unreadCount > 0 && (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-medium text-brand-foreground">
+                        {conv.unreadCount}
+                      </span>
+                    )}
+                  </Link>
                 </li>
               ))}
             </ul>
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>Xidmətlərim</CardTitle>
+            <CardDescription>Yaratdığınız xidmətlər</CardDescription>
+          </div>
+          <Link
+            href="/dashboard/provider/services"
+            className={buttonStyles('ghost', 'sm')}
+          >
+            Hamısı
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {services?.items.length === 0 && (
+            <div className="py-8 text-center">
+              <p className="text-sm text-muted-foreground">Hələ xidmət yoxdur</p>
+              <Link
+                href="/dashboard/provider/services/new"
+                className={buttonStyles('default', 'sm') + ' mt-3'}
+              >
+                İlk xidməti yarat
+              </Link>
+            </div>
+          )}
+          <ul className="divide-y divide-border">
+            {services?.items.slice(0, 5).map((service) => (
+              <li key={service.id} className="flex items-center justify-between py-3">
+                <div>
+                  <p className="text-sm font-medium">{service.title}</p>
+                  <p className="text-xs text-muted-foreground">{service.categoryName}</p>
+                </div>
+                <p className="text-sm font-medium">{formatPrice(service.price)}</p>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   );
 }

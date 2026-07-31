@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,7 +13,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { api, ApiError } from '@/lib/api';
-import { getPostAuthRedirectPath } from '@/lib/auth';
 import { useAuthStore } from '@/store/auth.store';
 
 const AZ_PHONE_PREFIX = '+994';
@@ -39,7 +37,6 @@ interface RegisterFormProps {
 }
 
 export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormProps) {
-  const router = useRouter();
   const setAuth = useAuthStore((state) => state.setAuth);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -76,8 +73,6 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
       const response = await api.auth.register(payload);
 
       setAuth(response.user, response.tokens);
-      router.push(getPostAuthRedirectPath(response.user.role));
-      router.refresh();
     } catch (error) {
       if (error instanceof ApiError) {
         setServerError(error.message);
