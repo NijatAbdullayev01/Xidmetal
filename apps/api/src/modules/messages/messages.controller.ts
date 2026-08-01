@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   Query,
@@ -46,6 +47,18 @@ export class MessagesController {
     @Query() query: ConversationQueryDto,
   ) {
     return this.messagesService.findConversations(userId, role, query.page, query.limit);
+  }
+
+  @Delete('conversations/:id')
+  @ApiOperation({
+    summary: 'Söhbəti öz siyahısından sil (per-user; qarşı tərəfə təsir etmir)',
+  })
+  deleteConversation(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return this.messagesService.deleteConversation(id, userId, role);
   }
 
   @Get('conversations/:id')

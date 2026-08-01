@@ -13,6 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { useAckBookingNotifications } from '@/hooks/use-ack-booking-notifications';
+import { BOOKING_ATTENTION_QUERY_KEY } from '@/hooks/use-booking-notifications';
 import { useAuthStore } from '@/store/auth.store';
 import { combineDateAndTime, formatDateTime, formatPrice } from '@/lib/utils';
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_VARIANTS } from '@/lib/provider-labels';
@@ -146,6 +148,7 @@ export default function ProviderBookingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+  useAckBookingNotifications(!!token);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [view, setView] = useState<ViewKey>(
     searchParams.get('view') === 'sent' ? 'sent' : 'incoming',
@@ -180,7 +183,8 @@ export default function ProviderBookingsPage() {
       return api.updateBookingStatus(token, id, status);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      void queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      void queryClient.invalidateQueries({ queryKey: BOOKING_ATTENTION_QUERY_KEY });
       setActionId(null);
       setRescheduleId(null);
       setActionError(null);
@@ -425,7 +429,10 @@ export default function ProviderBookingsPage() {
                   bookingId={booking.id}
                   onCancel={() => setRescheduleId(null)}
                   onSuccess={() => {
-                    queryClient.invalidateQueries({ queryKey: ['bookings'] });
+                    void queryClient.invalidateQueries({ queryKey: ['bookings'] });
+                    void queryClient.invalidateQueries({
+                      queryKey: BOOKING_ATTENTION_QUERY_KEY,
+                    });
                     setRescheduleId(null);
                     setActionError(null);
                   }}

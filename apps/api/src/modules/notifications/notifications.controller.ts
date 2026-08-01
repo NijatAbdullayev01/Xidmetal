@@ -33,19 +33,31 @@ export class NotificationsController {
   }
 
   @Get('unread-count')
-  @ApiOperation({ summary: 'Oxunmamış bildiriş sayı' })
+  @ApiOperation({ summary: 'Oxunmamış admin/platforma bildirişləri sayı' })
   getUnreadCount(@CurrentUser('id') userId: string) {
     return this.notificationsService.getUnreadCount(userId);
   }
 
+  @Get('booking-unread-count')
+  @ApiOperation({ summary: 'Sifariş bildirişləri sayı (nav badge)' })
+  getBookingUnreadCount(@CurrentUser('id') userId: string) {
+    return this.notificationsService.getBookingAttentionCount(userId);
+  }
+
+  @Post('booking-read-all')
+  @ApiOperation({ summary: 'Sifariş bildirişlərini oxundu et' })
+  markBookingReadAll(@CurrentUser('id') userId: string) {
+    return this.notificationsService.markBookingNotificationsRead(userId);
+  }
+
   @Patch(':id/read')
-  @ApiOperation({ summary: 'Bildirişi oxundu et' })
+  @ApiOperation({ summary: 'Admin bildirişini oxundu et' })
   markRead(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.notificationsService.markRead(id, userId);
   }
 
   @Post('read-all')
-  @ApiOperation({ summary: 'Bütün bildirişləri oxundu et' })
+  @ApiOperation({ summary: 'Bütün admin bildirişlərini oxundu et' })
   markAllRead(@CurrentUser('id') userId: string) {
     return this.notificationsService.markAllRead(userId);
   }

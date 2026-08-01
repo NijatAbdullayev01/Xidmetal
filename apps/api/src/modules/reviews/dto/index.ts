@@ -44,4 +44,10 @@ export class ReviewQueryDto {
   @Min(1)
   @Max(100)
   limit?: number;
+
+  /** Yalnız bu xidmətə aid rəylər */
+  @ApiPropertyOptional({ description: 'Xidmət ID ilə filtr' })
+  @IsOptional()
+  @IsUUID()
+  serviceId?: string;
 }

@@ -8,7 +8,7 @@ import { PrismaService } from '../../common/database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateConversationDto, SendMessageDto } from './dto';
 import { clearTyping, isPeerTyping, setTyping } from './typing.store';
-import { NotificationType, UserRole } from '@xidmetal/shared';
+import { UserRole } from '@xidmetal/shared';
 import type {
   ConversationDetail,
   ConversationSummary,
@@ -26,6 +26,8 @@ type ConversationWithRelations = {
   customerId: string;
   providerId: string;
   bookingId: string | null;
+  customerDeletedAt: Date | null;
+  providerDeletedAt: Date | null;
   updatedAt: Date;
   customer: { id: string; firstName: string; lastName: string; avatarUrl: string | null };
   provider: { id: string; firstName: string; lastName: string; avatarUrl: string | null };
@@ -55,8 +57,40 @@ export class MessagesService {
     throw new ForbiddenException('Bu əməliyyat üçün icazəniz yoxdur');
   }
 
+  /** İstifadəçinin öz siyahısından silmədiyi söhbətlər */
+  private visibleConversationWhere(userId: string, role: string) {
+    const base = this.conversationWhereForUser(userId, role);
+    if (role === UserRole.PROVIDER) {
+      return { ...base, providerDeletedAt: null };
+    }
+    return { ...base, customerDeletedAt: null };
+  }
+
+  private deletedAtFieldForUser(
+    conversation: { customerId: string; providerId: string },
+    userId: string,
+  ): 'customerDeletedAt' | 'providerDeletedAt' {
+    if (conversation.customerId === userId) return 'customerDeletedAt';
+    if (conversation.providerId === userId) return 'providerDeletedAt';
+    throw new ForbiddenException('Bu söhbətə giriş icazəniz yoxdur');
+  }
+
+  private isHiddenForUser(
+    conversation: {
+      customerId: string;
+      providerId: string;
+      customerDeletedAt: Date | null;
+      providerDeletedAt: Date | null;
+    },
+    userId: string,
+  ): boolean {
+    if (conversation.customerId === userId) return conversation.customerDeletedAt !== null;
+    if (conversation.providerId === userId) return conversation.providerDeletedAt !== null;
+    return true;
+  }
+
   async getUnreadSummary(userId: string, role: string): Promise<UnreadMessagesSummary> {
-    const conversationWhere = this.conversationWhereForUser(userId, role);
+    const conversationWhere = this.visibleConversationWhere(userId, role);
     const unreadWhere = {
       isRead: false,
       NOT: { senderId: userId },
@@ -81,7 +115,7 @@ export class MessagesService {
 
   async findConversations(userId: string, role: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
-    const where = this.conversationWhereForUser(userId, role);
+    const where = this.visibleConversationWhere(userId, role);
 
     const [conversations, total] = await Promise.all([
       this.prisma.conversation.findMany({
@@ -150,6 +184,10 @@ export class MessagesService {
 
     this.assertParticipant(conversation, userId);
 
+    if (this.isHiddenForUser(conversation, userId)) {
+      throw new NotFoundException('Söhbət tapılmadı');
+    }
+
     const peerId =
       conversation.customerId === userId
         ? conversation.providerId
@@ -205,7 +243,13 @@ export class MessagesService {
   ) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
-      select: { id: true, customerId: true, providerId: true },
+      select: {
+        id: true,
+        customerId: true,
+        providerId: true,
+        customerDeletedAt: true,
+        providerDeletedAt: true,
+      },
     });
 
     if (!conversation) {
@@ -213,6 +257,10 @@ export class MessagesService {
     }
 
     this.assertParticipant(conversation, userId);
+
+    if (this.isHiddenForUser(conversation, userId)) {
+      throw new NotFoundException('Söhbət tapılmadı');
+    }
 
     let beforeFilter: { createdAt: { lt: Date } } | undefined;
     if (before) {
@@ -251,7 +299,13 @@ export class MessagesService {
   async markConversationRead(id: string, userId: string) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id },
-      select: { id: true, customerId: true, providerId: true },
+      select: {
+        id: true,
+        customerId: true,
+        providerId: true,
+        customerDeletedAt: true,
+        providerDeletedAt: true,
+      },
     });
 
     if (!conversation) {
@@ -259,6 +313,10 @@ export class MessagesService {
     }
 
     this.assertParticipant(conversation, userId);
+
+    if (this.isHiddenForUser(conversation, userId)) {
+      throw new NotFoundException('Söhbət tapılmadı');
+    }
 
     const now = new Date();
     const result = await this.prisma.message.updateMany({
@@ -279,7 +337,13 @@ export class MessagesService {
   async setTyping(conversationId: string, userId: string) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
-      select: { id: true, customerId: true, providerId: true },
+      select: {
+        id: true,
+        customerId: true,
+        providerId: true,
+        customerDeletedAt: true,
+        providerDeletedAt: true,
+      },
     });
 
     if (!conversation) {
@@ -287,7 +351,65 @@ export class MessagesService {
     }
 
     this.assertParticipant(conversation, userId);
+
+    if (this.isHiddenForUser(conversation, userId)) {
+      throw new NotFoundException('Söhbət tapılmadı');
+    }
+
     setTyping(conversationId, userId);
+    return { ok: true as const };
+  }
+
+  /**
+   * Söhbəti yalnız cari istifadəçinin siyahısından gizlədir (hard-delete yox).
+   * Mesajlar DB-də qalır; qarşı tərəfə yeni mesaj gələndə söhbət yenidən açılır.
+   */
+  async deleteConversation(id: string, userId: string, role: string) {
+    this.conversationWhereForUser(userId, role);
+
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        customerId: true,
+        providerId: true,
+        customerDeletedAt: true,
+        providerDeletedAt: true,
+      },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Söhbət tapılmadı');
+    }
+
+    this.assertParticipant(conversation, userId);
+
+    if (this.isHiddenForUser(conversation, userId)) {
+      return { ok: true as const };
+    }
+
+    const deletedField = this.deletedAtFieldForUser(conversation, userId);
+    const now = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.message.updateMany({
+        where: {
+          conversationId: id,
+          isRead: false,
+          NOT: { senderId: userId },
+        },
+        data: { isRead: true, readAt: now },
+      });
+
+      await tx.conversation.update({
+        where: { id },
+        data: { [deletedField]: now },
+      });
+    });
+
+    await this.notificationsService.markMessageNotificationsRead(userId, id);
+    clearTyping(id, userId);
+
     return { ok: true as const };
   }
 
@@ -351,10 +473,19 @@ export class MessagesService {
     });
 
     if (existing) {
-      if (bookingId && existing.bookingId !== bookingId) {
+      const restoreField = this.deletedAtFieldForUser(existing, userId);
+      const needsBookingUpdate = Boolean(bookingId && existing.bookingId !== bookingId);
+      const needsRestore =
+        (restoreField === 'customerDeletedAt' && existing.customerDeletedAt !== null) ||
+        (restoreField === 'providerDeletedAt' && existing.providerDeletedAt !== null);
+
+      if (needsBookingUpdate || needsRestore) {
         await this.prisma.conversation.update({
           where: { id: existing.id },
-          data: { bookingId },
+          data: {
+            ...(needsBookingUpdate ? { bookingId } : {}),
+            ...(needsRestore ? { [restoreField]: null } : {}),
+          },
         });
       }
       if (dto.initialMessage) {
@@ -396,11 +527,6 @@ export class MessagesService {
 
     clearTyping(conversationId, userId);
 
-    const recipientId =
-      conversation.customerId === userId
-        ? conversation.providerId
-        : conversation.customerId;
-
     const message = await this.prisma.$transaction(async (tx) => {
       const created = await tx.message.create({
         data: {
@@ -411,28 +537,17 @@ export class MessagesService {
         include: { sender: { select: { firstName: true, lastName: true } } },
       });
 
+      // Yeni mesaj hər iki tərəf üçün silinmiş söhbəti yenidən görünən edir
       await tx.conversation.update({
         where: { id: conversationId },
-        data: { updatedAt: new Date() },
-      });
-
-      const preview =
-        content.length > 120 ? `${content.slice(0, 117).trimEnd()}...` : content;
-      const senderName = `${created.sender.firstName} ${created.sender.lastName}`;
-
-      await tx.notification.create({
         data: {
-          userId: recipientId,
-          type: NotificationType.MESSAGE_RECEIVED,
-          title: 'Yeni mesaj',
-          body: `${senderName}: ${preview}`,
-          data: {
-            conversationId,
-            messageId: created.id,
-          },
+          updatedAt: new Date(),
+          customerDeletedAt: null,
+          providerDeletedAt: null,
         },
       });
 
+      // Mesaj bildirişləri zəngdə deyil — oxunmamış sayı Mesajlarım badge-ində göstərilir
       return created;
     });
 

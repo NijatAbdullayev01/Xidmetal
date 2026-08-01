@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { ReviewDialog } from '@/components/bookings/review-dialog';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { useAckBookingNotifications } from '@/hooks/use-ack-booking-notifications';
+import { BOOKING_ATTENTION_QUERY_KEY } from '@/hooks/use-booking-notifications';
 import { formatPrice, formatDateTime } from '@/lib/utils';
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_VARIANTS } from '@/lib/provider-labels';
 import { cn } from '@/lib/utils';
@@ -29,6 +31,7 @@ export default function CustomerBookingsPage() {
   const token = useAuthToken();
   const router = useRouter();
   const queryClient = useQueryClient();
+  useAckBookingNotifications(!!token);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [actionId, setActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -58,7 +61,8 @@ export default function CustomerBookingsPage() {
       return api.updateBookingStatus(token, id, status);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      void queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      void queryClient.invalidateQueries({ queryKey: BOOKING_ATTENTION_QUERY_KEY });
       setActionId(null);
       setActionError(null);
     },
@@ -98,7 +102,8 @@ export default function CustomerBookingsPage() {
       return api.rejectReschedule(token, id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      void queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      void queryClient.invalidateQueries({ queryKey: BOOKING_ATTENTION_QUERY_KEY });
       setActionId(null);
       setActionError(null);
     },
@@ -118,7 +123,8 @@ export default function CustomerBookingsPage() {
       return api.confirmReschedule(token, id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      void queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      void queryClient.invalidateQueries({ queryKey: BOOKING_ATTENTION_QUERY_KEY });
       setActionId(null);
       setActionError(null);
     },

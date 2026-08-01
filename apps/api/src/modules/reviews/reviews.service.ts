@@ -6,9 +6,19 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { BookingStatus, ReviewStatus } from '@prisma/client';
-import { NotificationType } from '@xidmetal/shared';
 import { PrismaService } from '../../common/database/prisma.service';
 import { CreateReviewDto, ReviewQueryDto } from './dto';
+
+type ReviewWithRelations = {
+  id: string;
+  bookingId: string;
+  rating: number;
+  comment: string | null;
+  status: ReviewStatus;
+  createdAt: Date;
+  author: { firstName: string; lastName: string };
+  booking: { service: { title: string } };
+};
 
 @Injectable()
 export class ReviewsService {
@@ -90,38 +100,106 @@ export class ReviewsService {
         },
       });
 
-      await tx.notification.create({
-        data: {
-          userId: booking.providerId,
-          type: NotificationType.REVIEW_RECEIVED,
-          title: 'Yeni rəy aldınız',
-          body: `«${booking.service.title}» xidmətinizə ${dto.rating} ulduzlu rəy yazıldı.`,
-          data: { bookingId: booking.id, reviewId: created.id },
-        },
-      });
-
       return created;
     });
 
+    return this.mapReview(review, 'full');
+  }
+
+  /** Provider dashboard — tam ad ilə */
+  async findReceivedByProvider(providerId: string, query: ReviewQueryDto) {
+    return this.listProviderReviews(providerId, query, 'full');
+  }
+
+  /** İctimai — müştərilər digər rəylərə baxa bilir (qismən anonim ad) */
+  async findPublicByProvider(providerId: string, query: ReviewQueryDto) {
+    const provider = await this.prisma.user.findFirst({
+      where: {
+        id: providerId,
+        providerProfile: { isNot: null },
+      },
+      select: {
+        firstName: true,
+        lastName: true,
+        providerProfile: {
+          select: { rating: true, reviewCount: true },
+        },
+      },
+    });
+
+    if (!provider?.providerProfile) {
+      throw new NotFoundException('Xidmət verən tapılmadı');
+    }
+
+    const page = await this.listProviderReviews(providerId, query, 'public');
+
+    const distributionWhere = {
+      status: ReviewStatus.APPROVED,
+      booking: {
+        providerId,
+        ...(query.serviceId ? { serviceId: query.serviceId } : {}),
+      },
+    };
+
+    const [groups, filteredCount, filteredAvg] = await Promise.all([
+      this.prisma.review.groupBy({
+        by: ['rating'],
+        where: distributionWhere,
+        _count: { _all: true },
+      }),
+      query.serviceId
+        ? this.prisma.review.count({ where: distributionWhere })
+        : Promise.resolve(provider.providerProfile.reviewCount),
+      query.serviceId
+        ? this.prisma.review.aggregate({
+            where: distributionWhere,
+            _avg: { rating: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    const distribution: Record<1 | 2 | 3 | 4 | 5, number> = {
+      1: 0,
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 0,
+    };
+    for (const group of groups) {
+      if (group.rating >= 1 && group.rating <= 5) {
+        distribution[group.rating as 1 | 2 | 3 | 4 | 5] = group._count._all;
+      }
+    }
+
+    const averageRating = query.serviceId
+      ? Math.round((filteredAvg?._avg.rating ?? 0) * 100) / 100
+      : provider.providerProfile.rating;
+
     return {
-      id: review.id,
-      bookingId: review.bookingId,
-      serviceTitle: review.booking.service.title,
-      authorName: `${review.author.firstName} ${review.author.lastName}`,
-      rating: review.rating,
-      comment: review.comment ?? undefined,
-      status: review.status,
-      createdAt: review.createdAt.toISOString(),
+      ...page,
+      providerName: `${provider.firstName} ${provider.lastName}`,
+      stats: {
+        averageRating,
+        reviewCount: filteredCount,
+        ratingDistribution: distribution,
+      },
     };
   }
 
-  async findReceivedByProvider(providerId: string, query: ReviewQueryDto) {
-    const { page = 1, limit = 20 } = query;
+  private async listProviderReviews(
+    providerId: string,
+    query: ReviewQueryDto,
+    authorMode: 'full' | 'public',
+  ) {
+    const { page = 1, limit = 20, serviceId } = query;
     const skip = (page - 1) * limit;
 
     const where = {
       status: ReviewStatus.APPROVED,
-      booking: { providerId },
+      booking: {
+        providerId,
+        ...(serviceId ? { serviceId } : {}),
+      },
     };
 
     const [items, total] = await Promise.all([
@@ -143,20 +221,33 @@ export class ReviewsService {
     ]);
 
     return {
-      items: items.map((review) => ({
-        id: review.id,
-        bookingId: review.bookingId,
-        serviceTitle: review.booking.service.title,
-        authorName: `${review.author.firstName} ${review.author.lastName}`,
-        rating: review.rating,
-        comment: review.comment ?? undefined,
-        status: review.status,
-        createdAt: review.createdAt.toISOString(),
-      })),
+      items: items.map((review) => this.mapReview(review, authorMode)),
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / limit) || 0,
     };
+  }
+
+  private mapReview(review: ReviewWithRelations, authorMode: 'full' | 'public') {
+    return {
+      id: review.id,
+      bookingId: review.bookingId,
+      serviceTitle: review.booking.service.title,
+      authorName:
+        authorMode === 'public'
+          ? this.formatPublicAuthorName(review.author.firstName, review.author.lastName)
+          : `${review.author.firstName} ${review.author.lastName}`,
+      rating: review.rating,
+      comment: review.comment ?? undefined,
+      status: review.status,
+      createdAt: review.createdAt.toISOString(),
+    };
+  }
+
+  /** İctimai siyahıda: "Nicat A." — tam soyad gizlədilir */
+  private formatPublicAuthorName(firstName: string, lastName: string): string {
+    const initial = lastName.trim().charAt(0);
+    return initial ? `${firstName} ${initial.toUpperCase()}.` : firstName;
   }
 }

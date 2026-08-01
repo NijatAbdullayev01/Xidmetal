@@ -1,57 +1,10 @@
-import { Star, MapPin, Wifi, User, Briefcase } from 'lucide-react';
+import { MapPin, Wifi, User, Briefcase } from 'lucide-react';
 import type { ServiceSummary } from '@xidmetal/shared';
 import { formatPrice, cn } from '@/lib/utils';
 import { ServiceOrderButton } from '@/components/services/service-order-button';
+import { ProviderReviewsTrigger } from '@/components/reviews/provider-reviews-trigger';
 import { getCategoryIcon } from '@/lib/category-icons';
 import { getPriceUnitLabel } from '@/lib/provider-labels';
-
-function StarIcon({ fillPercent }: { fillPercent: number }) {
-  return (
-    <span className="relative inline-block h-3.5 w-3.5 shrink-0">
-      <Star
-        className="absolute inset-0 h-3.5 w-3.5 text-muted-foreground/35"
-        strokeWidth={1.5}
-        aria-hidden
-      />
-      {fillPercent > 0 ? (
-        <span
-          className="absolute inset-0 overflow-hidden"
-          style={{ width: `${fillPercent}%` }}
-        >
-          <Star
-            className="h-3.5 w-3.5 fill-brand text-brand"
-            strokeWidth={1.5}
-            aria-hidden
-          />
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
-function StarRating({ rating, count }: { rating: number; count: number }) {
-  const normalizedRating = Math.min(5, Math.max(0, rating));
-  const ariaLabel =
-    count > 0
-      ? `${normalizedRating.toFixed(1)} reytinq, ${count} rəy`
-      : 'Hələ reytinq yoxdur';
-
-  return (
-    <div className="flex shrink-0 flex-col items-start gap-0.5" aria-label={ariaLabel}>
-      <div className="flex items-center gap-0.5">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <StarIcon
-            key={index}
-            fillPercent={Math.min(100, Math.max(0, (normalizedRating - index) * 100))}
-          />
-        ))}
-      </div>
-      {count > 0 ? (
-        <span className="text-[11px] text-muted-foreground">({count} rəy)</span>
-      ) : null}
-    </div>
-  );
-}
 
 function ProviderAvatar({
   name,
@@ -190,7 +143,14 @@ export function ServiceCard({
           <p className="truncate text-sm font-medium text-foreground">{service.providerName}</p>
           <p className="text-xs text-muted-foreground">Xidmət verən</p>
           <div className="mt-1">
-            <StarRating rating={service.averageRating} count={service.reviewCount} />
+            <ProviderReviewsTrigger
+              providerId={service.providerId}
+              providerName={service.providerName}
+              averageRating={service.averageRating}
+              reviewCount={service.reviewCount}
+              serviceId={service.id}
+              serviceTitle={service.title}
+            />
           </div>
         </div>
       </div>

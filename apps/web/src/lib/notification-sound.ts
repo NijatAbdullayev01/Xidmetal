@@ -53,8 +53,7 @@ function playTone(
   oscillator.stop(startAt + duration + 0.02);
 }
 
-/** Qısa iki tonlu mesaj bildiriş səsi (Web Audio API). */
-export async function playMessageNotificationSound(): Promise<void> {
+async function playChime(frequencies: [number, number]): Promise<void> {
   const nowMs = Date.now();
   if (nowMs - lastPlayAt < MIN_PLAY_GAP_MS) return;
   lastPlayAt = nowMs;
@@ -68,9 +67,19 @@ export async function playMessageNotificationSound(): Promise<void> {
     }
 
     const now = ctx.currentTime;
-    playTone(ctx, 880, now, 0.12, 0.08);
-    playTone(ctx, 1174.66, now + 0.11, 0.16, 0.07);
+    playTone(ctx, frequencies[0], now, 0.12, 0.08);
+    playTone(ctx, frequencies[1], now + 0.11, 0.16, 0.07);
   } catch {
     // Autoplay bloklanarsa səssiz keç
   }
+}
+
+/** Qısa iki tonlu mesaj bildiriş səsi (Web Audio API). */
+export async function playMessageNotificationSound(): Promise<void> {
+  await playChime([880, 1174.66]);
+}
+
+/** Sifariş bildirişi — bir az aşağı tonlarla fərqlənir. */
+export async function playBookingNotificationSound(): Promise<void> {
+  await playChime([659.25, 880]);
 }

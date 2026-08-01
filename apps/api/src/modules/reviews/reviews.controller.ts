@@ -1,19 +1,30 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto, ReviewQueryDto } from './dto';
 import { JwtAuthGuard, RolesGuard } from '../../common/guards';
-import { Roles } from '../../common/decorators';
+import { Public, Roles } from '../../common/decorators';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '@xidmetal/shared';
 
 @ApiTags('Reviews')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('reviews')
 export class ReviewsController {
   constructor(private reviewsService: ReviewsService) {}
 
+  @Public()
+  @Get('provider/:providerId')
+  @ApiOperation({
+    summary: 'Xidmət verənin ictimai rəyləri',
+    description:
+      'Təsdiqlənmiş müştəri rəyləri — qonaqlar və digər müştərilər baxa bilər. Adlar qismən anonimdir.',
+  })
+  findByProvider(@Param('providerId') providerId: string, @Query() query: ReviewQueryDto) {
+    return this.reviewsService.findPublicByProvider(providerId, query);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.CUSTOMER, UserRole.PROVIDER)
   @Post()
   @ApiOperation({ summary: 'Tamamlanmış sifarişə rəy və reytinq yaz' })
@@ -21,6 +32,8 @@ export class ReviewsController {
     return this.reviewsService.create(userId, dto);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.PROVIDER)
   @Get('received')
   @ApiOperation({ summary: 'Provider-ə gələn rəylər' })

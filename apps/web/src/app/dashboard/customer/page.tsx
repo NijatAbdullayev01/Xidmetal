@@ -134,7 +134,7 @@ export default function CustomerOverviewPage() {
                     <p className="truncate text-sm font-medium">{booking.serviceTitle}</p>
                     <p className="text-xs text-muted-foreground">{booking.providerName}</p>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
+                  <div className="flex shrink-0 items-center gap-2">
                     <Badge variant={BOOKING_STATUS_VARIANTS[booking.status]} className="text-xs">
                       {BOOKING_STATUS_LABELS[booking.status]}
                     </Badge>

@@ -259,6 +259,10 @@ model Conversation {
   customerId String   @map("customer_id")
   providerId String   @map("provider_id")
   bookingId  String?  @unique @map("booking_id")
+  /// Müştəri söhbəti öz siyahısından silib (qarşı tərəfə təsir etmir)
+  customerDeletedAt DateTime? @map("customer_deleted_at")
+  /// Xidmət verən söhbəti öz siyahısından silib (qarşı tərəfə təsir etmir)
+  providerDeletedAt DateTime? @map("provider_deleted_at")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
@@ -323,6 +327,8 @@ enum NotificationType {
   BOOKING_RESCHEDULE_PROPOSED
   REVIEW_RECEIVED
   MESSAGE_RECEIVED
+  /// Platforma / admin tərəfindən göndərilən bildirişlər (zəng ikonu)
+  ADMIN_ANNOUNCEMENT
 }
 
 model Notification {

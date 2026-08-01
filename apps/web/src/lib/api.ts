@@ -7,6 +7,7 @@ import type {
   BookingSummary,
   CategorySummary,
   ReviewSummary,
+  ProviderReviewsPage,
   PaginatedResponse,
   CreateReviewInput,
   CreateServiceInput,
@@ -22,6 +23,7 @@ import type {
   UnreadMessagesSummary,
   NotificationSummary,
   UnreadNotificationsSummary,
+  BookingAttentionSummary,
   CreateConversationInput,
   SendMessageInput,
   CreateBookingInput,
@@ -316,6 +318,12 @@ export const api = {
     return apiClient<PaginatedResponse<ReviewSummary>>(`/reviews/received${query}`, { token });
   },
 
+  /** İctimai — xidmət verənin müştəri rəyləri (auth tələb olunmur) */
+  reviewsByProvider: (providerId: string, params?: Record<string, string>) => {
+    const query = params ? `?${new URLSearchParams(params)}` : '';
+    return apiClient<ProviderReviewsPage>(`/reviews/provider/${providerId}${query}`);
+  },
+
   messages: {
     unreadCount: (token: string) =>
       apiClient<UnreadMessagesSummary>('/messages/unread-count', { token }),
@@ -328,6 +336,11 @@ export const api = {
     },
     conversation: (token: string, id: string) =>
       apiClient<ConversationDetail>(`/messages/conversations/${id}`, { token }),
+    deleteConversation: (token: string, id: string) =>
+      apiClient<{ ok: true }>(`/messages/conversations/${id}`, {
+        method: 'DELETE',
+        token,
+      }),
     messages: (token: string, conversationId: string, params?: Record<string, string>) => {
       const query = params ? `?${new URLSearchParams(params)}` : '';
       return apiClient<MessagesPage>(
@@ -368,6 +381,13 @@ export const api = {
     },
     unreadCount: (token: string) =>
       apiClient<UnreadNotificationsSummary>('/notifications/unread-count', { token }),
+    bookingUnreadCount: (token: string) =>
+      apiClient<BookingAttentionSummary>('/notifications/booking-unread-count', { token }),
+    markBookingReadAll: (token: string) =>
+      apiClient<{ markedCount: number }>('/notifications/booking-read-all', {
+        method: 'POST',
+        token,
+      }),
     markRead: (token: string, id: string) =>
       apiClient<NotificationSummary>(`/notifications/${id}/read`, {
         method: 'PATCH',

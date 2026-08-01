@@ -106,6 +106,27 @@ export interface ReviewSummary {
   createdAt: string;
 }
 
+/** 1–5 ulduz üzrə rəy sayı paylanması */
+export interface RatingDistribution {
+  1: number;
+  2: number;
+  3: number;
+  4: number;
+  5: number;
+}
+
+export interface ProviderReviewStats {
+  averageRating: number;
+  reviewCount: number;
+  ratingDistribution: RatingDistribution;
+}
+
+/** İctimai: xidmət verənin rəyləri (səhifələnmiş + statistika) */
+export interface ProviderReviewsPage extends PaginatedResponse<ReviewSummary> {
+  stats: ProviderReviewStats;
+  providerName: string;
+}
+
 export interface ProviderDashboardStats {
   activeServices: number;
   totalServices: number;
@@ -177,6 +198,14 @@ export interface NotificationSummary {
 
 export interface UnreadNotificationsSummary {
   count: number;
+}
+
+/** Sifarişlər bölməsi üzərindəki diqqət badge-i */
+export interface BookingAttentionSummary {
+  count: number;
+  /** Yeni sifariş səsi üçün — ən son oxunmamış bildiriş */
+  latestUnreadId?: string | null;
+  latestUnreadAt?: string | null;
 }
 
 export interface UnreadMessagesSummary {

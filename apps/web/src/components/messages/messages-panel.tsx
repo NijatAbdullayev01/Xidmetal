@@ -4,18 +4,28 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, CheckCheck, Loader2, MessageSquare, Send, User } from 'lucide-react';
+import {
+  Check,
+  CheckCheck,
+  Loader2,
+  MessageSquare,
+  Send,
+  Trash2,
+  User,
+} from 'lucide-react';
 import { UserRole } from '@xidmetal/shared';
-import type { ConversationDetail, ConversationSummary, MessageSummary } from '@xidmetal/shared';
+import type {
+  ConversationDetail,
+  ConversationSummary,
+  MessageSummary,
+  PaginatedResponse,
+} from '@xidmetal/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { UNREAD_MESSAGES_QUERY_KEY } from '@/hooks/use-message-notifications';
-import {
-  NOTIFICATIONS_QUERY_KEY,
-  UNREAD_NOTIFICATIONS_QUERY_KEY,
-} from '@/hooks/use-notifications';
 import { playMessageNotificationSound } from '@/lib/notification-sound';
 import { formatPeerStatus } from '@/lib/format-last-seen';
 import { useAuthStore } from '@/store/auth.store';
@@ -75,6 +85,11 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
   const [selectedId, setSelectedId] = useState<string | null>(conversationFromUrl);
   const [messageText, setMessageText] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -106,12 +121,20 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
     refetchOnWindowFocus: true,
   });
 
-  const { data: activeConversation, isLoading: conversationLoading } = useQuery({
+  const {
+    data: activeConversation,
+    isLoading: conversationLoading,
+    error: conversationError,
+  } = useQuery({
     queryKey: ['conversation', selectedId],
     queryFn: () => api.messages.conversation(token!, selectedId!),
     enabled: !!token && !!selectedId,
     refetchInterval: 3_000,
     refetchOnWindowFocus: true,
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && error.status === 404) return false;
+      return failureCount < 2;
+    },
   });
 
   useEffect(() => {
@@ -121,6 +144,15 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only auto-select once when list arrives
   }, [conversations, selectedId, conversationFromUrl]);
+
+  // Silinmiş və ya əlçatmaz söhbəti URL-dən təmizlə
+  useEffect(() => {
+    if (!selectedId) return;
+    if (!(conversationError instanceof ApiError) || conversationError.status !== 404) return;
+    selectConversation(null);
+    void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- navigate away once on 404
+  }, [conversationError, selectedId]);
 
   const messageCount = activeConversation?.messages.length ?? 0;
   const lastMessageId = activeConversation?.messages.at(-1)?.id;
@@ -187,8 +219,6 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
       .markRead(token, selectedId)
       .then(() => {
         void queryClient.invalidateQueries({ queryKey: UNREAD_MESSAGES_QUERY_KEY });
-        void queryClient.invalidateQueries({ queryKey: UNREAD_NOTIFICATIONS_QUERY_KEY });
-        void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
         void queryClient.invalidateQueries({ queryKey: ['conversations'] });
         queryClient.setQueryData<ConversationDetail>(['conversation', selectedId], (prev) => {
           if (!prev) return prev;
@@ -228,6 +258,58 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
       notifyTyping();
     }, 2_000);
   };
+
+  const deleteMutation = useMutation({
+    mutationFn: (conversationId: string) => {
+      if (!token) throw new Error('Autentifikasiya tələb olunur');
+      return api.messages.deleteConversation(token, conversationId);
+    },
+    onMutate: async (conversationId) => {
+      await queryClient.cancelQueries({ queryKey: ['conversations'] });
+      const previous = queryClient.getQueryData<PaginatedResponse<ConversationSummary>>([
+        'conversations',
+      ]);
+
+      queryClient.setQueryData<PaginatedResponse<ConversationSummary>>(
+        ['conversations'],
+        (prev) => {
+          if (!prev) return prev;
+          const items = prev.items.filter((item) => item.id !== conversationId);
+          return {
+            ...prev,
+            items,
+            total: Math.max(0, prev.total - 1),
+          };
+        },
+      );
+
+      queryClient.removeQueries({ queryKey: ['conversation', conversationId] });
+
+      if (selectedId === conversationId) {
+        const nextId =
+          previous?.items.find((item) => item.id !== conversationId)?.id ?? null;
+        selectConversation(nextId);
+      }
+
+      setPendingDelete(null);
+      setDeleteError(null);
+      return { previous };
+    },
+    onError: (error, _conversationId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['conversations'], context.previous);
+      }
+      if (error instanceof ApiError) {
+        setDeleteError(error.message);
+      } else {
+        setDeleteError('Söhbət silinərkən xəta baş verdi');
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void queryClient.invalidateQueries({ queryKey: UNREAD_MESSAGES_QUERY_KEY });
+    },
+  });
 
   const sendMutation = useMutation({
     mutationFn: (content: string) => {
@@ -337,6 +419,12 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
     sendMutation.mutate(trimmed);
   };
 
+  const requestDeleteConversation = (conv: ConversationSummary) => {
+    if (deleteMutation.isPending) return;
+    setDeleteError(null);
+    setPendingDelete({ id: conv.id, name: getParticipantName(conv) });
+  };
+
   const bookingsHref = `${basePath}/bookings`;
   const peerStatusText = formatPeerStatus(activeConversation?.peerPresence);
   const peerOnline = activeConversation?.peerPresence?.isOnline ?? false;
@@ -352,6 +440,11 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
         <div className="border-b border-border px-4 py-3">
           <p className="text-sm font-medium">Söhbətlər</p>
         </div>
+        {deleteError && (
+          <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+            {deleteError}
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto">
           {conversationsLoading && (
             <div className="flex justify-center py-12">
@@ -368,35 +461,55 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
             const name = getParticipantName(conv);
             const active = selectedId === conv.id;
             return (
-              <button
+              <div
                 key={conv.id}
-                type="button"
-                onClick={() => selectConversation(conv.id)}
                 className={cn(
-                  'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50',
+                  'group flex w-full items-start gap-1 transition-colors hover:bg-muted/50',
                   active && 'bg-brand/10',
                 )}
               >
-                <div className="h-10 w-10 shrink-0 overflow-visible">
-                  <ParticipantAvatar name={name} avatarUrl={getParticipantAvatar(conv)} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm font-medium">{name}</p>
-                    {conv.unreadCount > 0 && (
-                      <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-medium text-brand-foreground">
-                        {conv.unreadCount}
-                      </span>
-                    )}
+                <button
+                  type="button"
+                  onClick={() => selectConversation(conv.id)}
+                  className="flex min-w-0 flex-1 items-start gap-3 px-4 py-3 text-left"
+                >
+                  <div className="h-10 w-10 shrink-0 overflow-visible">
+                    <ParticipantAvatar name={name} avatarUrl={getParticipantAvatar(conv)} />
                   </div>
-                  {conv.serviceTitle && (
-                    <p className="truncate text-xs text-muted-foreground">{conv.serviceTitle}</p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-medium">{name}</p>
+                      {conv.unreadCount > 0 && (
+                        <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-medium text-brand-foreground">
+                          {conv.unreadCount}
+                        </span>
+                      )}
+                    </div>
+                    {conv.serviceTitle && (
+                      <p className="truncate text-xs text-muted-foreground">{conv.serviceTitle}</p>
+                    )}
+                    <p className="truncate text-xs text-muted-foreground">
+                      {conv.lastMessage ?? 'Yeni söhbət'}
+                    </p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => requestDeleteConversation(conv)}
+                  disabled={deleteMutation.isPending}
+                  className={cn(
+                    'mr-2 mt-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground',
+                    'opacity-100 transition-colors hover:bg-destructive/10 hover:text-destructive',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+                    'lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100',
+                    active && 'lg:opacity-100',
                   )}
-                  <p className="truncate text-xs text-muted-foreground">
-                    {conv.lastMessage ?? 'Yeni söhbət'}
-                  </p>
-                </div>
-              </button>
+                  aria-label={`${name} ilə söhbəti sil`}
+                  title="Söhbəti sil"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             );
           })}
         </div>
@@ -461,6 +574,20 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
                   </p>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={() => requestDeleteConversation(activeConversation)}
+                disabled={deleteMutation.isPending}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                aria-label="Söhbəti sil"
+                title="Söhbəti sil"
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </button>
             </div>
 
             <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4">
@@ -584,6 +711,54 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
           </>
         )}
       </div>
+
+      <Modal
+        open={pendingDelete !== null}
+        onClose={() => {
+          if (deleteMutation.isPending) return;
+          setPendingDelete(null);
+        }}
+        title="Söhbəti sil"
+        description="Bu söhbət sizin siyahınızdan silinəcək"
+      >
+        <div className="flex flex-col gap-4 p-5 sm:p-6">
+          <div>
+            <h2 className="text-lg font-semibold">Söhbəti silmək istəyirsiniz?</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {pendingDelete
+                ? `"${pendingDelete.name}" ilə yazışma sizin mesajlar siyahınızdan silinəcək. Qarşı tərəfin söhbəti toxunulmaz qalır. Yeni mesaj gələndə söhbət yenidən görünə bilər.`
+                : null}
+            </p>
+          </div>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-[44px]"
+              disabled={deleteMutation.isPending}
+              onClick={() => setPendingDelete(null)}
+            >
+              Ləğv et
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="min-h-[44px]"
+              disabled={!pendingDelete || deleteMutation.isPending}
+              onClick={() => {
+                if (!pendingDelete) return;
+                deleteMutation.mutate(pendingDelete.id);
+              }}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Söhbəti sil'
+              )}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

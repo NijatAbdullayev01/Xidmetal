@@ -10,25 +10,58 @@ import { useAuthStore } from '@/store/auth.store';
 import { useLogout } from '@/hooks/use-logout';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { useMessageNotifications } from '@/hooks/use-message-notifications';
+import { useBookingNotifications } from '@/hooks/use-booking-notifications';
+
+/** Profil düyməsinin küncündə yanıb-sönən diqqət siqnalı */
+function AttentionSignal({ active, label }: { active: boolean; label: string }) {
+  if (!active) return null;
+
+  return (
+    <span
+      className="pointer-events-none absolute -right-1 -top-1 flex h-2.5 w-2.5"
+      aria-label={label}
+      role="status"
+    >
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-brand" />
+    </span>
+  );
+}
 
 export function Header() {
   const { user, isAuthenticated } = useAuthStore();
   const logout = useLogout();
+  const authed = isAuthenticated();
 
-  const profileHref = isAuthenticated()
+  const { unreadCount } = useMessageNotifications(authed);
+  const { attentionCount } = useBookingNotifications(authed);
+  const hasAttention = unreadCount + attentionCount > 0;
+  const attentionLabel =
+    unreadCount > 0 && attentionCount > 0
+      ? 'Yeni mesaj və sifariş bildirişi var'
+      : unreadCount > 0
+        ? 'Yeni mesajınız var'
+        : 'Yeni sifariş bildirişiniz var';
+
+  const profileHref = authed
     ? user
       ? getDashboardPath(user.role)
       : '/dashboard'
     : '/login';
 
-  const authSection = isAuthenticated() ? (
+  const authSection = authed ? (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
       <Link
         href={user ? getDashboardPath(user.role) : '/dashboard'}
-        className="flex items-center justify-center gap-2 rounded-md border !border-[#000000] px-3 py-2.5 text-sm font-medium hover:bg-brand-dark/20 sm:justify-start sm:py-2"
+        className="relative flex items-center justify-center gap-2 rounded-md border !border-[#000000] px-3 py-2.5 text-sm font-medium hover:bg-brand-dark/20 sm:justify-start sm:py-2"
+        aria-label={
+          hasAttention ? `${user?.firstName ?? 'Profil'} — ${attentionLabel}` : undefined
+        }
       >
         <User className="h-4 w-4 shrink-0" />
         <span className="truncate">{user?.firstName}</span>
+        <AttentionSignal active={hasAttention} label={attentionLabel} />
       </Link>
       <Button
         variant="default"
@@ -78,12 +111,19 @@ export function Header() {
           <ThemeToggle className="text-brand-foreground hover:bg-brand-dark/20 hover:text-brand-foreground" />
           <Link
             href={profileHref}
-            className="rounded-md p-2 transition-colors hover:bg-brand-dark/20"
-            aria-label={isAuthenticated() ? 'Profil' : 'Daxil ol'}
+            className="relative rounded-md p-2 transition-colors hover:bg-brand-dark/20"
+            aria-label={
+              authed
+                ? hasAttention
+                  ? `Profil — ${attentionLabel}`
+                  : 'Profil'
+                : 'Daxil ol'
+            }
           >
             <User className="h-6 w-6" />
+            <AttentionSignal active={authed && hasAttention} label={attentionLabel} />
           </Link>
-          {isAuthenticated() && (
+          {authed && (
             <button
               type="button"
               onClick={() => logout()}

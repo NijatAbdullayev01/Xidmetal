@@ -3,26 +3,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Star, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ReviewListItem } from '@/components/reviews/review-list-item';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
-import { formatDate } from '@/lib/utils';
-import { cn } from '@/lib/utils';
-
-function StarRating({ rating }: { rating: number }) {
-  return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Star
-          key={i}
-          className={cn(
-            'h-4 w-4',
-            i < rating ? 'fill-brand text-brand' : 'text-muted-foreground/30',
-          )}
-        />
-      ))}
-    </div>
-  );
-}
 
 export default function ProviderRatingsPage() {
   const token = useAuthToken();
@@ -97,23 +80,7 @@ export default function ProviderRatingsPage() {
 
           <ul className="divide-y divide-border">
             {reviews?.items.map((review) => (
-              <li key={review.id} className="py-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-medium">{review.authorName}</p>
-                    <p className="text-sm text-muted-foreground">{review.serviceTitle}</p>
-                  </div>
-                  <div className="text-right">
-                    <StarRating rating={review.rating} />
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {formatDate(review.createdAt)}
-                    </p>
-                  </div>
-                </div>
-                {review.comment && (
-                  <p className="mt-2 rounded-lg bg-muted px-3 py-2 text-sm">{review.comment}</p>
-                )}
-              </li>
+              <ReviewListItem key={review.id} review={review} />
             ))}
           </ul>
         </CardContent>

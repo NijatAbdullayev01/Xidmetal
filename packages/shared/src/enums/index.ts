@@ -46,7 +46,23 @@ export enum NotificationType {
   BOOKING_RESCHEDULE_PROPOSED = 'BOOKING_RESCHEDULE_PROPOSED',
   REVIEW_RECEIVED = 'REVIEW_RECEIVED',
   MESSAGE_RECEIVED = 'MESSAGE_RECEIVED',
+  /** Platforma / admin bildirişləri — NotificationsBell üçün */
+  ADMIN_ANNOUNCEMENT = 'ADMIN_ANNOUNCEMENT',
 }
+
+/** Zəng ikonunda göstərilən (admin/platforma) bildiriş tipləri */
+export const ADMIN_NOTIFICATION_TYPES = [
+  NotificationType.ADMIN_ANNOUNCEMENT,
+] as const;
+
+/** Sifarişlər naviqasiya badge-i üçün bildiriş tipləri */
+export const BOOKING_NOTIFICATION_TYPES = [
+  NotificationType.BOOKING_CREATED,
+  NotificationType.BOOKING_CONFIRMED,
+  NotificationType.BOOKING_CANCELLED,
+  NotificationType.BOOKING_COMPLETED,
+  NotificationType.BOOKING_RESCHEDULE_PROPOSED,
+] as const;
 
 export enum AvailabilityOverrideType {
   AVAILABLE = 'AVAILABLE',

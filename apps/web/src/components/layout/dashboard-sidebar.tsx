@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth.store';
 import { useLogout } from '@/hooks/use-logout';
 import { useMessageNotifications } from '@/hooks/use-message-notifications';
+import { useBookingNotifications } from '@/hooks/use-booking-notifications';
 import { NotificationsBell } from '@/components/notifications/notifications-bell';
 import { cn } from '@/lib/utils';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
@@ -70,12 +71,18 @@ function isMessagesNavItem(href: string) {
   return href.endsWith('/messages');
 }
 
-function UnreadBadge({
+function isBookingsNavItem(href: string) {
+  return href.endsWith('/bookings');
+}
+
+function NavBadge({
   count,
   active,
+  label,
 }: {
   count: number;
   active: boolean;
+  label: string;
 }) {
   if (count <= 0) return null;
 
@@ -87,7 +94,7 @@ function UnreadBadge({
           ? 'bg-brand-foreground/15 text-brand-foreground'
           : 'bg-brand text-brand-foreground',
       )}
-      aria-label={`${count} oxunmamış mesaj`}
+      aria-label={label}
     >
       {count > 99 ? '99+' : count}
     </span>
@@ -99,7 +106,8 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const user = useAuthStore((state) => state.user);
   const logout = useLogout();
-  const { unreadCount } = useMessageNotifications(!!user);
+  const { unreadCount: unreadMessages } = useMessageNotifications(!!user);
+  const { attentionCount: bookingAttention } = useBookingNotifications(!!user);
 
   const navItems = variant === 'provider' ? PROVIDER_NAV : CUSTOMER_NAV;
   const roleLabel = ROLE_LABELS[variant];
@@ -145,7 +153,8 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
       {navItems.map((item) => {
         const Icon = item.icon;
         const active = item.href === activeHref;
-        const showUnread = isMessagesNavItem(item.href);
+        const messageBadge = isMessagesNavItem(item.href);
+        const bookingBadge = isBookingsNavItem(item.href);
         return (
           <Link
             key={item.href}
@@ -160,7 +169,20 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
           >
             <Icon className="h-4 w-4 shrink-0" />
             <span className="min-w-0 flex-1 truncate">{item.label}</span>
-            {showUnread && <UnreadBadge count={unreadCount} active={active} />}
+            {messageBadge && (
+              <NavBadge
+                count={unreadMessages}
+                active={active}
+                label={`${unreadMessages} oxunmamış mesaj`}
+              />
+            )}
+            {bookingBadge && (
+              <NavBadge
+                count={bookingAttention}
+                active={active}
+                label={`${bookingAttention} yeni sifariş bildirişi`}
+              />
+            )}
           </Link>
         );
       })}

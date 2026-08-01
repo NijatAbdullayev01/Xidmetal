@@ -5,45 +5,46 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import {
-  playMessageNotificationSound,
+  playBookingNotificationSound,
   unlockNotificationAudio,
 } from '@/lib/notification-sound';
 
-export const UNREAD_MESSAGES_QUERY_KEY = ['messages', 'unread-count'] as const;
+export const BOOKING_ATTENTION_QUERY_KEY = ['notifications', 'booking-unread-count'] as const;
 
-const POLL_INTERVAL_MS = 5_000;
+const POLL_INTERVAL_MS = 8_000;
 
 interface LatestUnreadSnapshot {
   id: string | null;
   at: string | null;
 }
 
-export interface UseMessageNotificationsOptions {
-  /** Yeni mesaj gələndə səs çalsın (yalnız bir yerdə true saxlanmalıdır) */
+export interface UseBookingNotificationsOptions {
+  /** Yeni sifariş bildirişində səs çalsın (yalnız bir yerdə true saxlanmalıdır) */
   playSound?: boolean;
 }
 
 /**
- * Oxunmamış mesaj sayını poll edir. `playSound` yalnız qlobal AttentionProvider-də açılır
- * ki, kabinetdən kənarda da səs eşidilsin və ikiqat çalma olmasın.
+ * Sifariş hadisələrinin sayını poll edir. `playSound` yalnız qlobal AttentionProvider-də açılır.
  */
-export function useMessageNotifications(
+export function useBookingNotifications(
   enabled = true,
-  options: UseMessageNotificationsOptions = {},
+  options: UseBookingNotificationsOptions = {},
 ) {
   const { playSound = false } = options;
   const token = useAuthToken();
   const primedRef = useRef(false);
   const latestRef = useRef<LatestUnreadSnapshot>({ id: null, at: null });
 
-  const { data } = useQuery({
-    queryKey: UNREAD_MESSAGES_QUERY_KEY,
-    queryFn: () => api.messages.unreadCount(token!),
+  const attentionQuery = useQuery({
+    queryKey: BOOKING_ATTENTION_QUERY_KEY,
+    queryFn: () => api.notifications.bookingUnreadCount(token!),
     enabled: enabled && !!token,
     refetchInterval: POLL_INTERVAL_MS,
     refetchOnWindowFocus: true,
     staleTime: 5_000,
   });
+
+  const data = attentionQuery.data;
 
   useEffect(() => {
     if (!playSound) return;
@@ -65,8 +66,8 @@ export function useMessageNotifications(
     if (!playSound || !data) return;
 
     const next: LatestUnreadSnapshot = {
-      id: data.latestUnreadMessageId,
-      at: data.latestUnreadAt,
+      id: data.latestUnreadId ?? null,
+      at: data.latestUnreadAt ?? null,
     };
 
     if (!primedRef.current) {
@@ -82,15 +83,15 @@ export function useMessageNotifications(
       (prev.at === null || new Date(next.at).getTime() > new Date(prev.at).getTime());
 
     if (isNewer && next.id !== prev.id) {
-      void playMessageNotificationSound();
+      void playBookingNotificationSound();
     }
 
     latestRef.current = next;
   }, [data, playSound]);
 
   return {
-    unreadCount: data?.count ?? 0,
-    latestUnreadMessageId: data?.latestUnreadMessageId ?? null,
+    attentionCount: data?.count ?? 0,
+    latestUnreadId: data?.latestUnreadId ?? null,
     latestUnreadAt: data?.latestUnreadAt ?? null,
   };
 }

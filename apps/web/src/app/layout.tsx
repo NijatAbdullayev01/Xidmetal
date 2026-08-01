@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
+import { AttentionProvider } from '@/components/providers/attention-provider';
 import { APP } from '@xidmetal/shared';
 import './globals.css';
 
@@ -18,7 +19,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="az" suppressHydrationWarning>
       <body className="font-sans">
         <ThemeProvider>
-          <QueryProvider>{children}</QueryProvider>
+          <QueryProvider>
+            <AttentionProvider>{children}</AttentionProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>
