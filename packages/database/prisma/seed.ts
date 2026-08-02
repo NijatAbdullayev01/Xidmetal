@@ -13,7 +13,13 @@ async function main() {
       description:
         'Ev və ofisiniz üçün professional təmizlik — dərin təmizlik, pəncərə yuma və müntəzəm qulluq. Etibarlı xidmət verənləri kəşf edin və bir neçə addımda sifariş verin.',
     },
-    { name: 'Təmir', slug: 'temir', icon: '🔧', description: 'Texniki təmir və quraşdırma' },
+    {
+      name: 'Təmir',
+      slug: 'temir',
+      icon: '🔧',
+      description:
+        'Ev, ofis və avtomobiliniz üçün peşəkar təmir — elektrikdən santexnikaya, mühərrikdən rəngsazlığa. Etibarlı ustaları kəşf edin və bir neçə addımda sifariş verin.',
+    },
     { name: 'Gözəllik', slug: 'gozellik', icon: '💅', description: 'Gözəllik və sağlamlıq xidmətləri' },
     { name: 'Təhsil', slug: 'tehsil', icon: '📚', description: 'Repetitorluq və kurslar' },
     { name: 'Nəqliyyat', slug: 'neqliyyat', icon: '🚗', description: 'Daşınma və çatdırılma' },

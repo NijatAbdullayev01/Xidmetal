@@ -1,14 +1,17 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import type { CategorySummary, ServiceSummary } from '@xidmetal/shared';
+import { ServicesPageSkeleton } from '@/components/ui/page-skeletons';
 import { api } from '@/lib/api';
 import { ServicesContent } from './services-content';
 
-export const dynamic = 'force-dynamic';
+/** searchParams serverdə oxunmur → səhifə ISR ola bilir; ?q= client-də filtrələnir */
+export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: 'Xidmətlər | Xidmetal',
+  title: 'Xidmətlər | Xidmətal',
   description:
-    'Təmizlik, təmir, gözəllik, təhsil və daha çox — Xidmetal-da minlərlə etibarlı xidməti kəşf edin, müqayisə edin və sifariş verin.',
+    'Təmizlik, təmir, gözəllik, təhsil və daha çox — Xidmətal-da minlərlə etibarlı xidməti kəşf edin, müqayisə edin və sifariş verin.',
 };
 
 async function loadServicesData(): Promise<{
@@ -33,5 +36,9 @@ async function loadServicesData(): Promise<{
 export default async function ServicesPage() {
   const { categories, services } = await loadServicesData();
 
-  return <ServicesContent categories={categories} services={services} />;
+  return (
+    <Suspense fallback={<ServicesPageSkeleton />}>
+      <ServicesContent categories={categories} services={services} />
+    </Suspense>
+  );
 }

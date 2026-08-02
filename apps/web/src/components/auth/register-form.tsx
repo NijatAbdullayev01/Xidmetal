@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
 import { UserRole } from '@xidmetal/shared';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { RoleSelector } from '@/components/auth/role-selector';
@@ -12,25 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { AZ_PHONE_PREFIX, azPhoneLocalPart, toAzPhoneValue } from '@/lib/phone';
 import { api, ApiError } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
-
-const AZ_PHONE_PREFIX = '+994';
-
-/** Yalnız rəqəmləri götürüb +994XXXXXXXXX (və ya boş) formata çevirir. Prefiks silinə bilməz. */
-function toAzPhoneValue(raw: string): string {
-  let digits = raw.replace(/\D/g, '');
-  if (digits.startsWith('994')) digits = digits.slice(3);
-  if (digits.startsWith('0')) digits = digits.slice(1);
-  digits = digits.slice(0, 9);
-  return digits ? `${AZ_PHONE_PREFIX}${digits}` : '';
-}
-
-function azPhoneLocalPart(value: string | undefined): string {
-  if (!value) return '';
-  if (value.startsWith(AZ_PHONE_PREFIX)) return value.slice(AZ_PHONE_PREFIX.length);
-  return value.replace(/\D/g, '').slice(0, 9);
-}
 
 interface RegisterFormProps {
   defaultRole?: PublicUserRole;
@@ -38,6 +23,7 @@ interface RegisterFormProps {
 
 export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormProps) {
   const setAuth = useAuthStore((state) => state.setAuth);
+  const queryClient = useQueryClient();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -73,6 +59,8 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
       const response = await api.auth.register(payload);
 
       setAuth(response.user, response.tokens);
+      // Tənzimləmələr / profil sorğusu dərhal qeydiyyat məlumatlarını görsün
+      queryClient.setQueryData(['users', 'me'], response.user);
     } catch (error) {
       if (error instanceof ApiError) {
         setServerError(error.message);
@@ -170,7 +158,7 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
               <div
                 className={cn(
                   'flex h-10 w-full overflow-hidden rounded-lg border bg-background transition-colors',
-                  'focus-within:ring-2 focus-within:ring-brand focus-within:ring-offset-2',
+                  'focus-within:border-brand focus-within:ring-2 focus-within:ring-inset focus-within:ring-brand/40',
                   errors.phone ? 'border-destructive' : 'border-border',
                   isSubmitting && 'cursor-not-allowed opacity-50',
                 )}

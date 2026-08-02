@@ -1,14 +1,22 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import type { ServiceSummary } from '@xidmetal/shared';
 import { buttonStyles } from '@/components/ui/button';
-import { BookServiceDialog } from '@/components/services/book-service-dialog';
 import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 import { useAuthStore } from '@/store/auth.store';
 import { cn } from '@/lib/utils';
+
+const BookServiceDialog = dynamic(
+  () =>
+    import('@/components/services/book-service-dialog').then((mod) => ({
+      default: mod.BookServiceDialog,
+    })),
+  { ssr: false },
+);
 
 export const PENDING_BOOKING_SERVICE_KEY = 'xidmetal-pending-booking-service';
 

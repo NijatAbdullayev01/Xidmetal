@@ -1,6 +1,6 @@
 # Hədəf Arxitektura — On-Demand Xidmət & Canlı İzləmə
 
-Bu sənəd Xidmetal-ın **real-time, on-demand** platformaya çevrilməsi üçün lazım olan hədəf arxitekturanı təsvir edir.
+Bu sənəd Xidmətal-ın **real-time, on-demand** platformaya çevrilməsi üçün lazım olan hədəf arxitekturanı təsvir edir.
 
 > **Kontekst:** İstifadəçi xidməti rezerv edir → xidmət verəni çağırır → xidmət verən yolda olduqda xəritədə **canlı izlənir** → iş bitdikdə tamamlanır → müştəri **rəy verir**.
 >

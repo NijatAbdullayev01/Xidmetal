@@ -1,19 +1,22 @@
+import { Suspense, cache } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import type { CategorySummary, ServiceSummary } from '@xidmetal/shared';
+import { CategoryPageSkeleton } from '@/components/ui/page-skeletons';
 import { api, ApiError } from '@/lib/api';
 import { CategoryContent } from './category-content';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
 }
 
-async function loadCategoryData(slug: string): Promise<{
+/** Eyni request-də generateMetadata + page üçün təkrar API çağırışını aradan qaldırır */
+const loadCategoryData = cache(async (slug: string): Promise<{
   category: CategorySummary;
   services: ServiceSummary[];
-} | null> {
+} | null> => {
   try {
     const category = await api.category(slug);
 
@@ -32,6 +35,15 @@ async function loadCategoryData(slug: string): Promise<{
     }
     return null;
   }
+});
+
+export async function generateStaticParams() {
+  try {
+    const categories = await api.categories();
+    return categories.map((category) => ({ slug: category.slug }));
+  } catch {
+    return [];
+  }
 }
 
 export async function generateMetadata({
@@ -41,13 +53,13 @@ export async function generateMetadata({
   const data = await loadCategoryData(slug);
 
   if (!data) {
-    return { title: 'Kateqoriya tapılmadı | Xidmetal' };
+    return { title: 'Kateqoriya tapılmadı | Xidmətal' };
   }
 
   const { category } = data;
 
   return {
-    title: `${category.name} | Xidmetal`,
+    title: `${category.name} | Xidmətal`,
     description:
       category.description ??
       `${category.name} kateqoriyasında etibarlı xidmət verənləri tapın, müqayisə edin və sifariş verin.`,
@@ -64,5 +76,9 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
   const { category, services } = data;
 
-  return <CategoryContent category={category} services={services} />;
+  return (
+    <Suspense fallback={<CategoryPageSkeleton />}>
+      <CategoryContent category={category} services={services} />
+    </Suspense>
+  );
 }

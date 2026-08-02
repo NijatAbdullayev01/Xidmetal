@@ -16,13 +16,14 @@ import {
   HelpCircle,
   type LucideIcon,
 } from 'lucide-react';
+import { BecomeProviderLink } from '@/components/auth/become-provider-link';
 import { buttonStyles } from '@/components/ui/button';
 import { ProviderGuideHeroCta } from './provider-guide-hero-cta';
 
 export const metadata: Metadata = {
-  title: 'Xidmət verən bələdçisi | Xidmetal',
+  title: 'Xidmət verən bələdçisi | Xidmətal',
   description:
-    'Xidmetal platformasında xidmət verən kimi necə qeydiyyatdan keçmək, xidmət yaratmaq, sifarişləri idarə etmək və reytinqinizi artırmaq barədə addım-addım bələdçi.',
+    'Xidmətal platformasında xidmət verən kimi necə qeydiyyatdan keçmək, xidmət yaratmaq, sifarişləri idarə etmək və reytinqinizi artırmaq barədə addım-addım bələdçi.',
 };
 
 const steps: {
@@ -135,7 +136,7 @@ const tips: {
     icon: Clock,
     title: 'Sürətli cavab',
     description:
-      'Gözləyən sifarişlərə tez reaksiya verin. İlk cavab verən providerlər daha çox sifariş əldə edir.',
+      'Gözləyən sifarişlərə tez reaksiya verin. İlk cavab verən xidmət verənlər daha çox sifariş əldə edir.',
   },
   {
     icon: Star,
@@ -149,7 +150,7 @@ const faqs: { question: string; answer: string }[] = [
   {
     question: 'Qeydiyyat pulsuzdur?',
     answer:
-      'Bəli, Xidmetal-da xidmət verən kimi qeydiyyat tamamilə pulsuzdur. Hesab yaradıb dərhal xidmət əlavə edə bilərsiniz.',
+      'Bəli, Xidmətal-da xidmət verən kimi qeydiyyat tamamilə pulsuzdur. Hesab yaradıb dərhal xidmət əlavə edə bilərsiniz.',
   },
   {
     question: 'Neçə xidmət yarada bilərəm?',
@@ -185,7 +186,7 @@ export default function ProviderGuidePage() {
               <span className="text-brand">bələdçisi</span>
             </h1>
             <p className="mt-6 text-lg text-muted-foreground sm:text-xl">
-              Xidmetal-da xidmət verən kimi necə başlamaq, xidmət yaratmaq, sifarişləri
+              Xidmətal-da xidmət verən kimi necə başlamaq, xidmət yaratmaq, sifarişləri
               idarə etmək və reytinqinizi artırmaq — hamısını addım-addım öyrənin.
             </p>
             <ProviderGuideHeroCta />
@@ -273,7 +274,7 @@ export default function ProviderGuidePage() {
       <section className="bg-muted/50 py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h2 className="text-3xl font-bold tracking-tight">Niyə Xidmetal?</h2>
+            <h2 className="text-3xl font-bold tracking-tight">Niyə Xidmətal?</h2>
             <p className="mt-3 text-muted-foreground">
               Platformamız xidmət verənlərin işini asanlaşdırmaq üçün yaradılıb
             </p>
@@ -307,7 +308,7 @@ export default function ProviderGuidePage() {
             <div>
               <h2 className="text-3xl font-bold tracking-tight">Kabinetinizdə nə var?</h2>
               <p className="mt-4 text-muted-foreground leading-relaxed">
-                Provider kabineti bütün iş axınınızı bir yerdə cəmləyir. Buradan
+                Xidmət verən kabineti bütün iş axınınızı bir yerdə cəmləyir. Buradan
                 xidmətlərinizi idarə edir, gələn sifarişlərə cavab verir və reytinqinizi
                 izləyirsiniz.
               </p>
@@ -392,7 +393,7 @@ export default function ProviderGuidePage() {
           <div className="text-center">
             <h2 className="text-3xl font-bold tracking-tight">Uğur üçün məsləhətlər</h2>
             <p className="mt-3 text-muted-foreground">
-              Təcrübəli providerlərin ortaq praktikaları
+              Təcrübəli xidmət verənlərin ortaq praktikaları
             </p>
           </div>
           <div className="mt-12 grid gap-6 sm:grid-cols-2">
@@ -464,16 +465,13 @@ export default function ProviderGuidePage() {
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-brand-foreground/80">
               Bir neçə dəqiqə ərzində qeydiyyatdan keçin, ilk xidmətinizi yaradın və
-              Xidmetal-da minlərlə potensial müştəriyə çatın.
+              Xidmətal-da minlərlə potensial müştəriyə çatın.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link
-                href="/register?role=provider"
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-foreground px-6 py-3 font-medium text-brand transition-colors hover:bg-brand-foreground/90"
-              >
+              <BecomeProviderLink className="inline-flex items-center gap-2 rounded-lg bg-brand-foreground px-6 py-3 font-medium text-brand transition-colors hover:bg-brand-foreground/90">
                 Pulsuz qeydiyyat
                 <ArrowRight className="h-5 w-5" />
-              </Link>
+              </BecomeProviderLink>
               <Link
                 href="/contact"
                 className="inline-flex items-center gap-2 rounded-lg border border-brand-foreground/30 px-6 py-3 font-medium text-brand-foreground transition-colors hover:bg-brand-foreground/10"

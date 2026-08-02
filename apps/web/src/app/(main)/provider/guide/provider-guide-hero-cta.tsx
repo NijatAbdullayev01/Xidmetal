@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ArrowRight, Briefcase, LayoutDashboard } from 'lucide-react';
 import { UserRole } from '@xidmetal/shared';
+import { BecomeProviderLink } from '@/components/auth/become-provider-link';
 import { buttonStyles } from '@/components/ui/button';
 import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 import { useAuthStore } from '@/store/auth.store';
@@ -10,10 +11,10 @@ import { useAuthStore } from '@/store/auth.store';
 export function ProviderGuideHeroCta() {
   const hydrated = useAuthHydrated();
   const user = useAuthStore((state) => state.user);
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isAuthenticated = useAuthStore((state) => !!state.tokens?.accessToken);
 
   const isProvider =
-    hydrated && isAuthenticated() && user?.role === UserRole.PROVIDER;
+    hydrated && isAuthenticated && user?.role === UserRole.PROVIDER;
 
   if (isProvider) {
     return (
@@ -38,10 +39,10 @@ export function ProviderGuideHeroCta() {
 
   return (
     <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-      <Link href="/register?role=provider" className={buttonStyles('default', 'lg')}>
+      <BecomeProviderLink className={buttonStyles('default', 'lg')}>
         İndi qeydiyyatdan keç
         <ArrowRight className="h-5 w-5" />
-      </Link>
+      </BecomeProviderLink>
       <Link href="/dashboard/provider" className={buttonStyles('outline', 'lg')}>
         Kabinetə keç
       </Link>

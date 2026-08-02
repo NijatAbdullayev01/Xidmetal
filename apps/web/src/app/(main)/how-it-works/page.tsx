@@ -21,9 +21,9 @@ import { APP } from '@xidmetal/shared';
 import { buttonStyles } from '@/components/ui/button';
 
 export const metadata: Metadata = {
-  title: 'Necə işləyir? | Xidmetal',
+  title: 'Necə işləyir? | Xidmətal',
   description:
-    'Xidmetal-da xidmət tapmaq, müqayisə etmək, sifariş vermək və izləmək prosesi — addım-addım, sadə və aydın izah.',
+    'Xidmətal-da xidmət tapmaq, müqayisə etmək, sifariş vermək və izləmək prosesi — addım-addım, sadə və aydın izah.',
 };
 
 const customerSteps: {
@@ -90,7 +90,7 @@ const customerSteps: {
     details: [
       'Tamamlanan sifarişlər üçün rəy bölməsi açılır',
       'Dürüst və konkret rəy yazın',
-      'Yüksək reytinqli providerlər daha çox görünür',
+      'Yüksək reytinqli xidmət verənlər daha çox görünür',
     ],
   },
 ];

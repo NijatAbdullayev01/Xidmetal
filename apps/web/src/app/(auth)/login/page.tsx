@@ -3,7 +3,7 @@ import { LoginView } from '@/components/auth/login-view';
 
 export const metadata: Metadata = {
   title: 'Daxil ol',
-  description: 'Xidmetal hesabınıza daxil olun.',
+  description: 'Xidmətal hesabınıza daxil olun.',
 };
 
 export default function LoginPage() {

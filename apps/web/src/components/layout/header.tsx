@@ -7,6 +7,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { getDashboardPath } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
+import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 import { useLogout } from '@/hooks/use-logout';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -30,9 +31,15 @@ function AttentionSignal({ active, label }: { active: boolean; label: string }) 
 }
 
 export function Header() {
-  const { user, isAuthenticated } = useAuthStore();
+  const hydrated = useAuthHydrated();
+  // `tokens` birbaşa seçilir — `isAuthenticated()` funksiya referansı sabit
+  // olduğu üçün Zustand state dəyişikliyini aşkarlaya bilmirdi.
+  const isAuthenticated = useAuthStore((state) => !!state.tokens?.accessToken);
+  const user = useAuthStore((state) => state.user);
   const logout = useLogout();
-  const authed = isAuthenticated();
+  // Persist localStorage-dan client-də sinxron rehydrate edir; server isə
+  // həmişə boş state görür. Hydration bitənə qədər guest UI — mismatch olmasın.
+  const authed = hydrated && isAuthenticated;
 
   const { unreadCount } = useMessageNotifications(authed);
   const { attentionCount } = useBookingNotifications(authed);
@@ -98,7 +105,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-brand-dark bg-brand text-brand-foreground safe-top">
       <div className="mx-auto flex h-14 min-h-[3.5rem] max-w-7xl items-center justify-between gap-4 px-4 sm:h-16 sm:px-6 lg:px-8">
-        <Link href="/" className="flex shrink-0 items-center" aria-label="Xidmetal ana səhifə">
+        <Link href="/" className="flex shrink-0 items-center" aria-label="Xidmətal ana səhifə">
           <Logo priority />
         </Link>
 

@@ -8,7 +8,7 @@ const roles = [
   {
     value: UserRole.CUSTOMER,
     label: 'İstifadəçi',
-    description: 'Xidmət sifariş etmək və provider tapmaq üçün',
+    description: 'Xidmət sifariş etmək və xidmət verən tapmaq üçün',
     icon: User,
   },
   {
@@ -40,7 +40,7 @@ export function RoleSelector({ value, onChange, disabled }: RoleSelectorProps) {
             onClick={() => onChange(role.value)}
             className={cn(
               'relative flex min-h-[44px] min-w-0 gap-2.5 rounded-lg border-2 p-2.5 text-left transition-all',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40',
               'disabled:pointer-events-none disabled:opacity-50',
               'sm:flex-col sm:items-start sm:p-3',
               isSelected

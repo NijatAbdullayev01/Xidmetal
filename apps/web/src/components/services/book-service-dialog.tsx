@@ -152,7 +152,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
       if (!token) throw new Error('Autentifikasiya tələb olunur');
 
       if (!hasCalendar) {
-        throw new Error('Provider hələ təqvim təyin etməyib');
+        throw new Error('Xidmət verən hələ təqvim təyin etməyib');
       }
 
       const scheduledAt = combineDateAndTime(values.date, values.time);
@@ -317,7 +317,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
                     }
                     emptyMessage={
                       calendarBlocked
-                        ? 'Provider hələ təqvim təyin etməyib'
+                        ? 'Xidmət verən hələ təqvim təyin etməyib'
                         : 'Bu tarixdə boş vaxt yoxdur'
                     }
                   />
@@ -330,7 +330,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
               )}
               {calendarBlocked && (
                 <p className="text-sm text-destructive" role="alert">
-                  Provider hələ təqvim təyin etməyib
+                  Xidmət verən hələ təqvim təyin etməyib
                 </p>
               )}
               {noFreeSlots && (

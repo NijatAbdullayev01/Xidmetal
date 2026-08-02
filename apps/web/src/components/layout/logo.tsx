@@ -16,7 +16,7 @@ export function Logo({ className, priority = false, variant = 'brand' }: LogoPro
   return (
     <Image
       src={src}
-      alt="Xidmetal"
+      alt="Xidmətal"
       width={LOGO_WIDTH}
       height={LOGO_HEIGHT}
       quality={100}

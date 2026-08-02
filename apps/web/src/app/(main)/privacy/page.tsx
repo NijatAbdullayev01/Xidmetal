@@ -4,9 +4,9 @@ import { Shield, Mail, FileText } from 'lucide-react';
 import { APP } from '@xidmetal/shared';
 
 export const metadata: Metadata = {
-  title: 'Məxfilik siyasəti | Xidmetal',
+  title: 'Məxfilik siyasəti | Xidmətal',
   description:
-    'Xidmetal platformasında şəxsi məlumatlarınızın toplanması, istifadəsi, saxlanması və qorunması qaydaları.',
+    'Xidmətal platformasında şəxsi məlumatlarınızın toplanması, istifadəsi, saxlanması və qorunması qaydaları.',
 };
 
 const LAST_UPDATED = '10 iyul 2026';
@@ -34,9 +34,9 @@ const sections: {
     list: [
       'Şəxsi məlumat — birbaşa və ya dolayı yolla müəyyən bir fiziki şəxsi identifikasiya etməyə imkan verən hər hansı məlumat.',
       'Məlumat subyekti — şəxsi məlumatları təqdim edən və ya onun haqqında məlumat toplanan fiziki şəxs (Platforma istifadəçisi).',
-      'Məlumat operatoru — şəxsi məlumatların toplanması və emalının məqsəd və vasitələrini müəyyən edən Xidmetal platformasının idarəçisi.',
+      'Məlumat operatoru — şəxsi məlumatların toplanması və emalının məqsəd və vasitələrini müəyyən edən Xidmətal platformasının idarəçisi.',
       'Emal — şəxsi məlumatlar üzərində aparılan hər hansı əməliyyat (toplama, saxlama, istifadə, ötürmə, silmə və s.).',
-      'Xidmət verən (Provider) — Platformada xidmət təklif edən istifadəçi.',
+      'Xidmət verən — Platformada xidmət təklif edən istifadəçi.',
       'Xidmət alan (Customer) — Platformada xidmət sifariş edən istifadəçi.',
     ],
   },
@@ -44,7 +44,7 @@ const sections: {
     id: 'operator',
     title: '3. Məlumat operatoru',
     paragraphs: [
-      'Şəxsi məlumatlarınızın məlumat operatoru Xidmetal platformasının idarəçisidir.',
+      'Şəxsi məlumatlarınızın məlumat operatoru Xidmətal platformasının idarəçisidir.',
       'Məxfilik və şəxsi məlumatlarla bağlı sorğularınızı aşağıdakı əlaqə vasitələri ilə ünvanlaya bilərsiniz:',
     ],
     list: [

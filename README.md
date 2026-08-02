@@ -1,8 +1,8 @@
-# Xidmetal
+# Xidmətal
 
 **Xidmət verənlərlə xidmət alanları bir araya gətirən veb platforma.**
 
-Xidmetal, provider (xidmət verən) və customer (xidmət alan) rollarını birləşdirən marketplace tipli platformadır. İstifadəçilər xidmət axtara, sifariş verə, rəy yaza və provider kimi xidmət təklif edə bilərlər.
+Xidmətal, provider (xidmət verən) və customer (xidmət alan) rollarını birləşdirən marketplace tipli platformadır. İstifadəçilər xidmət axtara, sifariş verə, rəy yaza və provider kimi xidmət təklif edə bilərlər.
 
 ## Texnologiya yığını
 

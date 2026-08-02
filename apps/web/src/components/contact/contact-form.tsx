@@ -50,7 +50,7 @@ export function ContactForm() {
       .filter(Boolean)
       .join('\n');
 
-    const mailtoUrl = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`[Xidmetal] ${subjectLabel}`)}&body=${encodeURIComponent(body)}`;
+    const mailtoUrl = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`[Xidmətal] ${subjectLabel}`)}&body=${encodeURIComponent(body)}`;
 
     window.location.href = mailtoUrl;
     setSubmitted(true);

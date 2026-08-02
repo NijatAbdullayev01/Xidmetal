@@ -1,4 +1,4 @@
-/** Xidmetal brend rəngi */
+/** Xidmətal brend rəngi */
 export const BRAND = {
   primary: '#FFCC00',
   primaryDark: '#E6B800',
@@ -7,7 +7,7 @@ export const BRAND = {
 } as const;
 
 export const APP = {
-  name: 'Xidmetal',
+  name: 'Xidmətal',
   description: 'Xidmət verənlərlə xidmət alanları bir araya gətirən platforma',
   defaultLocale: 'az',
   supportedLocales: ['az', 'en', 'ru'] as const,

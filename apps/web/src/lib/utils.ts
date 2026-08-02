@@ -15,7 +15,7 @@ export function formatPrice(amount: number, currency = 'AZN'): string {
     maximumFractionDigits: 2,
   }).format(amount);
 
-  return `${formatted}${currency}`;
+  return `${formatted} ${currency}`;
 }
 
 const AZ_MONTHS = [

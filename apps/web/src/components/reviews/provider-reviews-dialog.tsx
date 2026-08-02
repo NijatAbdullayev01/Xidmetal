@@ -18,10 +18,10 @@ interface ProviderReviewsDialogProps {
   onClose: () => void;
   providerId: string;
   providerName: string;
-  /** Kart üzərindəki ümumi reytinq — ilk yüklənmədən əvvəl göstərilir */
+  /** Kart üzərindəki reytinq — ilk yüklənmədən əvvəl göstərilir */
   averageRating: number;
   reviewCount: number;
-  /** Açılışda bu xidmətə filtr tətbiq etmək üçün */
+  /** Verildikdə yalnız bu xidmətə aid rəylər göstərilir */
   serviceId?: string;
   serviceTitle?: string;
 }
@@ -67,20 +67,17 @@ export function ProviderReviewsDialog({
   serviceTitle,
 }: ProviderReviewsDialogProps) {
   const [page, setPage] = useState(1);
-  const [filterByService, setFilterByService] = useState(false);
-
-  const canFilterByService = Boolean(serviceId);
 
   const queryParams = useMemo(() => {
     const params: Record<string, string> = {
       page: String(page),
       limit: String(PAGE_SIZE),
     };
-    if (filterByService && serviceId) {
+    if (serviceId) {
       params.serviceId = serviceId;
     }
     return params;
-  }, [page, filterByService, serviceId]);
+  }, [page, serviceId]);
 
   const { data, isLoading, isFetching, isError } = useQuery({
     queryKey: ['reviews', 'provider', providerId, queryParams],
@@ -97,26 +94,32 @@ export function ProviderReviewsDialog({
   const handleClose = () => {
     onClose();
     setPage(1);
-    setFilterByService(false);
   };
 
-  const handleFilterChange = (next: boolean) => {
-    setFilterByService(next);
-    setPage(1);
-  };
+  const subtitle = serviceTitle
+    ? `${providerName} · ${serviceTitle}`
+    : providerName;
 
   return (
     <Modal
       open={open}
       onClose={handleClose}
-      title={`${providerName} — müştəri rəyləri`}
-      description="Digər müştərilərin bu xidmət verənə yazdığı rəylər"
+      title={
+        serviceTitle
+          ? `${serviceTitle} — müştəri rəyləri`
+          : `${providerName} — müştəri rəyləri`
+      }
+      description={
+        serviceId
+          ? 'Bu xidmət üçün müştəri rəyləri'
+          : 'Digər müştərilərin bu xidmət verənə yazdığı rəylər'
+      }
       panelClassName="max-w-xl"
     >
       <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold tracking-tight">Müştəri rəyləri</h2>
-          <p className="mt-0.5 truncate text-sm text-muted-foreground">{providerName}</p>
+          <p className="mt-0.5 truncate text-sm text-muted-foreground">{subtitle}</p>
         </div>
         <button
           type="button"
@@ -151,40 +154,6 @@ export function ProviderReviewsDialog({
           ) : null}
         </div>
 
-        {canFilterByService ? (
-          <div
-            className="mt-4 flex flex-wrap gap-2"
-            role="group"
-            aria-label="Rəy filtri"
-          >
-            <button
-              type="button"
-              onClick={() => handleFilterChange(false)}
-              className={cn(
-                'rounded-lg px-3 py-1.5 text-xs font-medium ring-1 transition-colors',
-                !filterByService
-                  ? 'bg-brand/15 text-foreground ring-brand/30'
-                  : 'bg-muted/50 text-muted-foreground ring-border hover:bg-muted',
-              )}
-            >
-              Bütün rəylər
-            </button>
-            <button
-              type="button"
-              onClick={() => handleFilterChange(true)}
-              className={cn(
-                'max-w-full truncate rounded-lg px-3 py-1.5 text-xs font-medium ring-1 transition-colors',
-                filterByService
-                  ? 'bg-brand/15 text-foreground ring-brand/30'
-                  : 'bg-muted/50 text-muted-foreground ring-border hover:bg-muted',
-              )}
-              title={serviceTitle}
-            >
-              Bu xidmət{serviceTitle ? `: ${serviceTitle}` : ''}
-            </button>
-          </div>
-        ) : null}
-
         <div className="mt-5 border-t border-border/50 pt-1">
           {isLoading ? (
             <div className="flex justify-center py-12">
@@ -202,7 +171,7 @@ export function ProviderReviewsDialog({
             <div className="flex flex-col items-center gap-2 py-12 text-center">
               <MessageSquareText className="h-8 w-8 text-muted-foreground/50" aria-hidden />
               <p className="text-sm text-muted-foreground">
-                {filterByService
+                {serviceId
                   ? 'Bu xidmət üçün hələ rəy yoxdur.'
                   : 'Bu xidmət verənə hələ rəy yazılmayıb.'}
               </p>

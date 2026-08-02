@@ -1,6 +1,6 @@
 # Töhfə Vermə Bələdçisi
 
-Xidmetal layihəsinə töhfə vermək istəyirsinizsə, bu bələdçini oxuyun.
+Xidmətal layihəsinə töhfə vermək istəyirsinizsə, bu bələdçini oxuyun.
 
 ## Development workflow
 

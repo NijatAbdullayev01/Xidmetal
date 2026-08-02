@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -28,7 +28,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 import { useAuthStore } from '@/store/auth.store';
+import { AZ_PHONE_PREFIX, azPhoneLocalPart, toAzPhoneValue } from '@/lib/phone';
 import { cn } from '@/lib/utils';
 
 const MAX_AVATAR_SIZE_BYTES = 1 * 1024 * 1024;
@@ -73,8 +75,10 @@ function UserAvatarPreview({
 }
 
 export function SettingsForm() {
+  const hydrated = useAuthHydrated();
   const token = useAuthToken();
   const queryClient = useQueryClient();
+  const authUser = useAuthStore((state) => state.user);
   const updateUser = useAuthStore((state) => state.updateUser);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,18 +107,22 @@ export function SettingsForm() {
     dismissTimeouts.current.push(setTimeout(() => setter(null), delay));
   };
 
-  const { data: profile, isLoading } = useQuery({
+  const { data: profile, isLoading, isError, error, isPlaceholderData } = useQuery({
     queryKey: ['users', 'me'],
     queryFn: () => api.users.me(token!),
     enabled: !!token,
+    // Qeydiyyat cavabındakı məlumatlar dərhal görünsün
+    placeholderData: () => authUser ?? undefined,
   });
+
+  const source = profile ?? authUser ?? undefined;
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(updateProfileSchema),
     defaultValues: {
-      firstName: '',
-      lastName: '',
-      phone: '',
+      firstName: authUser?.firstName ?? '',
+      lastName: authUser?.lastName ?? '',
+      phone: authUser?.phone ?? '',
     },
   });
 
@@ -138,17 +146,22 @@ export function SettingsForm() {
   });
 
   useEffect(() => {
-    if (!profile) return;
+    if (!source) return;
 
     profileForm.reset({
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      phone: profile.phone ?? '',
+      firstName: source.firstName,
+      lastName: source.lastName,
+      phone: source.phone ?? '',
     });
-    setAvatarPreview(profile.avatarUrl);
+    setAvatarPreview(source.avatarUrl);
     setAvatarRemoved(false);
     setAvatarError(null);
-  }, [profile, profileForm]);
+  }, [source, profileForm]);
+
+  useEffect(() => {
+    if (!profile || isPlaceholderData) return;
+    updateUser(profile);
+  }, [profile, isPlaceholderData, updateUser]);
 
   const profileMutation = useMutation({
     mutationFn: (data: ProfileFormValues) => {
@@ -160,7 +173,7 @@ export function SettingsForm() {
 
       if (avatarRemoved) {
         payload.avatarUrl = '';
-      } else if (avatarPreview && avatarPreview !== profile?.avatarUrl) {
+      } else if (avatarPreview && avatarPreview !== source?.avatarUrl) {
         payload.avatarUrl = avatarPreview;
       }
 
@@ -290,10 +303,20 @@ export function SettingsForm() {
     setAvatarError(null);
   };
 
-  if (isLoading) {
+  if (!hydrated || (!source && isLoading)) {
     return (
       <div className="flex min-h-[240px] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!source) {
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        {isError && error instanceof ApiError
+          ? error.message
+          : 'Profil məlumatları yüklənmədi. Səhifəni yeniləyin.'}
       </div>
     );
   }
@@ -316,8 +339,8 @@ export function SettingsForm() {
                 {avatarPreview && !avatarRemoved ? (
                   <UserAvatarPreview
                     avatarUrl={avatarPreview}
-                    firstName={profile?.firstName}
-                    lastName={profile?.lastName}
+                    firstName={source.firstName}
+                    lastName={source.lastName}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -348,7 +371,7 @@ export function SettingsForm() {
                     <Camera className="h-4 w-4" />
                     Şəkil seç
                   </Button>
-                  {(avatarPreview || profile?.avatarUrl) && !avatarRemoved && (
+                  {(avatarPreview || source.avatarUrl) && !avatarRemoved && (
                     <Button
                       type="button"
                       variant="outline"
@@ -395,12 +418,44 @@ export function SettingsForm() {
 
             <div className="space-y-2">
               <Label htmlFor="phone">Mobil nömrə</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="+994501234567"
-                autoComplete="tel"
-                {...profileForm.register('phone')}
+              <Controller
+                name="phone"
+                control={profileForm.control}
+                render={({ field }) => (
+                  <div
+                    className={cn(
+                      'flex h-10 w-full overflow-hidden rounded-lg border bg-background transition-colors',
+                      'focus-within:border-brand focus-within:ring-2 focus-within:ring-inset focus-within:ring-brand/40',
+                      profileForm.formState.errors.phone ? 'border-destructive' : 'border-border',
+                    )}
+                  >
+                    <span
+                      className="flex shrink-0 items-center border-r border-border bg-muted/40 px-2.5 text-sm text-muted-foreground select-none sm:px-3"
+                      aria-hidden
+                    >
+                      {AZ_PHONE_PREFIX}
+                    </span>
+                    <input
+                      id="phone"
+                      type="tel"
+                      autoComplete="tel"
+                      inputMode="numeric"
+                      placeholder="501234567"
+                      name={field.name}
+                      ref={field.ref}
+                      onBlur={field.onBlur}
+                      value={azPhoneLocalPart(field.value)}
+                      onChange={(event) => {
+                        field.onChange(toAzPhoneValue(event.target.value));
+                      }}
+                      className={cn(
+                        'min-w-0 flex-1 bg-transparent px-2.5 py-2 text-sm outline-none sm:px-3',
+                        'placeholder:text-muted-foreground',
+                      )}
+                      aria-invalid={!!profileForm.formState.errors.phone}
+                    />
+                  </div>
+                )}
               />
               {profileForm.formState.errors.phone && (
                 <p className="text-sm text-destructive">
@@ -444,8 +499,8 @@ export function SettingsForm() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <Label htmlFor="email">E-poçt</Label>
-                {emailChangeStep === 'idle' && profile?.email && (
-                  <p className="mt-1 text-sm">{profile.email}</p>
+                {emailChangeStep === 'idle' && source.email && (
+                  <p className="mt-1 text-sm">{source.email}</p>
                 )}
               </div>
               {emailChangeStep === 'idle' && (

@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../../common/database/prisma.service';
 import { CreateServiceDto, UpdateServiceDto, ServiceQueryDto } from './dto';
 import { UserRole, PriceUnit, requiresServiceVenue } from '@xidmetal/shared';
-import { BookingStatus, ServiceStatus } from '@prisma/client';
+import { BookingStatus, ReviewStatus, ServiceStatus } from '@prisma/client';
 
 @Injectable()
 export class ServicesService {
@@ -26,6 +26,8 @@ export class ServicesService {
         OR: [
           { title: { contains: search, mode: 'insensitive' as const } },
           { description: { contains: search, mode: 'insensitive' as const } },
+          { location: { contains: search, mode: 'insensitive' as const } },
+          { category: { name: { contains: search, mode: 'insensitive' as const } } },
         ],
       }),
     };
@@ -44,19 +46,24 @@ export class ServicesService {
       this.prisma.service.count({ where }),
     ]);
 
-    const activeBookingCounts = await this.countActiveBookingsByService(
-      items.map((service) => service.id),
-    );
+    const serviceIds = items.map((service) => service.id);
+    const [activeBookingCounts, reviewStats] = await Promise.all([
+      this.countActiveBookingsByService(serviceIds),
+      this.getReviewStatsByService(serviceIds),
+    ]);
 
     return {
-      items: items.map((service) =>
-        this.mapService({
+      items: items.map((service) => {
+        const stats = reviewStats.get(service.id);
+        return this.mapService({
           ...service,
           provider: undefined,
           bookingCount: service._count.bookings,
           activeBookingCount: activeBookingCounts.get(service.id) ?? 0,
-        }),
-      ),
+          averageRating: stats?.averageRating ?? 0,
+          reviewCount: stats?.reviewCount ?? 0,
+        });
+      }),
       total,
       page,
       limit,
@@ -76,6 +83,8 @@ export class ServicesService {
         OR: [
           { title: { contains: search, mode: 'insensitive' as const } },
           { description: { contains: search, mode: 'insensitive' as const } },
+          { location: { contains: search, mode: 'insensitive' as const } },
+          { category: { name: { contains: search, mode: 'insensitive' as const } } },
         ],
       }),
     };
@@ -95,7 +104,7 @@ export class ServicesService {
               lastName: true,
               avatarUrl: true,
               providerProfile: {
-                select: { rating: true, reviewCount: true, experience: true },
+                select: { experience: true },
               },
             },
           },
@@ -104,7 +113,15 @@ export class ServicesService {
       this.prisma.service.count({ where }),
     ]);
 
-    const mappedItems = items.map(this.mapService);
+    const reviewStats = await this.getReviewStatsByService(items.map((service) => service.id));
+    const mappedItems = items.map((service) => {
+      const stats = reviewStats.get(service.id);
+      return this.mapService({
+        ...service,
+        averageRating: stats?.averageRating ?? 0,
+        reviewCount: stats?.reviewCount ?? 0,
+      });
+    });
     const dedupedItems = this.dedupePublicListingItems(mappedItems);
 
     return {
@@ -142,7 +159,14 @@ export class ServicesService {
       throw new NotFoundException('Xidmət tapılmadı');
     }
 
-    return this.mapService(service);
+    const reviewStats = await this.getReviewStatsByService([service.id]);
+    const stats = reviewStats.get(service.id);
+
+    return this.mapService({
+      ...service,
+      averageRating: stats?.averageRating ?? 0,
+      reviewCount: stats?.reviewCount ?? 0,
+    });
   }
 
   async create(providerId: string, dto: CreateServiceDto) {
@@ -294,6 +318,41 @@ export class ServicesService {
     return counts;
   }
 
+  /** Hər xidmət üçün yalnız həmin xidmətə yazılmış təsdiqlənmiş rəylərin statistikası */
+  private async getReviewStatsByService(serviceIds: string[]) {
+    const stats = new Map<string, { averageRating: number; reviewCount: number }>();
+    if (serviceIds.length === 0) return stats;
+
+    const rows = await this.prisma.review.findMany({
+      where: {
+        status: ReviewStatus.APPROVED,
+        booking: { serviceId: { in: serviceIds } },
+      },
+      select: {
+        rating: true,
+        booking: { select: { serviceId: true } },
+      },
+    });
+
+    const totals = new Map<string, { sum: number; count: number }>();
+    for (const row of rows) {
+      const serviceId = row.booking.serviceId;
+      const current = totals.get(serviceId) ?? { sum: 0, count: 0 };
+      current.sum += row.rating;
+      current.count += 1;
+      totals.set(serviceId, current);
+    }
+
+    for (const [serviceId, { sum, count }] of totals) {
+      stats.set(serviceId, {
+        averageRating: Math.round((sum / count) * 100) / 100,
+        reviewCount: count,
+      });
+    }
+
+    return stats;
+  }
+
   private dedupePublicListingItems<
     T extends {
       id: string;
@@ -391,6 +450,8 @@ export class ServicesService {
     createdAt: Date;
     bookingCount?: number;
     activeBookingCount?: number;
+    averageRating?: number;
+    reviewCount?: number;
     category?: { id: string; name: string; slug?: string };
     provider?: {
       id: string;
@@ -398,8 +459,6 @@ export class ServicesService {
       lastName: string;
       avatarUrl: string | null;
       providerProfile?: {
-        rating: number;
-        reviewCount: number;
         experience: number | null;
       } | null;
     };
@@ -419,8 +478,8 @@ export class ServicesService {
         : '',
       providerAvatarUrl: service.provider?.avatarUrl ?? undefined,
       providerExperience: service.provider?.providerProfile?.experience ?? undefined,
-      averageRating: service.provider?.providerProfile?.rating ?? 0,
-      reviewCount: service.provider?.providerProfile?.reviewCount ?? 0,
+      averageRating: service.averageRating ?? 0,
+      reviewCount: service.reviewCount ?? 0,
       status: service.status,
       location: service.location ?? undefined,
       isRemote: service.isRemote,

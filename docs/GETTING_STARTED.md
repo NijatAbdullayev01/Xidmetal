@@ -1,6 +1,6 @@
 # Başlanğıc Bələdçisi
 
-Bu sənəd Xidmetal layihəsini local mühitdə işə salmaq üçün addım-addım təlimat verir.
+Bu sənəd Xidmətal layihəsini local mühitdə işə salmaq üçün addım-addım təlimat verir.
 
 ## 1. Sistem tələbləri
 

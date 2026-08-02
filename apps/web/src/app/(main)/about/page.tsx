@@ -14,11 +14,12 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { APP } from '@xidmetal/shared';
+import { BecomeProviderLink } from '@/components/auth/become-provider-link';
 
 export const metadata: Metadata = {
-  title: 'Haqqımızda | Xidmetal',
+  title: 'Haqqımızda | Xidmətal',
   description:
-    'Xidmetal haqqında — missiyamız, dəyərlərimiz və xidmət verənlərlə xidmət alanları necə birləşdirdiyimiz barədə məlumat.',
+    'Xidmətal haqqında — missiyamız, dəyərlərimiz və xidmət verənlərlə xidmət alanları necə birləşdirdiyimiz barədə məlumat.',
 };
 
 const stats = [
@@ -49,7 +50,7 @@ const values: {
     icon: Sparkles,
     title: 'Keyfiyyətə həsr',
     description:
-      'Yalnız keyfiyyətli xidmət təklif edən providerləri dəstəkləyirik. Reytinq sistemi hər kəsin daha yaxşı seçim etməsinə kömək edir.',
+      'Yalnız keyfiyyətli xidmət təklif edən xidmət verənləri dəstəkləyirik. Reytinq sistemi hər kəsin daha yaxşı seçim etməsinə kömək edir.',
   },
   {
     icon: Handshake,
@@ -101,7 +102,7 @@ const milestones: {
     year: '2025',
     title: 'Platformanın qurulması',
     description:
-      'Xidmetal platforması hazırlandı — xidmət axtarışı, sifariş, provider kabineti və reytinq sistemi bir ekosistemdə birləşdirildi.',
+      'Xidmətal platforması hazırlandı — xidmət axtarışı, sifariş, xidmət verən kabineti və reytinq sistemi bir ekosistemdə birləşdirildi.',
   },
   {
     year: '2026',
@@ -185,15 +186,15 @@ export default function AboutPage() {
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-bold tracking-tight">Hekayəmiz</h2>
             <p className="mt-4 leading-relaxed text-muted-foreground">
-              Xidmetal, gündəlik həyatda xidmət tapmağın çətin olduğu, xidmət verənlərin isə
+              Xidmətal, gündəlik həyatda xidmət tapmağın çətin olduğu, xidmət verənlərin isə
               müştəri tapmaqda çətinlik çəkdiyi bir reallıqdan doğulub. Təmizlik, təmir,
-              gözəllik, təhsil və daha onlarla kateqoriyada etibarlı provider tapmaq çox vaxt
+              gözəllik, təhsil və daha onlarla kateqoriyada etibarlı xidmət verən tapmaq çox vaxt
               tanışlıq və ya təsadüfi axtarışlara bağlı idi.
             </p>
             <p className="mt-4 leading-relaxed text-muted-foreground">
               Biz bu boşluğu doldurmaq üçün platforma yaratdıq: bir tərəfdə ehtiyacı olan
               müştəri, digər tərəfdə bacarıqlı xidmət verən — aralarında isə aydın qiymət,
-              reytinq və sifariş idarəetməsi. Bu gün Xidmetal minlərlə istifadəçiyə xidmət
+              reytinq və sifariş idarəetməsi. Bu gün Xidmətal minlərlə istifadəçiyə xidmət
               göstərir və davamlı inkişaf edir.
             </p>
           </div>
@@ -265,7 +266,7 @@ export default function AboutPage() {
             </div>
             <h2 className="mt-4 text-3xl font-bold tracking-tight">Kimlər üçün?</h2>
             <p className="mt-3 text-muted-foreground">
-              Xidmetal həm xidmət alan, həm də xidmət verən üçün faydalıdır
+              Xidmətal həm xidmət alan, həm də xidmət verən üçün faydalıdır
             </p>
           </div>
 
@@ -303,7 +304,7 @@ export default function AboutPage() {
             </div>
             <h2 className="mt-6 text-2xl font-bold">Azərbaycan üçün, Azərbaycandan</h2>
             <p className="mt-4 max-w-2xl leading-relaxed text-muted-foreground">
-              Xidmetal yerli bazarın ehtiyaclarına uyğun yaradılıb. Platforma Azərbaycan
+              Xidmətal yerli bazarın ehtiyaclarına uyğun yaradılıb. Platforma Azərbaycan
               dilindədir, yerli ödəniş və əlaqə imkanları nəzərə alınır və istifadəçilər
               öz şəhər və rayonlarına uyğun xidmət tapa bilirlər.
             </p>
@@ -330,12 +331,9 @@ export default function AboutPage() {
                 Xidmətlərə bax
                 <ArrowRight className="h-5 w-5" />
               </Link>
-              <Link
-                href="/register?role=provider"
-                className="inline-flex h-12 items-center gap-2 rounded-lg border border-brand-foreground/30 px-6 text-base font-medium text-brand-foreground transition-colors hover:bg-brand-foreground/10"
-              >
+              <BecomeProviderLink className="inline-flex h-12 items-center gap-2 rounded-lg border border-brand-foreground/30 px-6 text-base font-medium text-brand-foreground transition-colors hover:bg-brand-foreground/10">
                 Xidmət verən ol
-              </Link>
+              </BecomeProviderLink>
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 # Kod Konvensiyaları
 
-Bu sənəd Xidmetal layihəsində kod yazarkən riayət edilməli standartları müəyyən edir.
+Bu sənəd Xidmətal layihəsində kod yazarkən riayət edilməli standartları müəyyən edir.
 
 ## Ümumi prinsiplər
 

@@ -34,7 +34,7 @@ async function bootstrap() {
   );
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Xidmetal API')
+    .setTitle('Xidmətal API')
     .setDescription('Xidmət platforması REST API')
     .setVersion('1.0')
     .addBearerAuth()

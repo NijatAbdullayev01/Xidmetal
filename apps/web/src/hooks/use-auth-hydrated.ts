@@ -1,27 +1,30 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { useAuthStore } from '@/store/auth.store';
 
+/**
+ * Zustand persist localStorage-dan client-də sinxron rehydrate edə bilir,
+ * server isə həmişə boş initial state görür. Bu hook SSR snapshot-u (`false`)
+ * hydration boyunca sabit saxlayır — auth-a bağlı UI mismatch verməsin.
+ */
+function subscribe(onStoreChange: () => void): () => void {
+  const persist = useAuthStore.persist;
+  if (!persist) {
+    return () => {};
+  }
+
+  return persist.onFinishHydration(onStoreChange);
+}
+
+function getClientSnapshot(): boolean {
+  return useAuthStore.persist?.hasHydrated() ?? true;
+}
+
+function getServerSnapshot(): boolean {
+  return false;
+}
+
 export function useAuthHydrated(): boolean {
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    const persist = useAuthStore.persist;
-
-    if (!persist) {
-      setHydrated(true);
-      return;
-    }
-
-    setHydrated(persist.hasHydrated());
-
-    const unsub = persist.onFinishHydration(() => {
-      setHydrated(true);
-    });
-
-    return unsub;
-  }, []);
-
-  return hydrated;
+  return useSyncExternalStore(subscribe, getClientSnapshot, getServerSnapshot);
 }

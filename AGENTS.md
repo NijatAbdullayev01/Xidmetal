@@ -1,4 +1,4 @@
-# Xidmetal — Cursor Agent Qaydaları
+# Xidmətal — Cursor Agent Qaydaları
 
 Bu layihə xidmət verənlərlə xidmət alanları birləşdirən marketplace platformasıdır.
 

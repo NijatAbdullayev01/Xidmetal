@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PlusCircle, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { AlertTriangle, Loader2, Pencil, PlusCircle, Trash2, X } from 'lucide-react';
 import { ServiceStatus } from '@xidmetal/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button, buttonStyles } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Modal } from '@/components/ui/modal';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { formatPrice, formatDate } from '@/lib/utils';
@@ -17,11 +18,18 @@ import {
 } from '@/lib/provider-labels';
 import { useState } from 'react';
 
+interface DeleteTarget {
+  id: string;
+  title: string;
+  hasBookingHistory: boolean;
+}
+
 export default function MyServicesPage() {
   const token = useAuthToken();
   const queryClient = useQueryClient();
   const [actionId, setActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['services', 'mine'],
@@ -57,10 +65,12 @@ export default function MyServicesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services', 'mine'] });
       setActionId(null);
+      setDeleteTarget(null);
       setActionError(null);
     },
     onError: (error) => {
       setActionId(null);
+      setDeleteTarget(null);
       if (error instanceof ApiError) {
         setActionError(error.message);
       } else if (error instanceof Error) {
@@ -77,17 +87,21 @@ export default function MyServicesPage() {
     updateMutation.mutate({ id, status });
   };
 
-  const handleDelete = (id: string, title: string, hasBookingHistory: boolean) => {
-    const message = hasBookingHistory
-      ? `"${title}" xidmətini silmək istədiyinizə əminsiniz? Sifariş tarixçəsi saxlanılacaq və xidmət arxivlənəcək.`
-      : `"${title}" xidmətini silmək istədiyinizə əminsiniz? Bu əməliyyat geri qaytarıla bilməz.`;
-
-    const confirmed = window.confirm(message);
-    if (!confirmed) return;
-
+  const openDeleteDialog = (id: string, title: string, hasBookingHistory: boolean) => {
     setActionError(null);
-    setActionId(id);
-    deleteMutation.mutate(id);
+    setDeleteTarget({ id, title, hasBookingHistory });
+  };
+
+  const closeDeleteDialog = () => {
+    if (deleteMutation.isPending) return;
+    setDeleteTarget(null);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    setActionError(null);
+    setActionId(deleteTarget.id);
+    deleteMutation.mutate(deleteTarget.id);
   };
 
   return (
@@ -208,7 +222,7 @@ export default function MyServicesPage() {
                       : undefined
                   }
                   aria-label={`${service.title} xidmətini sil`}
-                  onClick={() => handleDelete(service.id, service.title, hasBookingHistory)}
+                  onClick={() => openDeleteDialog(service.id, service.title, hasBookingHistory)}
                 >
                   {actionId === service.id && deleteMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -223,6 +237,83 @@ export default function MyServicesPage() {
           );
         })}
       </div>
+
+      <Modal
+        open={!!deleteTarget}
+        onClose={closeDeleteDialog}
+        title="Xidməti sil"
+        description={
+          deleteTarget
+            ? deleteTarget.hasBookingHistory
+              ? `"${deleteTarget.title}" xidmətini silmək istədiyinizə əminsiniz? Sifariş tarixçəsi saxlanılacaq və xidmət arxivlənəcək.`
+              : `"${deleteTarget.title}" xidmətini silmək istədiyinizə əminsiniz? Bu əməliyyat geri qaytarıla bilməz.`
+            : undefined
+        }
+        panelClassName="max-w-md"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4 sm:px-6">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <AlertTriangle className="h-5 w-5" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold">Xidməti sil</h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">Bu əməliyyatı təsdiqləyin</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={closeDeleteDialog}
+            disabled={deleteMutation.isPending}
+            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+            aria-label="Bağla"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-5 py-5 sm:px-6">
+          {deleteTarget && (
+            <>
+              <p className="text-sm leading-relaxed text-foreground sm:text-base">
+                <span className="font-semibold">&ldquo;{deleteTarget.title}&rdquo;</span>{' '}
+                xidmətini silmək istədiyinizə əminsiniz?
+              </p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {deleteTarget.hasBookingHistory
+                  ? 'Sifariş tarixçəsi saxlanılacaq və xidmət arxivlənəcək.'
+                  : 'Bu əməliyyat geri qaytarıla bilməz.'}
+              </p>
+            </>
+          )}
+
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 w-full sm:min-h-10 sm:w-auto"
+              disabled={deleteMutation.isPending}
+              onClick={closeDeleteDialog}
+            >
+              Ləğv et
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="min-h-11 w-full sm:min-h-10 sm:w-auto"
+              disabled={deleteMutation.isPending}
+              onClick={confirmDelete}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Bəli, sil
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

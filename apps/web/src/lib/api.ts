@@ -40,6 +40,9 @@ import { useAuthStore } from '@/store/auth.store';
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const API_PREFIX = '/api/v1';
 
+/** İctimai GET-lər üçün ISR (server fetch cache). Client-də Next ignore edir. */
+const PUBLIC_REVALIDATE_SECONDS = 60;
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -50,8 +53,13 @@ export class ApiError extends Error {
   }
 }
 
-interface RequestOptions extends RequestInit {
+interface RequestOptions extends Omit<RequestInit, 'next'> {
   token?: string;
+  /** Server Components: Next.js fetch cache (ISR). Brauzerdə ignore olunur. */
+  next?: {
+    revalidate?: number | false;
+    tags?: string[];
+  };
 }
 
 // Bir vaxtda yalnız bir refresh sorğusu getsin deyə (eyni access token ilə
@@ -98,6 +106,8 @@ export async function apiClient<T>(
 
   const response = await fetch(`${API_URL}${API_PREFIX}${endpoint}`, {
     ...rest,
+    // Auth-lu cavablar heç vaxt paylaşılan keşə düşməsin
+    ...(token ? { cache: 'no-store' as const } : {}),
     headers: {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
@@ -193,13 +203,21 @@ export const api = {
       }),
   },
 
-  categories: () => apiClient<CategorySummary[]>('/categories'),
+  categories: () =>
+    apiClient<CategorySummary[]>('/categories', {
+      next: { revalidate: PUBLIC_REVALIDATE_SECONDS },
+    }),
 
-  category: (slug: string) => apiClient<CategorySummary>(`/categories/${slug}`),
+  category: (slug: string) =>
+    apiClient<CategorySummary>(`/categories/${slug}`, {
+      next: { revalidate: PUBLIC_REVALIDATE_SECONDS },
+    }),
 
   services: (params?: Record<string, string>) => {
     const query = params ? `?${new URLSearchParams(params)}` : '';
-    return apiClient<PaginatedResponse<ServiceSummary>>(`/services${query}`);
+    return apiClient<PaginatedResponse<ServiceSummary>>(`/services${query}`, {
+      next: { revalidate: PUBLIC_REVALIDATE_SECONDS },
+    });
   },
 
   myServices: (token: string, params?: Record<string, string>) => {

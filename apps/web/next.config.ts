@@ -12,6 +12,14 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '**' },
     ],
   },
+  // Next 15 default: dynamic segment staleTime = 0 → hər soft nav serverə gedir.
+  // Qısa client router cache ilə geri/irəli və təkrar keçidlər anlıq olur.
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+      static: 180,
+    },
+  },
 };
 
 export default nextConfig;

@@ -1,7 +1,9 @@
-import { MapPin, Wifi, User, Briefcase } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { MapPin, Wifi, User, Briefcase, type LucideIcon } from 'lucide-react';
 import type { ServiceSummary } from '@xidmetal/shared';
 import { formatPrice, cn } from '@/lib/utils';
 import { ServiceOrderButton } from '@/components/services/service-order-button';
+import { ServiceDescription } from '@/components/services/service-description';
 import { ProviderReviewsTrigger } from '@/components/reviews/provider-reviews-trigger';
 import { getCategoryIcon } from '@/lib/category-icons';
 import { getPriceUnitLabel } from '@/lib/provider-labels';
@@ -25,15 +27,15 @@ function ProviderAvatar({
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={avatarUrl}
-        alt={name}
-        className="h-10 w-10 rounded-full object-cover ring-2 ring-background"
+        alt=""
+        className="h-11 w-11 rounded-full object-cover"
       />
     );
   }
 
   return (
     <div
-      className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand/50 to-brand/20 text-xs font-bold text-brand-foreground ring-2 ring-background"
+      className="flex h-11 w-11 items-center justify-center rounded-full bg-brand/20 text-xs font-bold text-brand-foreground"
       aria-hidden
     >
       {initials || <User className="h-4 w-4" />}
@@ -41,11 +43,31 @@ function ProviderAvatar({
   );
 }
 
-function RemoteBadge() {
+function RemoteBadge({ className }: { className?: string }) {
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand/10 px-2.5 py-1 text-xs font-medium text-foreground ring-1 ring-brand/25">
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-md bg-brand/10 px-1.5 py-0.5 text-[11px] font-medium leading-none text-foreground ring-1 ring-brand/20 sm:text-xs',
+        className,
+      )}
+    >
       <Wifi className="h-3 w-3 text-brand-dark" aria-hidden />
       Onlayn
+    </span>
+  );
+}
+
+function MetaChip({
+  icon: Icon,
+  children,
+}: {
+  icon: LucideIcon;
+  children: ReactNode;
+}) {
+  return (
+    <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-[11px] leading-none text-muted-foreground sm:text-xs">
+      <Icon className="h-3 w-3 shrink-0 text-muted-foreground/80 sm:h-3.5 sm:w-3.5" aria-hidden />
+      <span className="truncate">{children}</span>
     </span>
   );
 }
@@ -61,87 +83,29 @@ export function ServiceCard({
   showCategoryHeader?: boolean;
 }) {
   const Icon = getCategoryIcon(categorySlug ?? '');
+  const hasExperience =
+    service.providerExperience != null && service.providerExperience > 0;
+  const hasLocation = Boolean(service.location);
+  const showMeta = hasLocation || hasExperience || service.isRemote;
 
   return (
-    <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-border/60 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand/8 hover:ring-brand/35">
-      {showCategoryHeader ? (
-        <div className="relative flex items-center justify-between gap-3 bg-gradient-to-r from-brand/12 via-brand/5 to-transparent px-5 py-3.5">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/20 shadow-sm ring-1 ring-brand/25 transition-transform duration-300 group-hover:scale-105">
-              <Icon className="h-5 w-5 text-brand-foreground" strokeWidth={1.75} aria-hidden />
-            </div>
-            <span className="truncate text-sm font-semibold text-foreground">
-              {service.categoryName}
-            </span>
-          </div>
-
-          {service.isRemote && <RemoteBadge />}
-        </div>
-      ) : null}
-
-      {/* Əsas məzmun */}
-      <div className={cn('flex flex-1 flex-col px-5 pb-5', showCategoryHeader ? 'pt-4' : 'pt-5')}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-3">
-              {!showCategoryHeader && (
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/15 ring-1 ring-brand/20 transition-transform duration-300 group-hover:scale-105">
-                  <Icon className="h-5 w-5 text-brand-foreground" strokeWidth={1.75} aria-hidden />
-                </div>
-              )}
-              <h3 className="min-w-0 flex-1 line-clamp-2 text-[1.05rem] font-semibold leading-snug tracking-tight transition-colors group-hover:text-brand-dark">
-                {service.title}
-              </h3>
-            </div>
-            <div className={cn(!showCategoryHeader && 'pl-[calc(2.5rem+0.75rem)]')}>
-              <p className="mt-2 line-clamp-2 flex-1 text-sm leading-relaxed text-muted-foreground">
-                {service.description}
-              </p>
-              {(service.location ||
-                (service.providerExperience != null && service.providerExperience > 0)) && (
-                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-                  {service.location && (
-                    <p className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                      <MapPin className="h-3.5 w-3.5 shrink-0 text-brand-dark/70" aria-hidden />
-                      <span className="truncate">{service.location}</span>
-                    </p>
-                  )}
-                  {service.providerExperience != null && service.providerExperience > 0 && (
-                    <p className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                      <Briefcase className="h-3.5 w-3.5 shrink-0 text-brand-dark/70" aria-hidden />
-                      <span>{service.providerExperience} il təcrübə</span>
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          {!showCategoryHeader && service.isRemote ? <RemoteBadge /> : null}
-        </div>
-      </div>
-
-      {/* Qiymət və CTA */}
-      <div className="flex items-center justify-between gap-3 border-t border-border/50 px-5 py-3.5">
-        <p className="text-xl font-bold tracking-tight text-foreground">
-          {formatPrice(service.price)}
-          {service.price > 0 && (
-            <span className="ml-1.5 text-sm font-normal text-muted-foreground">
-              / {getPriceUnitLabel(service.priceUnit)}
-            </span>
-          )}
-        </p>
-        <ServiceOrderButton service={service} />
-      </div>
-
-      {/* Provayder */}
-      <div className="flex items-center gap-3 border-t border-border/50 bg-muted/25 px-5 py-4">
+    <article
+      className={cn(
+        'group relative flex h-full flex-col rounded-2xl bg-card px-5 pb-3.5 pt-5',
+        'ring-1 ring-border/70 transition-[box-shadow,ring-color] duration-200',
+        'hover:shadow-md hover:ring-brand/30',
+      )}
+    >
+      {/* 1. Etibar — kimdir, nə qədər etibarlıdır */}
+      <div className="flex items-start gap-3">
         <ProviderAvatar
           name={service.providerName}
           avatarUrl={service.providerAvatarUrl}
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-foreground">{service.providerName}</p>
-          <p className="text-xs text-muted-foreground">Xidmət verən</p>
+          <p className="truncate text-sm font-semibold text-foreground">
+            {service.providerName}
+          </p>
           <div className="mt-1">
             <ProviderReviewsTrigger
               providerId={service.providerId}
@@ -150,9 +114,86 @@ export function ServiceCard({
               reviewCount={service.reviewCount}
               serviceId={service.id}
               serviceTitle={service.title}
+              compact
             />
           </div>
         </div>
+        {showCategoryHeader ? (
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/15 ring-1 ring-brand/20"
+            title={service.categoryName}
+          >
+            <Icon className="h-4 w-4 text-brand-foreground" strokeWidth={1.75} aria-hidden />
+            <span className="sr-only">{service.categoryName}</span>
+          </div>
+        ) : null}
+      </div>
+
+      {/* 2. Təklif — nə təklif olunur */}
+      <div className="mt-4 flex min-h-0 flex-1 flex-col">
+        {showCategoryHeader ? (
+          <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+            {service.categoryName}
+          </p>
+        ) : null}
+
+        <h3 className="line-clamp-2 text-base font-semibold leading-snug tracking-tight text-foreground sm:text-[1.05rem]">
+          {service.title}
+        </h3>
+
+        {service.description ? (
+          <ServiceDescription
+            description={service.description}
+            title={service.title}
+          />
+        ) : null}
+      </div>
+
+      {/* 3. Qərar — qiymət + hərəkət */}
+      <div className="mt-4 border-t border-border/60 pt-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate">
+            {service.price > 0 ? (
+              <>
+                <span className="text-base font-bold tracking-tight text-foreground tabular-nums">
+                  {formatPrice(service.price)}
+                </span>
+                <span className="ml-1 text-xs text-muted-foreground">
+                  / {getPriceUnitLabel(service.priceUnit)}
+                </span>
+              </>
+            ) : (
+              <span className="text-sm font-semibold text-foreground">
+                {formatPrice(service.price)}
+              </span>
+            )}
+          </p>
+
+          <ServiceOrderButton
+            service={service}
+            className="h-9 shrink-0 touch-manipulation px-3 text-sm"
+          />
+        </div>
+
+        {/* 4. Kontekst — yer / təcrübə / çatdırılma (qərardan sonra, daha sakit) */}
+        {showMeta ? (
+          <div
+            className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-2.5"
+            aria-label="Xidmət məlumatları"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              {hasLocation ? (
+                <MetaChip icon={MapPin}>{service.location}</MetaChip>
+              ) : null}
+              {service.isRemote ? <RemoteBadge /> : null}
+            </div>
+            {hasExperience ? (
+              <MetaChip icon={Briefcase}>
+                {service.providerExperience} il təcrübə
+              </MetaChip>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </article>
   );

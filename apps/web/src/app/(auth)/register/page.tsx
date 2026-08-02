@@ -4,7 +4,7 @@ import { parseRoleFromQuery } from '@/lib/auth';
 
 export const metadata: Metadata = {
   title: 'Qeydiyyat',
-  description: 'Xidmetal platformasında istifadəçi və ya xidmət verən kimi qeydiyyatdan keçin.',
+  description: 'Xidmətal platformasında istifadəçi və ya xidmət verən kimi qeydiyyatdan keçin.',
 };
 
 interface RegisterPageProps {

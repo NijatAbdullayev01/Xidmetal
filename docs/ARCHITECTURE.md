@@ -1,8 +1,8 @@
-# Xidmetal Arxitekturası
+# Xidmətal Arxitekturası
 
 ## Ümumi baxış
 
-Xidmetal **monorepo** arxitekturası ilə qurulub. Bu yanaşma kod paylaşımını, tip təhlükəsizliyini və vahid development workflow-unu təmin edir.
+Xidmətal **monorepo** arxitekturası ilə qurulub. Bu yanaşma kod paylaşımını, tip təhlükəsizliyini və vahid development workflow-unu təmin edir.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
