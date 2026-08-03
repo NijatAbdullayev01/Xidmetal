@@ -7,8 +7,18 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/database/prisma.service';
 import { CreateServiceDto, UpdateServiceDto, ServiceQueryDto } from './dto';
-import { UserRole, PriceUnit, requiresServiceVenue } from '@xidmetal/shared';
+import { UserRole, PriceUnit, requiresServiceVenue, MAX_SERVICE_IMAGES } from '@xidmetal/shared';
 import { BookingStatus, ReviewStatus, ServiceStatus } from '@prisma/client';
+
+const SERVICE_IMAGES_INCLUDE = { orderBy: { sortOrder: 'asc' as const } };
+
+function isValidImageUrl(url: string): boolean {
+  return (
+    url.startsWith('data:image/') ||
+    url.startsWith('http://') ||
+    url.startsWith('https://')
+  );
+}
 
 @Injectable()
 export class ServicesService {
@@ -40,6 +50,7 @@ export class ServicesService {
         orderBy: { createdAt: 'desc' },
         include: {
           category: { select: { id: true, name: true, slug: true } },
+          images: SERVICE_IMAGES_INCLUDE,
           _count: { select: { bookings: true } },
         },
       }),
@@ -97,6 +108,7 @@ export class ServicesService {
         orderBy: { createdAt: 'desc' },
         include: {
           category: { select: { id: true, name: true, slug: true } },
+          images: SERVICE_IMAGES_INCLUDE,
           provider: {
             select: {
               id: true,
@@ -147,7 +159,7 @@ export class ServicesService {
             providerProfile: true,
           },
         },
-        images: { orderBy: { sortOrder: 'asc' } },
+        images: SERVICE_IMAGES_INCLUDE,
       },
     });
 
@@ -182,14 +194,28 @@ export class ServicesService {
     this.assertValidPriceUnit(category.slug, dto.priceUnit);
     this.assertValidServiceVenue(category.slug, dto.serviceVenue);
 
+    const { images, ...serviceFields } = dto;
+    const normalizedImages = this.normalizeServiceImages(images);
+
     const service = await this.prisma.service.create({
       data: {
-        ...dto,
+        ...serviceFields,
         serviceVenue: requiresServiceVenue(category.slug) ? dto.serviceVenue : null,
         providerId,
         status: ServiceStatus.DRAFT,
+        ...(normalizedImages.length > 0 && {
+          images: {
+            create: normalizedImages.map((url, index) => ({
+              url,
+              sortOrder: index,
+            })),
+          },
+        }),
       },
-      include: { category: { select: { id: true, name: true, slug: true } } },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        images: SERVICE_IMAGES_INCLUDE,
+      },
     });
     return this.mapService({ ...service, provider: undefined });
   }
@@ -247,20 +273,43 @@ export class ServicesService {
       }
     }
 
-    const updated = await this.prisma.service.update({
-      where: { id },
-      data: {
-        ...dto,
-        ...(dto.categoryId !== undefined || dto.serviceVenue !== undefined
-          ? {
-              serviceVenue: requiresServiceVenue(effectiveCategory.slug)
-                ? (dto.serviceVenue ?? service.serviceVenue)
-                : null,
-            }
-          : {}),
-      },
-      include: { category: { select: { id: true, name: true, slug: true } } },
+    const { images, ...serviceFields } = dto;
+    const normalizedImages =
+      images !== undefined ? this.normalizeServiceImages(images) : undefined;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (normalizedImages !== undefined) {
+        await tx.serviceImage.deleteMany({ where: { serviceId: id } });
+        if (normalizedImages.length > 0) {
+          await tx.serviceImage.createMany({
+            data: normalizedImages.map((url, index) => ({
+              serviceId: id,
+              url,
+              sortOrder: index,
+            })),
+          });
+        }
+      }
+
+      return tx.service.update({
+        where: { id },
+        data: {
+          ...serviceFields,
+          ...(dto.categoryId !== undefined || dto.serviceVenue !== undefined
+            ? {
+                serviceVenue: requiresServiceVenue(effectiveCategory.slug)
+                  ? (dto.serviceVenue ?? service.serviceVenue)
+                  : null,
+              }
+            : {}),
+        },
+        include: {
+          category: { select: { id: true, name: true, slug: true } },
+          images: SERVICE_IMAGES_INCLUDE,
+        },
+      });
     });
+
     return this.mapService({ ...updated, provider: undefined });
   }
 
@@ -435,6 +484,21 @@ export class ServicesService {
     }
   }
 
+  private normalizeServiceImages(images?: string[]): string[] {
+    if (!images || images.length === 0) return [];
+    if (images.length > MAX_SERVICE_IMAGES) {
+      throw new BadRequestException(
+        `Maksimum ${MAX_SERVICE_IMAGES} şəkil əlavə etmək olar`,
+      );
+    }
+    for (const url of images) {
+      if (!isValidImageUrl(url)) {
+        throw new BadRequestException('Düzgün şəkil formatı daxil edin');
+      }
+    }
+    return images;
+  }
+
   private mapService(service: {
     id: string;
     title: string;
@@ -462,6 +526,12 @@ export class ServicesService {
         experience: number | null;
       } | null;
     };
+    images?: Array<{
+      id: string;
+      url: string;
+      alt: string | null;
+      sortOrder: number;
+    }>;
   }) {
     const price = typeof service.price === 'number' ? service.price : service.price.toNumber();
     return {
@@ -488,6 +558,14 @@ export class ServicesService {
       ...(service.bookingCount !== undefined && { bookingCount: service.bookingCount }),
       ...(service.activeBookingCount !== undefined && {
         activeBookingCount: service.activeBookingCount,
+      }),
+      ...(service.images !== undefined && {
+        images: service.images.map((image) => ({
+          id: image.id,
+          url: image.url,
+          alt: image.alt ?? undefined,
+          sortOrder: image.sortOrder,
+        })),
       }),
     };
   }

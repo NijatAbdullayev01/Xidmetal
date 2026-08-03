@@ -254,22 +254,23 @@ export default function ProviderCalendarPage() {
               id="calendar-service"
               value={serviceId}
               disabled={servicesQuery.isLoading || services.length === 0}
-              onChange={(event) => {
-                setServiceId(event.target.value);
+              onChange={(next) => {
+                setServiceId(next);
                 setFormError(null);
                 setFormSuccess(null);
               }}
-            >
-              {services.length === 0 ? (
-                <option value="">Xidmət yoxdur</option>
-              ) : (
-                services.map((service) => (
-                  <option key={service.id} value={service.id}>
-                    {service.title}
-                  </option>
-                ))
-              )}
-            </Select>
+              options={
+                services.length === 0
+                  ? [{ value: '', label: 'Xidmət yoxdur', disabled: true }]
+                  : services.map((service) => ({
+                      value: service.id,
+                      label: service.title,
+                    }))
+              }
+              placeholder="Xidmət seçin"
+              searchable={services.length > 8}
+              searchPlaceholder="Xidmət axtarın..."
+            />
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -476,13 +477,20 @@ export default function ProviderCalendarPage() {
                       <Select
                         id="override-type"
                         value={overrideType}
-                        onChange={(event) =>
-                          setOverrideType(event.target.value as AvailabilityOverrideType)
+                        onChange={(next) =>
+                          setOverrideType(next as AvailabilityOverrideType)
                         }
-                      >
-                        <option value={AvailabilityOverrideType.AVAILABLE}>Boş vaxt</option>
-                        <option value={AvailabilityOverrideType.BLOCKED}>Bağlı / məşğul</option>
-                      </Select>
+                        options={[
+                          {
+                            value: AvailabilityOverrideType.AVAILABLE,
+                            label: 'Boş vaxt',
+                          },
+                          {
+                            value: AvailabilityOverrideType.BLOCKED,
+                            label: 'Bağlı / məşğul',
+                          },
+                        ]}
+                      />
                     </div>
                     <label className="flex min-h-[44px] items-center gap-3 text-sm">
                       <input

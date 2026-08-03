@@ -44,6 +44,13 @@ export interface UserProfile {
   providerProfile?: ProviderProfile;
 }
 
+export interface ServiceImageSummary {
+  id: string;
+  url: string;
+  alt?: string;
+  sortOrder: number;
+}
+
 export interface ServiceSummary {
   id: string;
   title: string;
@@ -65,6 +72,8 @@ export interface ServiceSummary {
   createdAt: string;
   bookingCount?: number;
   activeBookingCount?: number;
+  /** Xidmətə bağlı şəkillər (sıralı) */
+  images?: ServiceImageSummary[];
 }
 
 export interface BookingSummary {

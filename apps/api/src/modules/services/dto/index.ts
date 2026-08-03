@@ -5,6 +5,9 @@ import {
   IsOptional,
   IsUUID,
   IsEnum,
+  IsArray,
+  ArrayMinSize,
+  ArrayMaxSize,
   Min,
   Max,
   MinLength,
@@ -12,7 +15,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ServiceStatus, PriceUnit, ServiceVenue } from '@xidmetal/shared';
+import { ServiceStatus, PriceUnit, ServiceVenue, MAX_SERVICE_IMAGES } from '@xidmetal/shared';
 
 export class CreateServiceDto {
   @ApiProperty()
@@ -47,10 +50,10 @@ export class CreateServiceDto {
   @Min(1)
   duration?: number;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty({ description: 'Xidmət göstərilən şəhər/rayon' })
   @IsString()
-  location?: string;
+  @MinLength(1, { message: 'Ünvan seçin' })
+  location!: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -61,6 +64,21 @@ export class CreateServiceDto {
   @IsOptional()
   @IsEnum(ServiceVenue)
   serviceVenue?: ServiceVenue;
+
+  @ApiProperty({
+    description: 'Xidmət şəkilləri (data URL və ya http URL)',
+    type: [String],
+    minItems: 1,
+    maxItems: MAX_SERVICE_IMAGES,
+  })
+  @IsArray()
+  @ArrayMinSize(1, { message: 'Ən azı 1 şəkil əlavə edin' })
+  @ArrayMaxSize(MAX_SERVICE_IMAGES, {
+    message: `Maksimum ${MAX_SERVICE_IMAGES} şəkil əlavə etmək olar`,
+  })
+  @IsString({ each: true })
+  @MaxLength(2_000_000, { each: true })
+  images!: string[];
 }
 
 export class UpdateServiceDto {
@@ -97,6 +115,7 @@ export class UpdateServiceDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MinLength(1, { message: 'Ünvan seçin' })
   location?: string;
 
   @ApiPropertyOptional()
@@ -113,6 +132,22 @@ export class UpdateServiceDto {
   @IsOptional()
   @IsEnum(ServiceStatus)
   status?: ServiceStatus;
+
+  @ApiPropertyOptional({
+    description: 'Xidmət şəkilləri — göndərildikdə mövcudları tam əvəz edir',
+    type: [String],
+    minItems: 1,
+    maxItems: MAX_SERVICE_IMAGES,
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1, { message: 'Ən azı 1 şəkil əlavə edin' })
+  @ArrayMaxSize(MAX_SERVICE_IMAGES, {
+    message: `Maksimum ${MAX_SERVICE_IMAGES} şəkil əlavə etmək olar`,
+  })
+  @IsString({ each: true })
+  @MaxLength(2_000_000, { each: true })
+  images?: string[];
 }
 
 export class ServiceQueryDto {

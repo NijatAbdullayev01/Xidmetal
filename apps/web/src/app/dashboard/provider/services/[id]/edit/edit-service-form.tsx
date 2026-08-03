@@ -5,7 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createServiceSchema, PRICE_UNIT_VALUES, PriceUnit, ServiceVenue, requiresServiceVenue } from '@xidmetal/shared';
+import {
+  AZERBAIJAN_LOCATIONS,
+  createServiceSchema,
+  PRICE_UNIT_VALUES,
+  PriceUnit,
+  ServiceVenue,
+  requiresServiceVenue,
+} from '@xidmetal/shared';
 import { z } from 'zod';
 import { ArrowLeft, Loader2, Save } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
+import { LocationPicker } from '@/components/ui/location-picker';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { useAuthStore } from '@/store/auth.store';
@@ -22,9 +30,10 @@ import { formatPrice } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
 import { getServiceTypesForCategory } from '@/lib/service-types';
 import { ServiceVenueSelector } from '@/components/services/service-venue-selector';
+import { ServiceImageUploader } from '@/components/services/service-image-uploader';
 import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 
-const editServiceFormSchema = createServiceSchema.extend({
+const editServiceFormSchema = createServiceSchema.omit({ images: true }).extend({
   priceUnit: z.enum(PRICE_UNIT_VALUES),
   isRemote: z.boolean(),
   serviceVenue: z.nativeEnum(ServiceVenue).optional(),
@@ -43,6 +52,12 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
   const hydrated = useAuthHydrated();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
+  const [imagesError, setImagesError] = useState<string | null>(null);
+  const [initialImages, setInitialImages] = useState<string[]>([]);
+  const imagesDirty =
+    images.length !== initialImages.length ||
+    images.some((url, index) => url !== initialImages[index]);
 
   const {
     data: service,
@@ -97,10 +112,23 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
       isRemote: service.isRemote,
       serviceVenue: service.serviceVenue as EditServiceFormValues['serviceVenue'],
     });
+
+    const loadedImages = (service.images ?? [])
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((image) => image.url);
+    setImages(loadedImages);
+    setInitialImages(loadedImages);
   }, [service, reset]);
 
   const updateMutation = useMutation({
-    mutationFn: (data: EditServiceFormValues) => {
+    mutationFn: ({
+      data,
+      serviceImages,
+    }: {
+      data: EditServiceFormValues;
+      serviceImages: string[];
+    }) => {
       if (!token) throw new ApiError('Autentifikasiya tələb olunur', 401);
       const category = categories.find((cat) => cat.id === data.categoryId);
       return api.updateService(token, serviceId, {
@@ -109,9 +137,10 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
         categoryId: data.categoryId,
         price: Number(data.price),
         priceUnit: data.priceUnit,
-        location: data.location?.trim() || undefined,
+        location: data.location.trim(),
         isRemote: data.isRemote,
         serviceVenue: requiresServiceVenue(category?.slug) ? data.serviceVenue : undefined,
+        images: serviceImages,
       });
     },
     onSuccess: () => {
@@ -133,15 +162,21 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
       setError('serviceVenue', { type: 'manual', message: 'Xidmət yerini seçin' });
       return;
     }
+    if (images.length === 0) {
+      setImagesError('Ən azı 1 şəkil əlavə edin');
+      return;
+    }
     clearErrors('serviceVenue');
+    setImagesError(null);
     setServerError(null);
-    updateMutation.mutate(data);
+    updateMutation.mutate({ data, serviceImages: images });
   };
 
   const categoryId = watch('categoryId');
   const title = watch('title');
   const price = watch('price');
   const priceUnit = watch('priceUnit');
+  const location = watch('location');
   const selectedCategory = categories.find((cat) => cat.id === categoryId);
   const serviceTypes = selectedCategory
     ? getServiceTypesForCategory(selectedCategory.slug)
@@ -244,17 +279,20 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
               <Label htmlFor="categoryId">Kateqoriya</Label>
               <Select
                 id="categoryId"
+                value={categoryId}
+                onChange={(next) =>
+                  setValue('categoryId', next, { shouldValidate: true, shouldDirty: true })
+                }
+                options={categories.map((cat) => ({
+                  value: cat.id,
+                  label: cat.name,
+                }))}
+                placeholder="Kateqoriya seçin"
                 error={!!errors.categoryId}
                 disabled={isSubmitting}
-                {...register('categoryId')}
-              >
-                <option value="">Kateqoriya seçin</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </Select>
+                searchable={categories.length > 8}
+                searchPlaceholder="Kateqoriya axtarın..."
+              />
               {errors.categoryId && (
                 <p className="text-sm text-destructive">{errors.categoryId.message}</p>
               )}
@@ -287,17 +325,20 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
                 {serviceTypeOptions ? (
                   <Select
                     id="title"
+                    value={title}
+                    onChange={(next) =>
+                      setValue('title', next, { shouldValidate: true, shouldDirty: true })
+                    }
+                    options={serviceTypeOptions.map((type) => ({
+                      value: type,
+                      label: type,
+                    }))}
+                    placeholder="Xidmət növünü seçin"
                     error={!!errors.title}
                     disabled={isSubmitting}
-                    {...register('title')}
-                  >
-                    <option value="">Xidmət növünü seçin</option>
-                    {serviceTypeOptions.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </Select>
+                    searchable={serviceTypeOptions.length > 8}
+                    searchPlaceholder="Xidmət növü axtarın..."
+                  />
                 ) : (
                   <Input
                     id="title"
@@ -328,6 +369,16 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
               )}
             </div>
 
+            <ServiceImageUploader
+              images={images}
+              onChange={(next) => {
+                setImages(next);
+                if (next.length > 0) setImagesError(null);
+              }}
+              disabled={isSubmitting}
+              error={imagesError}
+            />
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="price">Qiymət (AZN)</Label>
@@ -353,13 +404,21 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
 
               <div className="space-y-2">
                 <Label htmlFor="priceUnit">Qiymət növü</Label>
-                <Select id="priceUnit" disabled={isSubmitting} {...register('priceUnit')}>
-                  {availablePriceUnits.map((value) => (
-                    <option key={value} value={value}>
-                      {PRICE_UNIT_LABELS[value]}
-                    </option>
-                  ))}
-                </Select>
+                <Select
+                  id="priceUnit"
+                  value={priceUnit}
+                  onChange={(next) =>
+                    setValue('priceUnit', next as PriceUnit, {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    })
+                  }
+                  options={availablePriceUnits.map((unit) => ({
+                    value: unit,
+                    label: PRICE_UNIT_LABELS[unit],
+                  }))}
+                  disabled={isSubmitting}
+                />
               </div>
             </div>
 
@@ -376,13 +435,25 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="location">Ünvan (istəyə bağlı)</Label>
-              <Input
+              <Label htmlFor="location">Ünvan</Label>
+              <LocationPicker
                 id="location"
-                placeholder="Bakı, Nəsimi rayonu"
+                value={location ?? ''}
+                onChange={(next) =>
+                  setValue('location', next, { shouldValidate: true, shouldDirty: true })
+                }
                 disabled={isSubmitting}
-                {...register('location')}
+                error={!!errors.location}
+                clearable={false}
+                extraOptions={
+                  service.location && !AZERBAIJAN_LOCATIONS.includes(service.location)
+                    ? [service.location]
+                    : []
+                }
               />
+              {errors.location && (
+                <p className="text-sm text-destructive">{errors.location.message}</p>
+              )}
             </div>
 
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-4 transition-colors hover:border-brand/40 hover:bg-brand/5">
@@ -413,7 +484,11 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
               >
                 Ləğv et
               </Link>
-              <Button type="submit" disabled={isSubmitting || !isDirty} className="sm:min-w-[160px]">
+              <Button
+                type="submit"
+                disabled={isSubmitting || (!isDirty && !imagesDirty)}
+                className="sm:min-w-[160px]"
+              >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />

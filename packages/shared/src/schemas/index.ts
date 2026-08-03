@@ -41,18 +41,6 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Şifrə tələb olunur'),
 });
 
-export const createServiceSchema = z.object({
-  title: z.string().min(3, 'Xidmət növü minimum 3 simvol olmalıdır').max(200),
-  description: z.string().min(10, 'Təsvir minimum 10 simvol olmalıdır').max(5000),
-  categoryId: z.string().uuid('Kateqoriya seçin'),
-  price: z.number().min(0, 'Qiymət mənfi ola bilməz'),
-  priceUnit: z.enum(PRICE_UNIT_VALUES).default(PriceUnit.FIXED),
-  duration: z.number().int().positive().optional(),
-  location: z.string().optional(),
-  isRemote: z.boolean().default(false),
-  serviceVenue: z.enum(SERVICE_VENUE_VALUES).optional(),
-});
-
 const imageUrlSchema = z
   .string()
   .max(2_000_000, 'Şəkil çox böyükdür')
@@ -63,6 +51,27 @@ const imageUrlSchema = z
       val.startsWith('https://'),
     'Düzgün şəkil formatı daxil edin',
   );
+
+/** Xidmət elanına əlavə oluna bilən maksimum şəkil sayı */
+export const MAX_SERVICE_IMAGES = 3;
+
+const serviceImagesSchema = z
+  .array(imageUrlSchema)
+  .min(1, 'Ən azı 1 şəkil əlavə edin')
+  .max(MAX_SERVICE_IMAGES, `Maksimum ${MAX_SERVICE_IMAGES} şəkil əlavə etmək olar`);
+
+export const createServiceSchema = z.object({
+  title: z.string().min(3, 'Xidmət növü minimum 3 simvol olmalıdır').max(200),
+  description: z.string().min(10, 'Təsvir minimum 10 simvol olmalıdır').max(5000),
+  categoryId: z.string().uuid('Kateqoriya seçin'),
+  price: z.number().min(0, 'Qiymət mənfi ola bilməz'),
+  priceUnit: z.enum(PRICE_UNIT_VALUES).default(PriceUnit.FIXED),
+  duration: z.number().int().positive().optional(),
+  location: z.string().min(1, 'Ünvan seçin'),
+  isRemote: z.boolean().default(false),
+  serviceVenue: z.enum(SERVICE_VENUE_VALUES).optional(),
+  images: serviceImagesSchema,
+});
 
 export const createBookingSchema = z.object({
   serviceId: z.string().uuid(),
@@ -89,10 +98,12 @@ export const updateServiceSchema = z.object({
   categoryId: z.string().uuid().optional(),
   price: z.number().min(0, 'Qiymət mənfi ola bilməz').optional(),
   priceUnit: z.enum(PRICE_UNIT_VALUES).optional(),
-  location: z.string().optional(),
+  location: z.string().min(1, 'Ünvan seçin').optional(),
   isRemote: z.boolean().optional(),
   serviceVenue: z.enum(SERVICE_VENUE_VALUES).optional(),
   status: z.enum(['DRAFT', 'ACTIVE', 'PAUSED', 'ARCHIVED']).optional(),
+  /** Göndərildikdə mövcud şəkilləri tam əvəz edir */
+  images: serviceImagesSchema.optional(),
 });
 
 export const updateProfileSchema = z.object({

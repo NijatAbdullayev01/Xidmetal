@@ -8,8 +8,8 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { API } from '@xidmetal/shared';
 
-/** Base64 profil şəkli üçün (max ~1 MB fayl + JSON overhead) */
-const JSON_BODY_LIMIT = '3mb';
+/** Base64 şəkillər üçün (xidmət/profil; bir neçə şəkil + JSON overhead) */
+const JSON_BODY_LIMIT = '5mb';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);

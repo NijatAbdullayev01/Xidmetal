@@ -4,6 +4,7 @@ import type { ServiceSummary } from '@xidmetal/shared';
 import { formatPrice, cn } from '@/lib/utils';
 import { ServiceOrderButton } from '@/components/services/service-order-button';
 import { ServiceDescription } from '@/components/services/service-description';
+import { ServiceImagesPreview } from '@/components/services/service-images-preview';
 import { ProviderReviewsTrigger } from '@/components/reviews/provider-reviews-trigger';
 import { getCategoryIcon } from '@/lib/category-icons';
 import { getPriceUnitLabel } from '@/lib/provider-labels';
@@ -87,50 +88,34 @@ export function ServiceCard({
     service.providerExperience != null && service.providerExperience > 0;
   const hasLocation = Boolean(service.location);
   const showMeta = hasLocation || hasExperience || service.isRemote;
+  const images = service.images ?? [];
+  const hasImages = images.length > 0;
 
   return (
     <article
       className={cn(
-        'group relative flex h-full flex-col rounded-2xl bg-card px-5 pb-3.5 pt-5',
+        'group relative flex h-full flex-col overflow-hidden rounded-2xl bg-card pb-3.5',
         'ring-1 ring-border/70 transition-[box-shadow,ring-color] duration-200',
         'hover:shadow-md hover:ring-brand/30',
       )}
     >
-      {/* 1. Etibar — kimdir, nə qədər etibarlıdır */}
-      <div className="flex items-start gap-3">
-        <ProviderAvatar
-          name={service.providerName}
-          avatarUrl={service.providerAvatarUrl}
-        />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-foreground">
-            {service.providerName}
-          </p>
-          <div className="mt-1">
-            <ProviderReviewsTrigger
-              providerId={service.providerId}
-              providerName={service.providerName}
-              averageRating={service.averageRating}
-              reviewCount={service.reviewCount}
-              serviceId={service.id}
-              serviceTitle={service.title}
-              compact
-            />
+      {hasImages ? (
+        <ServiceImagesPreview images={images} title={service.title} />
+      ) : (
+        <div
+          className="relative aspect-[16/10] w-full bg-muted"
+          aria-hidden
+        >
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand/15 ring-1 ring-brand/20">
+              <Icon className="h-6 w-6 text-brand-foreground" strokeWidth={1.75} />
+            </div>
           </div>
         </div>
-        {showCategoryHeader ? (
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/15 ring-1 ring-brand/20"
-            title={service.categoryName}
-          >
-            <Icon className="h-4 w-4 text-brand-foreground" strokeWidth={1.75} aria-hidden />
-            <span className="sr-only">{service.categoryName}</span>
-          </div>
-        ) : null}
-      </div>
+      )}
 
-      {/* 2. Təklif — nə təklif olunur */}
-      <div className="mt-4 flex min-h-0 flex-1 flex-col">
+      {/* 1. Təklif — nə təklif olunur */}
+      <div className="flex min-h-0 flex-1 flex-col px-5 pt-4">
         {showCategoryHeader ? (
           <p className="mb-1.5 text-xs font-medium text-muted-foreground">
             {service.categoryName}
@@ -147,10 +132,43 @@ export function ServiceCard({
             title={service.title}
           />
         ) : null}
+
+        {/* 2. Etibar — bütün kartlarda eyni yerdə (məzmunun altında) */}
+        <div className="mt-auto flex items-start gap-3 pt-4">
+          <ProviderAvatar
+            name={service.providerName}
+            avatarUrl={service.providerAvatarUrl}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-foreground">
+              {service.providerName}
+            </p>
+            <div className="mt-1">
+              <ProviderReviewsTrigger
+                providerId={service.providerId}
+                providerName={service.providerName}
+                averageRating={service.averageRating}
+                reviewCount={service.reviewCount}
+                serviceId={service.id}
+                serviceTitle={service.title}
+                compact
+              />
+            </div>
+          </div>
+          {showCategoryHeader ? (
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/15 ring-1 ring-brand/20"
+              title={service.categoryName}
+            >
+              <Icon className="h-4 w-4 text-brand-foreground" strokeWidth={1.75} aria-hidden />
+              <span className="sr-only">{service.categoryName}</span>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {/* 3. Qərar — qiymət + hərəkət */}
-      <div className="mt-4 border-t border-border/60 pt-3">
+      <div className="mt-4 border-t border-border/60 px-5 pt-3">
         <div className="flex items-center justify-between gap-3">
           <p className="min-w-0 truncate">
             {service.price > 0 ? (
@@ -175,25 +193,31 @@ export function ServiceCard({
           />
         </div>
 
-        {/* 4. Kontekst — yer / təcrübə / çatdırılma (qərardan sonra, daha sakit) */}
-        {showMeta ? (
-          <div
-            className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-2.5"
-            aria-label="Xidmət məlumatları"
-          >
-            <div className="flex min-w-0 items-center gap-2">
-              {hasLocation ? (
-                <MetaChip icon={MapPin}>{service.location}</MetaChip>
+        {/* 4. Kontekst — hündürlük sabitdir ki, provider bloku hizalansın */}
+        <div
+          className={cn(
+            'mt-3 flex min-h-[1.375rem] items-center justify-between gap-3 pt-2.5',
+            showMeta && '-mx-5 border-t border-border/60 px-5',
+          )}
+          aria-label={showMeta ? 'Xidmət məlumatları' : undefined}
+          aria-hidden={!showMeta}
+        >
+          {showMeta ? (
+            <>
+              <div className="flex min-w-0 items-center gap-2">
+                {hasLocation ? (
+                  <MetaChip icon={MapPin}>{service.location}</MetaChip>
+                ) : null}
+                {service.isRemote ? <RemoteBadge /> : null}
+              </div>
+              {hasExperience ? (
+                <MetaChip icon={Briefcase}>
+                  {service.providerExperience} il təcrübə
+                </MetaChip>
               ) : null}
-              {service.isRemote ? <RemoteBadge /> : null}
-            </div>
-            {hasExperience ? (
-              <MetaChip icon={Briefcase}>
-                {service.providerExperience} il təcrübə
-              </MetaChip>
-            ) : null}
-          </div>
-        ) : null}
+            </>
+          ) : null}
+        </div>
       </div>
     </article>
   );

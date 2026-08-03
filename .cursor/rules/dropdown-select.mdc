@@ -1,0 +1,47 @@
+---
+description: Vahid dropdown/Select dizayn sistemi — yeni dropdown-lar üçün məcburi
+globs: apps/web/**
+alwaysApply: false
+---
+
+# Dropdown / Select Qaydaları
+
+Yeni və ya dəyişdirilən **dropdown/select** yalnız vahid `Select` komponenti ilə yazılsın.
+
+## Məcburi
+
+- Komponent: `@/components/ui/select` (`Select`, `SelectOption`, `SelectGroup`)
+- Controlled API: `value` + `onChange` (native `<select>` / `register()` yox)
+- RHF: `watch` + `setValue(..., { shouldValidate, shouldDirty })`
+- Uzun siyahı (>8): `searchable`
+- Ünvan: `LocationPicker` (`@/components/ui/location-picker`)
+- Sıralama: `ServiceSortSelect` və ya eyni `Select` (icon + description)
+
+## Qadağan
+
+- Native HTML `<select>` / `<option>`
+- OS-stilli və ya ad-hoc custom dropdown (portal/listbox məntiqini yenidən yazma)
+- Radix/cmdk və digər üçüncü tərəf select library (mövcud `Select` kifayətdir)
+
+## İstisna (dropdown deyil)
+
+- Kart seçimi: `RoleSelector`, `ServiceVenueSelector`
+- Domen picker: `DatePicker`, `TimePicker`
+- Accordion/disclosure: `category-filters`
+
+## Nümunə
+
+```tsx
+import { Select } from '@/components/ui/select';
+
+<Select
+  id="categoryId"
+  value={categoryId}
+  onChange={(next) => setValue('categoryId', next, { shouldValidate: true, shouldDirty: true })}
+  options={categories.map((c) => ({ value: c.id, label: c.name }))}
+  placeholder="Kateqoriya seçin"
+  searchable={categories.length > 8}
+/>
+```
+
+Domenə xüsusi wrapper lazımdırsa (`LocationPicker` kimi), daxildə yenə `Select` istifadə et — UI dilini təkrarlama.

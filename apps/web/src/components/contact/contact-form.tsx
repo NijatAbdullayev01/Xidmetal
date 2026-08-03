@@ -24,6 +24,8 @@ export function ContactForm() {
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
     reset,
   } = useForm<ContactFormValues>({
@@ -36,6 +38,8 @@ export function ContactForm() {
       message: '',
     },
   });
+
+  const subject = watch('subject');
 
   const onSubmit = async (values: ContactFormValues) => {
     const subjectLabel = contactSubjectLabels[values.subject];
@@ -148,13 +152,21 @@ export function ContactForm() {
 
         <div className="space-y-2">
           <Label htmlFor="contact-subject">Mövzu</Label>
-          <Select id="contact-subject" error={!!errors.subject} {...register('subject')}>
-            {contactSubjectValues.map((value) => (
-              <option key={value} value={value}>
-                {contactSubjectLabels[value]}
-              </option>
-            ))}
-          </Select>
+          <Select
+            id="contact-subject"
+            value={subject}
+            onChange={(next) =>
+              setValue('subject', next as ContactFormValues['subject'], {
+                shouldValidate: true,
+                shouldDirty: true,
+              })
+            }
+            options={contactSubjectValues.map((value) => ({
+              value,
+              label: contactSubjectLabels[value],
+            }))}
+            error={!!errors.subject}
+          />
           {errors.subject && (
             <p className="text-sm text-destructive" role="alert">
               {errors.subject.message}

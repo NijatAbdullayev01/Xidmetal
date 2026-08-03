@@ -4,7 +4,14 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createServiceSchema, PRICE_UNIT_VALUES, PriceUnit, ServiceVenue, requiresServiceVenue, SERVICE_VENUE_LABELS } from '@xidmetal/shared';
+import {
+  createServiceSchema,
+  PRICE_UNIT_VALUES,
+  PriceUnit,
+  ServiceVenue,
+  requiresServiceVenue,
+  SERVICE_VENUE_LABELS,
+} from '@xidmetal/shared';
 import { z } from 'zod';
 import {
   ArrowLeft,
@@ -22,6 +29,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
+import { LocationPicker } from '@/components/ui/location-picker';
 import { Stepper, type StepItem } from '@/components/ui/stepper';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
@@ -30,8 +38,9 @@ import { formatPrice } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
 import { getServiceTypesForCategory } from '@/lib/service-types';
 import { ServiceVenueSelector } from '@/components/services/service-venue-selector';
+import { ServiceImageUploader } from '@/components/services/service-image-uploader';
 
-const serviceFormSchema = createServiceSchema.extend({
+const serviceFormSchema = createServiceSchema.omit({ images: true }).extend({
   priceUnit: z.enum(PRICE_UNIT_VALUES),
   isRemote: z.boolean(),
   serviceVenue: z.nativeEnum(ServiceVenue).optional(),
@@ -74,7 +83,7 @@ const STEPS: StepItem[] = [
 const STEP_FIELDS: Record<number, (keyof ServiceFormValues)[]> = {
   1: ['categoryId', 'title', 'experience', 'description'],
   2: ['price', 'priceUnit'],
-  3: [],
+  3: ['location'],
 };
 
 export function NewServiceForm() {
@@ -92,6 +101,8 @@ export function NewServiceForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
+  const [imagesError, setImagesError] = useState<string | null>(null);
 
   const {
     register,
@@ -120,7 +131,13 @@ export function NewServiceForm() {
   const values = watch();
 
   const createMutation = useMutation({
-    mutationFn: async (data: ServiceFormValues) => {
+    mutationFn: async ({
+      data,
+      serviceImages,
+    }: {
+      data: ServiceFormValues;
+      serviceImages: string[];
+    }) => {
       if (!token) throw new ApiError('Autentifikasiya tələb olunur', 401);
       const category = categories.find((cat) => cat.id === data.categoryId);
       await api.users.updateProfile(token, { experience: data.experience });
@@ -130,9 +147,10 @@ export function NewServiceForm() {
         categoryId: data.categoryId,
         price: Number(data.price),
         priceUnit: data.priceUnit,
-        location: data.location?.trim() || undefined,
+        location: data.location.trim(),
         isRemote: data.isRemote,
         serviceVenue: requiresServiceVenue(category?.slug) ? data.serviceVenue : undefined,
+        images: serviceImages,
       });
       return api.updateService(token, service.id, { status: 'ACTIVE' });
     },
@@ -154,8 +172,13 @@ export function NewServiceForm() {
 
   const onSubmit = (data: ServiceFormValues) => {
     if (!isConfirmed || isSaving) return;
+    if (images.length === 0) {
+      setImagesError('Ən azı 1 şəkil əlavə edin');
+      setCurrentStep(1);
+      return;
+    }
     setServerError(null);
-    createMutation.mutate(data);
+    createMutation.mutate({ data, serviceImages: images });
   };
 
   const goNext = async () => {
@@ -165,13 +188,19 @@ export function NewServiceForm() {
       if (!valid) return;
     }
 
-    if (
-      currentStep === 1 &&
-      requiresServiceVenue(selectedCategory?.slug) &&
-      !values.serviceVenue
-    ) {
-      setError('serviceVenue', { type: 'manual', message: 'Xidmət yerini seçin' });
-      return;
+    if (currentStep === 1) {
+      if (
+        requiresServiceVenue(selectedCategory?.slug) &&
+        !values.serviceVenue
+      ) {
+        setError('serviceVenue', { type: 'manual', message: 'Xidmət yerini seçin' });
+        return;
+      }
+      if (images.length === 0) {
+        setImagesError('Ən azı 1 şəkil əlavə edin');
+        return;
+      }
+      setImagesError(null);
     }
     clearErrors('serviceVenue');
 
@@ -284,17 +313,20 @@ export function NewServiceForm() {
                   <Label htmlFor="categoryId">Kateqoriya</Label>
                   <Select
                     id="categoryId"
+                    value={values.categoryId}
+                    onChange={(categoryId) =>
+                      setValue('categoryId', categoryId, { shouldValidate: true, shouldDirty: true })
+                    }
+                    options={categories.map((cat) => ({
+                      value: cat.id,
+                      label: cat.name,
+                    }))}
+                    placeholder="Kateqoriya seçin"
                     error={!!errors.categoryId}
                     disabled={isSaving}
-                    {...register('categoryId')}
-                  >
-                    <option value="">Kateqoriya seçin</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </Select>
+                    searchable={categories.length > 8}
+                    searchPlaceholder="Kateqoriya axtarın..."
+                  />
                   {errors.categoryId && (
                     <p className="text-sm text-destructive">{errors.categoryId.message}</p>
                   )}
@@ -331,17 +363,20 @@ export function NewServiceForm() {
                     {serviceTypes ? (
                       <Select
                         id="title"
+                        value={values.title}
+                        onChange={(title) =>
+                          setValue('title', title, { shouldValidate: true, shouldDirty: true })
+                        }
+                        options={serviceTypes.map((type) => ({
+                          value: type,
+                          label: type,
+                        }))}
+                        placeholder="Xidmət növünü seçin"
                         error={!!errors.title}
                         disabled={isSaving}
-                        {...register('title')}
-                      >
-                        <option value="">Xidmət növünü seçin</option>
-                        {serviceTypes.map((type) => (
-                          <option key={type} value={type}>
-                            {type}
-                          </option>
-                        ))}
-                      </Select>
+                        searchable={serviceTypes.length > 8}
+                        searchPlaceholder="Xidmət növü axtarın..."
+                      />
                     ) : (
                       <Input
                         id="title"
@@ -401,6 +436,16 @@ export function NewServiceForm() {
                     Nə təklif etdiyinizi və üstünlüklərinizi qeyd edin.
                   </p>
                 </div>
+
+                <ServiceImageUploader
+                  images={images}
+                  onChange={(next) => {
+                    setImages(next);
+                    if (next.length > 0) setImagesError(null);
+                  }}
+                  disabled={isSaving}
+                  error={imagesError}
+                />
               </div>
             )}
 
@@ -434,15 +479,19 @@ export function NewServiceForm() {
                     <Label htmlFor="priceUnit">Qiymət növü</Label>
                     <Select
                       id="priceUnit"
+                      value={values.priceUnit}
+                      onChange={(priceUnit) =>
+                        setValue('priceUnit', priceUnit as PriceUnit, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        })
+                      }
+                      options={availablePriceUnits.map((unit) => ({
+                        value: unit,
+                        label: PRICE_UNIT_LABELS[unit],
+                      }))}
                       disabled={isSaving}
-                      {...register('priceUnit')}
-                    >
-                      {availablePriceUnits.map((value) => (
-                        <option key={value} value={value}>
-                          {PRICE_UNIT_LABELS[value]}
-                        </option>
-                      ))}
-                    </Select>
+                    />
                   </div>
                 </div>
 
@@ -464,13 +513,23 @@ export function NewServiceForm() {
             {currentStep === 3 && (
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="location">Ünvan (istəyə bağlı)</Label>
-                  <Input
+                  <Label htmlFor="location">Ünvan</Label>
+                  <LocationPicker
                     id="location"
-                    placeholder="Bakı, Nəsimi rayonu"
+                    value={values.location ?? ''}
+                    onChange={(location) =>
+                      setValue('location', location, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      })
+                    }
                     disabled={isSaving}
-                    {...register('location')}
+                    error={!!errors.location}
+                    clearable={false}
                   />
+                  {errors.location && (
+                    <p className="text-sm text-destructive">{errors.location.message}</p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     Xidmət göstərdiyiniz ərazini qeyd edin.
                   </p>
@@ -521,6 +580,30 @@ export function NewServiceForm() {
                   <div className="grid gap-1 p-4 sm:grid-cols-3">
                     <dt className="text-sm font-medium text-muted-foreground">Təsvir</dt>
                     <dd className="text-sm sm:col-span-2 line-clamp-3">{values.description}</dd>
+                  </div>
+                  <div className="grid gap-1 p-4 sm:grid-cols-3">
+                    <dt className="text-sm font-medium text-muted-foreground">Şəkillər</dt>
+                    <dd className="sm:col-span-2">
+                      {images.length > 0 ? (
+                        <ul className="flex flex-wrap gap-2">
+                          {images.map((url, index) => (
+                            <li
+                              key={`${index}-${url.slice(0, 24)}`}
+                              className="h-12 w-12 overflow-hidden rounded-lg ring-1 ring-border"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={url}
+                                alt={`Şəkil ${index + 1}`}
+                                className="h-full w-full object-cover"
+                              />
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Əlavə edilməyib</span>
+                      )}
+                    </dd>
                   </div>
                   <div className="grid gap-1 p-4 sm:grid-cols-3">
                     <dt className="text-sm font-medium text-muted-foreground">Kateqoriya</dt>
