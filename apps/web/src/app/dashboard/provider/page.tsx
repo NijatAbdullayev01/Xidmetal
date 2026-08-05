@@ -29,7 +29,8 @@ export default function ProviderOverviewPage() {
     queryKey: ['bookings', 'all'],
     queryFn: () => api.bookings(token!, { limit: '100' }),
     enabled: !!token,
-    refetchInterval: 10_000,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
   });
 
@@ -37,7 +38,8 @@ export default function ProviderOverviewPage() {
     queryKey: ['conversations'],
     queryFn: () => api.messages.conversations(token!, { limit: '100' }),
     enabled: !!token,
-    refetchInterval: 5_000,
+    refetchInterval: 4_000,
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
   });
 

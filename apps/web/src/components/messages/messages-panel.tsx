@@ -117,7 +117,8 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
     queryKey: ['conversations'],
     queryFn: () => api.messages.conversations(token!, { limit: '50' }),
     enabled: !!token,
-    refetchInterval: 5_000,
+    refetchInterval: 4_000,
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
   });
 
@@ -129,7 +130,8 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
     queryKey: ['conversation', selectedId],
     queryFn: () => api.messages.conversation(token!, selectedId!),
     enabled: !!token && !!selectedId,
-    refetchInterval: 3_000,
+    refetchInterval: 2_500,
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     retry: (failureCount, error) => {
       if (error instanceof ApiError && error.status === 404) return false;

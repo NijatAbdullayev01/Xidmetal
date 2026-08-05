@@ -1,92 +1,32 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import {
-  playMessageNotificationSound,
-  unlockNotificationAudio,
-} from '@/lib/notification-sound';
+  LIVE_POLL_HIDDEN_MS,
+  LIVE_POLL_VISIBLE_MS,
+  livePollIntervalMs,
+} from '@/lib/live-attention';
 
 export const UNREAD_MESSAGES_QUERY_KEY = ['messages', 'unread-count'] as const;
 
-const POLL_INTERVAL_MS = 5_000;
-
-interface LatestUnreadSnapshot {
-  id: string | null;
-  at: string | null;
-}
-
-export interface UseMessageNotificationsOptions {
-  /** Yeni mesaj gələndə səs çalsın (yalnız bir yerdə true saxlanmalıdır) */
-  playSound?: boolean;
-}
-
 /**
- * Oxunmamış mesaj sayını poll edir. `playSound` yalnız qlobal AttentionProvider-də açılır
- * ki, kabinetdən kənarda da səs eşidilsin və ikiqat çalma olmasın.
+ * Oxunmamış mesaj sayını poll edir.
+ * Səs / toast / OS bildirişi yalnız `useLiveAttention` (AttentionProvider) tərəfindən verilir.
  */
-export function useMessageNotifications(
-  enabled = true,
-  options: UseMessageNotificationsOptions = {},
-) {
-  const { playSound = false } = options;
+export function useMessageNotifications(enabled = true) {
   const token = useAuthToken();
-  const primedRef = useRef(false);
-  const latestRef = useRef<LatestUnreadSnapshot>({ id: null, at: null });
 
   const { data } = useQuery({
     queryKey: UNREAD_MESSAGES_QUERY_KEY,
     queryFn: () => api.messages.unreadCount(token!),
     enabled: enabled && !!token,
-    refetchInterval: POLL_INTERVAL_MS,
+    refetchInterval: () => livePollIntervalMs(LIVE_POLL_VISIBLE_MS, LIVE_POLL_HIDDEN_MS),
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
-    staleTime: 5_000,
+    staleTime: 2_000,
   });
-
-  useEffect(() => {
-    if (!playSound) return;
-
-    const unlock = () => {
-      void unlockNotificationAudio();
-    };
-
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('keydown', unlock, { once: true });
-
-    return () => {
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('keydown', unlock);
-    };
-  }, [playSound]);
-
-  useEffect(() => {
-    if (!playSound || !data) return;
-
-    const next: LatestUnreadSnapshot = {
-      id: data.latestUnreadMessageId,
-      at: data.latestUnreadAt,
-    };
-
-    if (!primedRef.current) {
-      latestRef.current = next;
-      primedRef.current = true;
-      return;
-    }
-
-    const prev = latestRef.current;
-    const isNewer =
-      next.id !== null &&
-      next.at !== null &&
-      (prev.at === null || new Date(next.at).getTime() > new Date(prev.at).getTime());
-
-    if (isNewer && next.id !== prev.id) {
-      void playMessageNotificationSound();
-    }
-
-    latestRef.current = next;
-  }, [data, playSound]);
 
   return {
     unreadCount: data?.count ?? 0,

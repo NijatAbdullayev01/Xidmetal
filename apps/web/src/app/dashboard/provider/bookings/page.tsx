@@ -168,7 +168,8 @@ export default function ProviderBookingsPage() {
         ...(currentTab.status && { status: currentTab.status }),
       }),
     enabled: !!token,
-    refetchInterval: 10_000,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
   });
 

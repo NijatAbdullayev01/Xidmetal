@@ -1,6 +1,6 @@
 let audioContext: AudioContext | null = null;
 let lastPlayAt = 0;
-const MIN_PLAY_GAP_MS = 1_500;
+const MIN_PLAY_GAP_MS = 1_200;
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null;
@@ -43,7 +43,7 @@ function playTone(
   oscillator.frequency.setValueAtTime(frequency, startAt);
 
   gain.gain.setValueAtTime(0.0001, startAt);
-  gain.gain.exponentialRampToValueAtTime(gainValue, startAt + 0.02);
+  gain.gain.exponentialRampToValueAtTime(gainValue, startAt + 0.015);
   gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
 
   oscillator.connect(gain);
@@ -53,7 +53,7 @@ function playTone(
   oscillator.stop(startAt + duration + 0.02);
 }
 
-async function playChime(frequencies: [number, number]): Promise<void> {
+async function playChime(pattern: Array<{ freq: number; offset: number; duration: number; gain: number }>): Promise<void> {
   const nowMs = Date.now();
   if (nowMs - lastPlayAt < MIN_PLAY_GAP_MS) return;
   lastPlayAt = nowMs;
@@ -67,19 +67,28 @@ async function playChime(frequencies: [number, number]): Promise<void> {
     }
 
     const now = ctx.currentTime;
-    playTone(ctx, frequencies[0], now, 0.12, 0.08);
-    playTone(ctx, frequencies[1], now + 0.11, 0.16, 0.07);
+    for (const tone of pattern) {
+      playTone(ctx, tone.freq, now + tone.offset, tone.duration, tone.gain);
+    }
   } catch {
     // Autoplay bloklanarsa səssiz keç
   }
 }
 
-/** Qısa iki tonlu mesaj bildiriş səsi (Web Audio API). */
+/** Mesaj bildirişi — aydın üç tonlu zəng. */
 export async function playMessageNotificationSound(): Promise<void> {
-  await playChime([880, 1174.66]);
+  await playChime([
+    { freq: 880, offset: 0, duration: 0.14, gain: 0.11 },
+    { freq: 1174.66, offset: 0.12, duration: 0.16, gain: 0.1 },
+    { freq: 1318.51, offset: 0.26, duration: 0.18, gain: 0.09 },
+  ]);
 }
 
-/** Sifariş bildirişi — bir az aşağı tonlarla fərqlənir. */
+/** Sifariş bildirişi — daha aşağı, təcili tonlar. */
 export async function playBookingNotificationSound(): Promise<void> {
-  await playChime([659.25, 880]);
+  await playChime([
+    { freq: 523.25, offset: 0, duration: 0.14, gain: 0.12 },
+    { freq: 659.25, offset: 0.13, duration: 0.14, gain: 0.11 },
+    { freq: 783.99, offset: 0.26, duration: 0.2, gain: 0.1 },
+  ]);
 }

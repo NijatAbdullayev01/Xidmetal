@@ -28,6 +28,7 @@ export function useAckBookingNotifications(enabled = true) {
       .markBookingReadAll(token)
       .then(() => {
         void queryClient.invalidateQueries({ queryKey: BOOKING_ATTENTION_QUERY_KEY });
+        void queryClient.invalidateQueries({ queryKey: ['bookings'] });
       })
       .finally(() => {
         inFlightRef.current = false;

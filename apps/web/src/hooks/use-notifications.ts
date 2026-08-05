@@ -17,8 +17,9 @@ export function useNotifications(enabled = true) {
     queryFn: () => api.notifications.unreadCount(token!),
     enabled: enabled && !!token,
     refetchInterval: POLL_INTERVAL_MS,
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
-    staleTime: 5_000,
+    staleTime: 2_000,
   });
 
   return {
