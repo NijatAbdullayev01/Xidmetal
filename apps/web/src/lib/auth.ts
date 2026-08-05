@@ -8,6 +8,7 @@ export function parseRoleFromQuery(role: string | null | undefined): PublicUserR
   return UserRole.CUSTOMER;
 }
 
+/** Marketplace web — ADMIN buraya yönləndirilmir (ayrı origin) */
 export function getPostAuthRedirectPath(role: UserRole): string {
   switch (role) {
     case UserRole.PROVIDER:
@@ -16,7 +17,7 @@ export function getPostAuthRedirectPath(role: UserRole): string {
       return '/dashboard/customer';
     case UserRole.ADMIN:
     default:
-      return '/dashboard';
+      return '/login';
   }
 }
 
@@ -28,6 +29,10 @@ export function getDashboardPath(role: UserRole): string {
       return '/dashboard/customer';
     case UserRole.ADMIN:
     default:
-      return '/dashboard';
+      return '/login';
   }
+}
+
+export function getAdminAppUrl(): string {
+  return process.env.NEXT_PUBLIC_ADMIN_URL ?? 'http://localhost:3021';
 }

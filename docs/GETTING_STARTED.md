@@ -2,6 +2,8 @@
 
 Bu sənəd Xidmətal layihəsini local mühitdə işə salmaq üçün addım-addım təlimat verir.
 
+> **Portlar (cari):** Web `3020`, Admin `3021`, API `4000`, Postgres host `5434`, Redis host `6380`.
+
 ## 1. Sistem tələbləri
 
 | Alət | Minimum versiya |
@@ -10,8 +12,6 @@ Bu sənəd Xidmətal layihəsini local mühitdə işə salmaq üçün addım-add
 | pnpm | 9.x |
 | Docker | 24.x |
 | Docker Compose | 2.x |
-
-Node.js versiyasını yoxlamaq:
 
 ```bash
 node --version   # v20.x.x və ya yuxarı
@@ -32,64 +32,63 @@ pnpm install
 cp .env.example .env
 ```
 
-`.env` faylında aşağıdakı dəyərləri yoxlayın:
+`.env` dəyərləri (`.env.example` ilə eyni):
 
-| Dəyişən | Təsvir | Default |
-|---------|--------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://xidmetal:xidmetal_dev@localhost:5432/xidmetal` |
-| `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
+| Dəyişən | Təsvir | Default (local Docker) |
+|---------|--------|-------------------------|
+| `DATABASE_URL` | PostgreSQL | `postgresql://xidmetal:xidmetal_dev@localhost:5434/xidmetal` |
+| `REDIS_URL` | Redis (API hələ istifadə etmir) | `redis://localhost:6380` |
 | `JWT_SECRET` | JWT imzalama açarı | Dəyişdirin! |
 | `API_PORT` | Backend port | `4000` |
-| `NEXT_PUBLIC_API_URL` | Frontend-in API URL-i | `http://localhost:4000` |
+| `CORS_ORIGIN` | İcazəli frontend origin-lər (vergüllə) | `http://localhost:3020,http://localhost:3021` |
+| `NEXT_PUBLIC_API_URL` | API URL (web + admin) | `http://localhost:4000` |
+| `NEXT_PUBLIC_APP_URL` | Marketplace URL | `http://localhost:3020` |
+| `NEXT_PUBLIC_ADMIN_URL` | Admin panel URL | `http://localhost:3021` |
+| `NEXT_PUBLIC_API_URL` | Frontend → API | `http://localhost:4000` |
+| `NEXT_PUBLIC_APP_URL` | Frontend URL | `http://localhost:3020` |
+
+Mövcud `.env` varsa, portları yuxarıdakı ilə uyğunlaşdırın.
 
 ## 4. Verilənlər bazasını işə salmaq
 
 ```bash
-# PostgreSQL və Redis container-larını başlat
 docker compose up -d
-
-# Container-ların hazır olmasını gözləyin
 docker compose ps
 ```
 
-## 5. Database migration
+## 5. Database schema
+
+Hazırda production migration history yoxdur — local üçün `db:push` istifadə olunur.
 
 ```bash
-# Prisma client generate
 pnpm db:generate
-
-# Schema-nı DB-yə push et
 pnpm db:push
-
-# Seed data (kateqoriyalar)
 pnpm --filter @xidmetal/database seed
 ```
 
 ## 6. Development serverləri
 
 ```bash
-# Hər iki app eyni vaxtda
 pnpm dev
 ```
 
 Və ya ayrı-ayrı:
 
 ```bash
-# Terminal 1 — API
 pnpm --filter @xidmetal/api dev
-
-# Terminal 2 — Web
 pnpm --filter @xidmetal/web dev
+pnpm --filter @xidmetal/admin dev
 ```
 
 ## 7. Yoxlama
 
 | Test | URL / Əmr |
 |------|-----------|
-| Frontend | http://localhost:3001 |
+| Marketplace | http://localhost:3020 |
+| Admin panel | http://localhost:3021 |
 | API Health | http://localhost:4000/api/v1/health |
 | Swagger | http://localhost:4000/docs |
-| DB Studio | `pnpm db:studio` → http://localhost:5555 |
+| DB Studio | `pnpm db:studio` |
 
 ## 8. İlk API sorğuları
 
@@ -118,21 +117,24 @@ curl http://localhost:4000/api/v1/categories
 ### Port artıq istifadədədir
 
 ```bash
-# Hansı proses portu tutur
-lsof -i :3001
+lsof -i :3020
 lsof -i :4000
-lsof -i :5432
+lsof -i :5434
 ```
 
 ### Database connection error
 
-```bash
-# Container statusunu yoxla
-docker compose logs postgres
+`DATABASE_URL`-də host portunun **5434** olduğunu yoxlayın (`docker-compose.yml` map: `5434:5432`).
 
-# Container-i restart et
+```bash
+docker compose logs postgres
 docker compose restart postgres
 ```
+
+### CORS / login problemləri
+
+`CORS_ORIGIN` həm marketplace, həm admin origin-lərini əhatə etməlidir:
+`http://localhost:3020,http://localhost:3021`. Admin üçün `NEXT_PUBLIC_ADMIN_URL=http://localhost:3021`.
 
 ### Prisma client tapılmır
 

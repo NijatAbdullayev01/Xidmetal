@@ -22,3 +22,11 @@ export const SERVICE_VENUE_DESCRIPTIONS: Record<ServiceVenueValue, string> = {
 export function requiresServiceVenue(categorySlug?: string): boolean {
   return categorySlug === BEAUTY_CATEGORY_SLUG;
 }
+
+export function formatServiceVenue(venue?: string | null): string | undefined {
+  if (!venue) return undefined;
+  if ((SERVICE_VENUE_VALUES as readonly string[]).includes(venue)) {
+    return SERVICE_VENUE_LABELS[venue as ServiceVenueValue];
+  }
+  return undefined;
+}

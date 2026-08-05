@@ -69,6 +69,14 @@ export interface ServiceSummary {
   location?: string;
   isRemote: boolean;
   serviceVenue?: string;
+  /** Yükdaşıma: yük yeri uzunluğu (metr) */
+  vehicleLength?: number;
+  /** Yükdaşıma: yük yeri eni (metr) */
+  vehicleWidth?: number;
+  /** Yükdaşıma: yük yeri hündürlüyü (metr) */
+  vehicleHeight?: number;
+  /** Yükdaşıma: şəhərdaxili / şəhərlərarası */
+  cargoRouteScope?: string;
   createdAt: string;
   bookingCount?: number;
   activeBookingCount?: number;
@@ -143,6 +151,70 @@ export interface ProviderDashboardStats {
   completedBookings: number;
   rating: number;
   reviewCount: number;
+}
+
+/** Admin panel — platforma icmalı */
+export interface AdminDashboardStats {
+  usersTotal: number;
+  usersCustomers: number;
+  usersProviders: number;
+  usersActive: number;
+  providersUnverified: number;
+  servicesTotal: number;
+  servicesActive: number;
+  bookingsTotal: number;
+  bookingsPending: number;
+  reviewsPending: number;
+  categoriesActive: number;
+}
+
+export interface AdminUserSummary {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  avatarUrl?: string;
+  role: UserRole;
+  isVerified: boolean;
+  isActive: boolean;
+  createdAt: string;
+  lastSeenAt?: string | null;
+  providerProfile?: {
+    id: string;
+    isVerified: boolean;
+    rating: number;
+    reviewCount: number;
+    location?: string;
+    experience?: number;
+  };
+  _count?: {
+    services: number;
+    bookingsAsCustomer: number;
+    bookingsAsProvider: number;
+  };
+}
+
+export interface AdminCategorySummary {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  sortOrder: number;
+  isActive: boolean;
+  serviceCount: number;
+  createdAt: string;
+}
+
+export interface AdminReviewSummary extends ReviewSummary {
+  authorId: string;
+  providerId: string;
+  providerName: string;
+}
+
+export interface AdminAnnouncementResult {
+  sentCount: number;
 }
 
 export interface MessageSummary {

@@ -9,7 +9,8 @@ alwaysApply: true
 ## Kontekst
 
 Xidmət verən (PROVIDER) və xidmət alan (CUSTOMER) rollarını birləşdirən veb marketplace.
-Monorepo: `apps/web` (Next.js 15), `apps/api` (NestJS 11), `packages/shared`, `packages/database`.
+Monorepo: `apps/web` (Next.js 15, port 3020), `apps/admin` (ayrı admin panel, port 3021), `apps/api` (NestJS 11), `packages/shared`, `packages/database`.
+Admin UI marketplace daxilində olmamalıdır — yalnız `apps/admin`.
 
 ## Brend
 

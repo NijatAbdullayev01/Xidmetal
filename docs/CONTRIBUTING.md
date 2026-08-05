@@ -30,12 +30,11 @@ Xidmətal layihəsinə töhfə vermək istəyirsinizsə, bu bələdçini oxuyun.
 ## Branch strategiyası
 
 ```
-main          ← production-ready kod
-├── develop   ← integration branch
-│   ├── feature/*
-│   ├── fix/*
-│   └── refactor/*
+main          ← əsas branch (cari iş axını)
+└── feature/* / fix/* / refactor/*
 ```
+
+`develop` integration branch-i hazırda məcburi deyil; PR-lər adətən `main`-ə açılır.
 
 ## Environment
 

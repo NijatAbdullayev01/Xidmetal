@@ -7,7 +7,16 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/database/prisma.service';
 import { CreateServiceDto, UpdateServiceDto, ServiceQueryDto } from './dto';
-import { UserRole, PriceUnit, requiresServiceVenue, MAX_SERVICE_IMAGES } from '@xidmetal/shared';
+import {
+  UserRole,
+  PriceUnit,
+  CargoRouteScope,
+  requiresServiceVenue,
+  requiresVehicleDetails,
+  requiresCargoRouteScope,
+  allowsPerSqmPriceUnit,
+  MAX_SERVICE_IMAGES,
+} from '@xidmetal/shared';
 import { BookingStatus, ReviewStatus, ServiceStatus } from '@prisma/client';
 
 const SERVICE_IMAGES_INCLUDE = { orderBy: { sortOrder: 'asc' as const } };
@@ -193,14 +202,39 @@ export class ServicesService {
 
     this.assertValidPriceUnit(category.slug, dto.priceUnit);
     this.assertValidServiceVenue(category.slug, dto.serviceVenue);
+    this.assertValidVehicleDetails(
+      dto.title,
+      {
+        vehicleLength: dto.vehicleLength,
+        vehicleWidth: dto.vehicleWidth,
+        vehicleHeight: dto.vehicleHeight,
+        cargoRouteScope: dto.cargoRouteScope,
+      },
+      { rejectExtras: true },
+    );
+    this.assertCargoVehicleImages(dto.title, dto.images);
 
-    const { images, ...serviceFields } = dto;
+    const {
+      images,
+      vehicleLength,
+      vehicleWidth,
+      vehicleHeight,
+      cargoRouteScope,
+      ...serviceFields
+    } = dto;
     const normalizedImages = this.normalizeServiceImages(images);
+    const vehicleFields = this.resolveVehicleFields(dto.title, {
+      vehicleLength,
+      vehicleWidth,
+      vehicleHeight,
+      cargoRouteScope,
+    });
 
     const service = await this.prisma.service.create({
       data: {
         ...serviceFields,
         serviceVenue: requiresServiceVenue(category.slug) ? dto.serviceVenue : null,
+        ...vehicleFields,
         providerId,
         status: ServiceStatus.DRAFT,
         ...(normalizedImages.length > 0 && {
@@ -259,6 +293,61 @@ export class ServicesService {
       dto.serviceVenue !== undefined ? dto.serviceVenue : service.serviceVenue ?? undefined,
     );
 
+    this.assertValidVehicleDetails(effectiveTitle, {
+      vehicleLength:
+        dto.vehicleLength !== undefined
+          ? dto.vehicleLength
+          : requiresVehicleDetails(effectiveTitle)
+            ? (service.vehicleLength ?? undefined)
+            : undefined,
+      vehicleWidth:
+        dto.vehicleWidth !== undefined
+          ? dto.vehicleWidth
+          : requiresVehicleDetails(effectiveTitle)
+            ? (service.vehicleWidth ?? undefined)
+            : undefined,
+      vehicleHeight:
+        dto.vehicleHeight !== undefined
+          ? dto.vehicleHeight
+          : requiresVehicleDetails(effectiveTitle)
+            ? (service.vehicleHeight ?? undefined)
+            : undefined,
+      cargoRouteScope:
+        dto.cargoRouteScope !== undefined
+          ? dto.cargoRouteScope
+          : requiresCargoRouteScope(effectiveTitle)
+            ? (service.cargoRouteScope ?? undefined)
+            : undefined,
+    });
+
+    const effectiveVehicle = {
+      vehicleLength:
+        dto.vehicleLength !== undefined ? dto.vehicleLength : service.vehicleLength ?? undefined,
+      vehicleWidth:
+        dto.vehicleWidth !== undefined ? dto.vehicleWidth : service.vehicleWidth ?? undefined,
+      vehicleHeight:
+        dto.vehicleHeight !== undefined ? dto.vehicleHeight : service.vehicleHeight ?? undefined,
+      cargoRouteScope:
+        dto.cargoRouteScope !== undefined
+          ? dto.cargoRouteScope
+          : service.cargoRouteScope ?? undefined,
+    };
+
+    const effectiveImageCount =
+      dto.images !== undefined ? dto.images.length : undefined;
+    if (effectiveImageCount !== undefined) {
+      this.assertCargoVehicleImages(effectiveTitle, dto.images);
+    } else if (requiresVehicleDetails(effectiveTitle)) {
+      const existingImageCount = await this.prisma.serviceImage.count({
+        where: { serviceId: id },
+      });
+      if (existingImageCount < 1) {
+        throw new BadRequestException(
+          'Yükdaşıma xidməti üçün ən azı 1 avtomobil şəkli əlavə edin',
+        );
+      }
+    }
+
     if (dto.status === ServiceStatus.ARCHIVED) {
       const activeBookings = await this.prisma.booking.count({
         where: {
@@ -273,7 +362,8 @@ export class ServicesService {
       }
     }
 
-    const { images, ...serviceFields } = dto;
+    const { images, vehicleLength, vehicleWidth, vehicleHeight, cargoRouteScope, ...serviceFields } =
+      dto;
     const normalizedImages =
       images !== undefined ? this.normalizeServiceImages(images) : undefined;
 
@@ -291,6 +381,13 @@ export class ServicesService {
         }
       }
 
+      const vehicleChanged =
+        dto.title !== undefined ||
+        vehicleLength !== undefined ||
+        vehicleWidth !== undefined ||
+        vehicleHeight !== undefined ||
+        cargoRouteScope !== undefined;
+
       return tx.service.update({
         where: { id },
         data: {
@@ -301,6 +398,9 @@ export class ServicesService {
                   ? (dto.serviceVenue ?? service.serviceVenue)
                   : null,
               }
+            : {}),
+          ...(vehicleChanged
+            ? this.resolveVehicleFields(effectiveTitle, effectiveVehicle)
             : {}),
         },
         include: {
@@ -475,11 +575,95 @@ export class ServicesService {
     }
   }
 
+  private assertValidVehicleDetails(
+    title: string,
+    dims: {
+      vehicleLength?: number | null;
+      vehicleWidth?: number | null;
+      vehicleHeight?: number | null;
+      cargoRouteScope?: string | null;
+    },
+    options?: { rejectExtras?: boolean },
+  ) {
+    const needsVehicle = requiresVehicleDetails(title);
+    const needsRoute = requiresCargoRouteScope(title);
+
+    if (needsVehicle) {
+      if (dims.vehicleLength == null) {
+        throw new BadRequestException('Yükdaşıma üçün maşın uzunluğunu qeyd edin');
+      }
+      if (dims.vehicleWidth == null) {
+        throw new BadRequestException('Yükdaşıma üçün maşın enini qeyd edin');
+      }
+      if (dims.vehicleHeight == null) {
+        throw new BadRequestException('Yükdaşıma üçün maşın hündürlüyünü qeyd edin');
+      }
+    } else if (
+      options?.rejectExtras &&
+      (dims.vehicleLength != null || dims.vehicleWidth != null || dims.vehicleHeight != null)
+    ) {
+      throw new BadRequestException(
+        'Maşın ölçüləri yalnız yükdaşıma xidmət növləri üçün mövcuddur',
+      );
+    }
+
+    if (needsRoute) {
+      if (!dims.cargoRouteScope) {
+        throw new BadRequestException(
+          'Şəhərdaxili və ya şəhərlərarası daşıma seçilməlidir',
+        );
+      }
+      return;
+    }
+
+    if (options?.rejectExtras && dims.cargoRouteScope != null) {
+      throw new BadRequestException(
+        'Daşıma marşrutu yalnız nəqliyyat xidmət növləri üçün mövcuddur',
+      );
+    }
+  }
+
+  private assertCargoVehicleImages(title: string, images?: string[]) {
+    if (!requiresVehicleDetails(title)) return;
+    if (!images || images.length < 1) {
+      throw new BadRequestException(
+        'Yükdaşıma xidməti üçün ən azı 1 avtomobil şəkli əlavə edin',
+      );
+    }
+  }
+
+  private resolveVehicleFields(
+    title: string,
+    dims: {
+      vehicleLength?: number | null;
+      vehicleWidth?: number | null;
+      vehicleHeight?: number | null;
+      cargoRouteScope?: string | null;
+    },
+  ): {
+    vehicleLength: number | null;
+    vehicleWidth: number | null;
+    vehicleHeight: number | null;
+    cargoRouteScope: CargoRouteScope | null;
+  } {
+    const needsVehicle = requiresVehicleDetails(title);
+    const needsRoute = requiresCargoRouteScope(title);
+
+    return {
+      vehicleLength: needsVehicle ? (dims.vehicleLength ?? null) : null,
+      vehicleWidth: needsVehicle ? (dims.vehicleWidth ?? null) : null,
+      vehicleHeight: needsVehicle ? (dims.vehicleHeight ?? null) : null,
+      cargoRouteScope: needsRoute
+        ? ((dims.cargoRouteScope as CargoRouteScope | null) ?? null)
+        : null,
+    };
+  }
+
   private assertValidPriceUnit(categorySlug: string | undefined, priceUnit?: string) {
     if (priceUnit !== PriceUnit.PER_SQM) return;
-    if (categorySlug !== 'temizlik') {
+    if (!allowsPerSqmPriceUnit(categorySlug)) {
       throw new BadRequestException(
-        'Kvadrat başına təmizlik qiyməti yalnız Təmizlik kateqoriyası üçün mövcuddur',
+        'Kvadrat başına qiymət yalnız Təmizlik və Dezinfeksiya kateqoriyaları üçün mövcuddur',
       );
     }
   }
@@ -511,6 +695,10 @@ export class ServicesService {
     location: string | null;
     isRemote: boolean;
     serviceVenue?: string | null;
+    vehicleLength?: number | null;
+    vehicleWidth?: number | null;
+    vehicleHeight?: number | null;
+    cargoRouteScope?: string | null;
     createdAt: Date;
     bookingCount?: number;
     activeBookingCount?: number;
@@ -554,6 +742,10 @@ export class ServicesService {
       location: service.location ?? undefined,
       isRemote: service.isRemote,
       serviceVenue: service.serviceVenue ?? undefined,
+      vehicleLength: service.vehicleLength ?? undefined,
+      vehicleWidth: service.vehicleWidth ?? undefined,
+      vehicleHeight: service.vehicleHeight ?? undefined,
+      cargoRouteScope: service.cargoRouteScope ?? undefined,
       createdAt: service.createdAt.toISOString(),
       ...(service.bookingCount !== undefined && { bookingCount: service.bookingCount }),
       ...(service.activeBookingCount !== undefined && {

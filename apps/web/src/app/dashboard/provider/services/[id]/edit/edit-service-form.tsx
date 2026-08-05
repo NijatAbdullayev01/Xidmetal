@@ -11,7 +11,11 @@ import {
   PRICE_UNIT_VALUES,
   PriceUnit,
   ServiceVenue,
+  CargoRouteScope,
   requiresServiceVenue,
+  requiresVehicleDetails,
+  requiresCargoRouteScope,
+  MAX_SERVICE_IMAGES,
 } from '@xidmetal/shared';
 import { z } from 'zod';
 import { ArrowLeft, Loader2, Save } from 'lucide-react';
@@ -31,12 +35,18 @@ import { useEffect, useRef, useState } from 'react';
 import { getServiceTypesForCategory } from '@/lib/service-types';
 import { ServiceVenueSelector } from '@/components/services/service-venue-selector';
 import { ServiceImageUploader } from '@/components/services/service-image-uploader';
+import { VehicleDimensionsFields } from '@/components/services/vehicle-dimensions-fields';
+import { CargoRouteScopeSelector } from '@/components/services/cargo-route-scope-selector';
 import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 
 const editServiceFormSchema = createServiceSchema.omit({ images: true }).extend({
   priceUnit: z.enum(PRICE_UNIT_VALUES),
   isRemote: z.boolean(),
   serviceVenue: z.nativeEnum(ServiceVenue).optional(),
+  vehicleLength: z.number().positive().max(30).optional(),
+  vehicleWidth: z.number().positive().max(30).optional(),
+  vehicleHeight: z.number().positive().max(30).optional(),
+  cargoRouteScope: z.nativeEnum(CargoRouteScope).optional(),
 });
 
 type EditServiceFormValues = z.infer<typeof editServiceFormSchema>;
@@ -96,6 +106,10 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
       location: '',
       isRemote: false,
       serviceVenue: undefined,
+      vehicleLength: undefined,
+      vehicleWidth: undefined,
+      vehicleHeight: undefined,
+      cargoRouteScope: undefined,
     },
   });
 
@@ -111,6 +125,10 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
       location: service.location ?? '',
       isRemote: service.isRemote,
       serviceVenue: service.serviceVenue as EditServiceFormValues['serviceVenue'],
+      vehicleLength: service.vehicleLength,
+      vehicleWidth: service.vehicleWidth,
+      vehicleHeight: service.vehicleHeight,
+      cargoRouteScope: service.cargoRouteScope as EditServiceFormValues['cargoRouteScope'],
     });
 
     const loadedImages = (service.images ?? [])
@@ -140,6 +158,16 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
         location: data.location.trim(),
         isRemote: data.isRemote,
         serviceVenue: requiresServiceVenue(category?.slug) ? data.serviceVenue : undefined,
+        ...(requiresVehicleDetails(data.title)
+          ? {
+              vehicleLength: data.vehicleLength,
+              vehicleWidth: data.vehicleWidth,
+              vehicleHeight: data.vehicleHeight,
+            }
+          : {}),
+        ...(requiresCargoRouteScope(data.title)
+          ? { cargoRouteScope: data.cargoRouteScope }
+          : {}),
         images: serviceImages,
       });
     },
@@ -162,11 +190,45 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
       setError('serviceVenue', { type: 'manual', message: 'Xidmət yerini seçin' });
       return;
     }
-    if (images.length === 0) {
+    if (requiresVehicleDetails(data.title)) {
+      let hasVehicleError = false;
+      if (data.vehicleLength == null) {
+        setError('vehicleLength', { type: 'manual', message: 'Maşın uzunluğunu qeyd edin' });
+        hasVehicleError = true;
+      }
+      if (data.vehicleWidth == null) {
+        setError('vehicleWidth', { type: 'manual', message: 'Maşın enini qeyd edin' });
+        hasVehicleError = true;
+      }
+      if (data.vehicleHeight == null) {
+        setError('vehicleHeight', { type: 'manual', message: 'Maşın hündürlüyünü qeyd edin' });
+        hasVehicleError = true;
+      }
+      if (hasVehicleError) return;
+    }
+    if (requiresCargoRouteScope(data.title) && !data.cargoRouteScope) {
+      setError('cargoRouteScope', {
+        type: 'manual',
+        message: 'Şəhərdaxili və ya şəhərlərarası daşıma seçin',
+      });
+      return;
+    }
+    if (requiresVehicleDetails(data.title)) {
+      if (images.length === 0) {
+        setImagesError('Ən azı 1 avtomobil şəkli əlavə edin');
+        return;
+      }
+    } else if (images.length === 0) {
       setImagesError('Ən azı 1 şəkil əlavə edin');
       return;
     }
-    clearErrors('serviceVenue');
+    clearErrors([
+      'serviceVenue',
+      'vehicleLength',
+      'vehicleWidth',
+      'vehicleHeight',
+      'cargoRouteScope',
+    ]);
     setImagesError(null);
     setServerError(null);
     updateMutation.mutate({ data, serviceImages: images });
@@ -187,6 +249,8 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
       : serviceTypes;
   const showServiceTypeField = !!categoryId;
   const showServiceVenueField = requiresServiceVenue(selectedCategory?.slug);
+  const showVehicleFields = requiresVehicleDetails(title);
+  const showCargoRouteField = requiresCargoRouteScope(title);
   const availablePriceUnits = getPriceUnitsForCategorySlug(selectedCategory?.slug);
   const prevCategoryIdRef = useRef<string | null>(null);
 
@@ -198,12 +262,35 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
     if (prevCategoryIdRef.current !== null && prevCategoryIdRef.current !== categoryId) {
       setValue('title', '', { shouldValidate: false, shouldDirty: true });
       setValue('serviceVenue', undefined, { shouldValidate: false, shouldDirty: true });
+      setValue('vehicleLength', undefined, { shouldValidate: false, shouldDirty: true });
+      setValue('vehicleWidth', undefined, { shouldValidate: false, shouldDirty: true });
+      setValue('vehicleHeight', undefined, { shouldValidate: false, shouldDirty: true });
+      setValue('cargoRouteScope', undefined, { shouldValidate: false, shouldDirty: true });
       if (priceUnit === PriceUnit.PER_SQM) {
         setValue('priceUnit', PriceUnit.FIXED, { shouldValidate: false, shouldDirty: true });
       }
     }
     prevCategoryIdRef.current = categoryId;
   }, [categoryId, setValue, priceUnit]);
+
+  const prevTitleRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previousTitle = prevTitleRef.current;
+    prevTitleRef.current = title;
+
+    if (!previousTitle) return;
+
+    if (requiresVehicleDetails(previousTitle) && !requiresVehicleDetails(title)) {
+      setValue('vehicleLength', undefined, { shouldValidate: false, shouldDirty: true });
+      setValue('vehicleWidth', undefined, { shouldValidate: false, shouldDirty: true });
+      setValue('vehicleHeight', undefined, { shouldValidate: false, shouldDirty: true });
+      clearErrors(['vehicleLength', 'vehicleWidth', 'vehicleHeight']);
+    }
+    if (requiresCargoRouteScope(previousTitle) && !requiresCargoRouteScope(title)) {
+      setValue('cargoRouteScope', undefined, { shouldValidate: false, shouldDirty: true });
+      clearErrors(['cargoRouteScope']);
+    }
+  }, [title, setValue, clearErrors]);
 
   if (isLoading || categoriesLoading || !hydrated) {
     return (
@@ -354,6 +441,56 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
               </div>
             )}
 
+            {showCargoRouteField && (
+              <div className="space-y-2">
+                <Label>Daşıma marşrutu</Label>
+                <CargoRouteScopeSelector
+                  value={watch('cargoRouteScope')}
+                  onChange={(scope) => {
+                    setValue('cargoRouteScope', scope, {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    });
+                    clearErrors('cargoRouteScope');
+                  }}
+                  disabled={isSubmitting}
+                  error={!!errors.cargoRouteScope}
+                />
+                {errors.cargoRouteScope && (
+                  <p className="text-sm text-destructive">{errors.cargoRouteScope.message}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Şəhərdaxili, şəhərlərarası və ya hər ikisini təklif etdiyinizi seçin.
+                </p>
+              </div>
+            )}
+
+            {showVehicleFields && (
+              <VehicleDimensionsFields
+                length={watch('vehicleLength')}
+                width={watch('vehicleWidth')}
+                height={watch('vehicleHeight')}
+                disabled={isSubmitting}
+                errors={{
+                  length: errors.vehicleLength?.message,
+                  width: errors.vehicleWidth?.message,
+                  height: errors.vehicleHeight?.message,
+                }}
+                onLengthChange={(value) => {
+                  setValue('vehicleLength', value, { shouldValidate: true, shouldDirty: true });
+                  clearErrors('vehicleLength');
+                }}
+                onWidthChange={(value) => {
+                  setValue('vehicleWidth', value, { shouldValidate: true, shouldDirty: true });
+                  clearErrors('vehicleWidth');
+                }}
+                onHeightChange={(value) => {
+                  setValue('vehicleHeight', value, { shouldValidate: true, shouldDirty: true });
+                  clearErrors('vehicleHeight');
+                }}
+              />
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="description">Təsvir</Label>
               <Textarea
@@ -377,6 +514,12 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
               }}
               disabled={isSubmitting}
               error={imagesError}
+              label={showVehicleFields ? 'Avtomobil şəkilləri' : 'İş nümunəsi şəkilləri'}
+              hint={
+                showVehicleFields
+                  ? `Avtomobilinizin ən azı 1 şəklini əlavə edin. JPG, PNG və ya WEBP, hər biri maksimum 1 MB. Ən çox ${MAX_SERVICE_IMAGES} şəkil.`
+                  : undefined
+              }
             />
 
             <div className="grid gap-4 sm:grid-cols-2">

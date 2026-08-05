@@ -1,6 +1,15 @@
-import type { ReactNode } from 'react';
-import { MapPin, Wifi, User, Briefcase, type LucideIcon } from 'lucide-react';
+'use client';
+
+import { useState, type ReactNode } from 'react';
+import dynamic from 'next/dynamic';
+import { MapPin, Wifi, User, Briefcase, Ruler, Route, Store, Home, type LucideIcon } from 'lucide-react';
 import type { ServiceSummary } from '@xidmetal/shared';
+import {
+  formatVehicleDimensions,
+  formatCargoRouteScope,
+  formatServiceVenue,
+  ServiceVenue,
+} from '@xidmetal/shared';
 import { formatPrice, cn } from '@/lib/utils';
 import { ServiceOrderButton } from '@/components/services/service-order-button';
 import { ServiceDescription } from '@/components/services/service-description';
@@ -8,6 +17,14 @@ import { ServiceImagesPreview } from '@/components/services/service-images-previ
 import { ProviderReviewsTrigger } from '@/components/reviews/provider-reviews-trigger';
 import { getCategoryIcon } from '@/lib/category-icons';
 import { getPriceUnitLabel } from '@/lib/provider-labels';
+
+const ServicePreviewDialog = dynamic(
+  () =>
+    import('@/components/services/service-preview-dialog').then((mod) => ({
+      default: mod.ServicePreviewDialog,
+    })),
+  { ssr: false },
+);
 
 function ProviderAvatar({
   name,
@@ -73,6 +90,11 @@ function MetaChip({
   );
 }
 
+/** Nested interactive controls — kart preview hit-target-ini bloklamır */
+function InteractiveSlot({ children }: { children: ReactNode }) {
+  return <div className="relative z-[2] pointer-events-auto">{children}</div>;
+}
+
 export function ServiceCard({
   service,
   categorySlug,
@@ -83,142 +105,206 @@ export function ServiceCard({
   /** Kateqoriya səhifəsində false — səhifə başlığı artıq konteksti verir */
   showCategoryHeader?: boolean;
 }) {
+  const [previewOpen, setPreviewOpen] = useState(false);
   const Icon = getCategoryIcon(categorySlug ?? '');
   const hasExperience =
     service.providerExperience != null && service.providerExperience > 0;
   const hasLocation = Boolean(service.location);
-  const showMeta = hasLocation || hasExperience || service.isRemote;
+  const vehicleDimensions = formatVehicleDimensions(
+    service.vehicleLength,
+    service.vehicleWidth,
+    service.vehicleHeight,
+  );
+  const cargoRouteLabel = formatCargoRouteScope(service.cargoRouteScope);
+  const venueLabel = formatServiceVenue(service.serviceVenue);
+  const VenueIcon =
+    service.serviceVenue === ServiceVenue.AT_SALON ? Store : Home;
+  const showMeta =
+    hasLocation ||
+    hasExperience ||
+    service.isRemote ||
+    Boolean(vehicleDimensions) ||
+    Boolean(cargoRouteLabel) ||
+    Boolean(venueLabel);
   const images = service.images ?? [];
   const hasImages = images.length > 0;
+  const hasReviews = service.reviewCount > 0;
 
   return (
-    <article
-      className={cn(
-        'group relative flex h-full flex-col overflow-hidden rounded-2xl bg-card pb-3.5',
-        'ring-1 ring-border/70 transition-[box-shadow,ring-color] duration-200',
-        'hover:shadow-md hover:ring-brand/30',
-      )}
-    >
-      {hasImages ? (
-        <ServiceImagesPreview images={images} title={service.title} />
-      ) : (
-        <div
-          className="relative aspect-[16/10] w-full bg-muted"
-          aria-hidden
-        >
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand/15 ring-1 ring-brand/20">
-              <Icon className="h-6 w-6 text-brand-foreground" strokeWidth={1.75} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 1. Təklif — nə təklif olunur */}
-      <div className="flex min-h-0 flex-1 flex-col px-5 pt-4">
-        {showCategoryHeader ? (
-          <p className="mb-1.5 text-xs font-medium text-muted-foreground">
-            {service.categoryName}
-          </p>
-        ) : null}
-
-        <h3 className="line-clamp-2 text-base font-semibold leading-snug tracking-tight text-foreground sm:text-[1.05rem]">
-          {service.title}
-        </h3>
-
-        {service.description ? (
-          <ServiceDescription
-            description={service.description}
-            title={service.title}
-          />
-        ) : null}
-
-        {/* 2. Etibar — bütün kartlarda eyni yerdə (məzmunun altında) */}
-        <div className="mt-auto flex items-start gap-3 pt-4">
-          <ProviderAvatar
-            name={service.providerName}
-            avatarUrl={service.providerAvatarUrl}
-          />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-foreground">
-              {service.providerName}
-            </p>
-            <div className="mt-1">
-              <ProviderReviewsTrigger
-                providerId={service.providerId}
-                providerName={service.providerName}
-                averageRating={service.averageRating}
-                reviewCount={service.reviewCount}
-                serviceId={service.id}
-                serviceTitle={service.title}
-                compact
-              />
-            </div>
-          </div>
-          {showCategoryHeader ? (
-            <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/15 ring-1 ring-brand/20"
-              title={service.categoryName}
-            >
-              <Icon className="h-4 w-4 text-brand-foreground" strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">{service.categoryName}</span>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      {/* 3. Qərar — qiymət + hərəkət */}
-      <div className="mt-4 border-t border-border/60 px-5 pt-3">
-        <div className="flex items-center justify-between gap-3">
-          <p className="min-w-0 truncate">
-            {service.price > 0 ? (
-              <>
-                <span className="text-base font-bold tracking-tight text-foreground tabular-nums">
-                  {formatPrice(service.price)}
-                </span>
-                <span className="ml-1 text-xs text-muted-foreground">
-                  / {getPriceUnitLabel(service.priceUnit)}
-                </span>
-              </>
-            ) : (
-              <span className="text-sm font-semibold text-foreground">
-                {formatPrice(service.price)}
-              </span>
-            )}
-          </p>
-
-          <ServiceOrderButton
-            service={service}
-            className="h-9 shrink-0 touch-manipulation px-3 text-sm"
-          />
-        </div>
-
-        {/* 4. Kontekst — hündürlük sabitdir ki, provider bloku hizalansın */}
-        <div
+    <>
+      <article
+        className={cn(
+          'group relative flex h-full flex-col overflow-hidden rounded-2xl bg-card pb-3.5',
+          'ring-1 ring-border/70 transition-[box-shadow,ring-color] duration-200',
+          'hover:shadow-md hover:ring-brand/30',
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setPreviewOpen(true)}
           className={cn(
-            'mt-3 flex min-h-[1.375rem] items-center justify-between gap-3 pt-2.5',
-            showMeta && '-mx-5 border-t border-border/60 px-5',
+            'absolute inset-0 z-[1] cursor-pointer rounded-2xl',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
           )}
-          aria-label={showMeta ? 'Xidmət məlumatları' : undefined}
-          aria-hidden={!showMeta}
-        >
-          {showMeta ? (
-            <>
-              <div className="flex min-w-0 items-center gap-2">
-                {hasLocation ? (
-                  <MetaChip icon={MapPin}>{service.location}</MetaChip>
-                ) : null}
-                {service.isRemote ? <RemoteBadge /> : null}
+          aria-label={`${service.title} — şəkillər və təsvir`}
+        />
+
+        <div className="relative z-[2] flex min-h-0 flex-1 flex-col pointer-events-none">
+          {hasImages ? (
+            <ServiceImagesPreview
+              images={images}
+              title={service.title}
+              enableLightbox={false}
+            />
+          ) : (
+            <div
+              className="relative aspect-[16/10] w-full bg-muted"
+              aria-hidden
+            >
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand/15 ring-1 ring-brand/20">
+                  <Icon className="h-6 w-6 text-brand-foreground" strokeWidth={1.75} />
+                </div>
               </div>
-              {hasExperience ? (
-                <MetaChip icon={Briefcase}>
-                  {service.providerExperience} il təcrübə
-                </MetaChip>
+            </div>
+          )}
+
+          {/* 1. Təklif — nə təklif olunur */}
+          <div className="flex min-h-0 flex-1 flex-col px-5 pt-4">
+            {showCategoryHeader ? (
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                {service.categoryName}
+              </p>
+            ) : null}
+
+            <h3 className="line-clamp-2 text-base font-semibold leading-snug tracking-tight text-foreground sm:text-[1.05rem]">
+              {service.title}
+            </h3>
+
+            {service.description ? (
+              <ServiceDescription
+                description={service.description}
+                title={service.title}
+                enableModal={false}
+              />
+            ) : null}
+
+            {/* 2. Kontekst — şəhər / marşrut / ölçü / təcrübə */}
+            <div
+              className="mt-auto flex min-h-[1.375rem] flex-wrap items-center gap-x-3 gap-y-1.5 pt-4"
+              aria-label={showMeta ? 'Xidmət məlumatları' : undefined}
+              aria-hidden={!showMeta}
+            >
+              {showMeta ? (
+                <>
+                  {hasLocation ? (
+                    <MetaChip icon={MapPin}>{service.location}</MetaChip>
+                  ) : null}
+                  {venueLabel ? (
+                    <MetaChip icon={VenueIcon}>{venueLabel}</MetaChip>
+                  ) : null}
+                  {service.isRemote ? <RemoteBadge /> : null}
+                  {cargoRouteLabel ? (
+                    <MetaChip icon={Route}>{cargoRouteLabel}</MetaChip>
+                  ) : null}
+                  {vehicleDimensions ? (
+                    <MetaChip icon={Ruler}>{vehicleDimensions}</MetaChip>
+                  ) : null}
+                  {hasExperience ? (
+                    <MetaChip icon={Briefcase}>
+                      {service.providerExperience} il təcrübə
+                    </MetaChip>
+                  ) : null}
+                </>
               ) : null}
-            </>
-          ) : null}
+            </div>
+          </div>
+
+          {/* 3. Qərar — qiymət + hərəkət */}
+          <div className="mt-4 border-t border-border/60">
+            <div className="flex items-center justify-between gap-3 px-5 pt-3">
+              <p className="min-w-0 truncate">
+                {service.price > 0 ? (
+                  <>
+                    <span className="text-base font-bold tracking-tight text-foreground tabular-nums">
+                      {formatPrice(service.price)}
+                    </span>
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      / {getPriceUnitLabel(service.priceUnit)}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-sm font-semibold text-foreground">
+                    {formatPrice(service.price)}
+                  </span>
+                )}
+              </p>
+
+              <InteractiveSlot>
+                <ServiceOrderButton
+                  service={service}
+                  className="h-9 shrink-0 touch-manipulation px-3 text-sm"
+                />
+              </InteractiveSlot>
+            </div>
+
+            {/* 4. Etibar — xidmət verənin profili (border kartın sol/sağ kənarına qədər) */}
+            <div className="mt-3 flex items-start gap-3 border-t border-border/60 px-5 pt-2.5">
+              <ProviderAvatar
+                name={service.providerName}
+                avatarUrl={service.providerAvatarUrl}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {service.providerName}
+                </p>
+                <div className="mt-1">
+                  {hasReviews ? (
+                    <InteractiveSlot>
+                      <ProviderReviewsTrigger
+                        providerId={service.providerId}
+                        providerName={service.providerName}
+                        averageRating={service.averageRating}
+                        reviewCount={service.reviewCount}
+                        serviceId={service.id}
+                        serviceTitle={service.title}
+                        compact
+                      />
+                    </InteractiveSlot>
+                  ) : (
+                    <ProviderReviewsTrigger
+                      providerId={service.providerId}
+                      providerName={service.providerName}
+                      averageRating={service.averageRating}
+                      reviewCount={service.reviewCount}
+                      serviceId={service.id}
+                      serviceTitle={service.title}
+                      compact
+                    />
+                  )}
+                </div>
+              </div>
+              {showCategoryHeader ? (
+                <div
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/15 ring-1 ring-brand/20"
+                  title={service.categoryName}
+                >
+                  <Icon className="h-4 w-4 text-brand-foreground" strokeWidth={1.75} aria-hidden />
+                  <span className="sr-only">{service.categoryName}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
-      </div>
-    </article>
+      </article>
+
+      {previewOpen ? (
+        <ServicePreviewDialog
+          service={service}
+          open
+          onClose={() => setPreviewOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }

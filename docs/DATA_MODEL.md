@@ -2,6 +2,8 @@
 
 Bu sənəd on-demand + canlı izləmə axını üçün `packages/database/prisma/schema.prisma`-da lazım olan **additive** dəyişiklikləri təsvir edir.
 
+> **Cari schema** (User, Service, Booking, Review, Message, Notification, availability, cargo sahələri və s.) artıq mövcuddur — bax: `packages/database/prisma/schema.prisma` və [ARCHITECTURE.md](./ARCHITECTURE.md). Bu fayl **hədəf** əlavələri (PostGIS, Payment, DispatchOffer, `EN_ROUTE`, …) üçündür; onlar hələ implementasiya olunmayıb.
+
 > **Qayda:** Mövcud sahələr silinmir/dəyişdirilmir. Yeni sahələr optional (`?`) və ya default dəyərlə əlavə olunur ki, köhnə data və kod sınmasın. Bax: [.cursor/rules/safe-changes.mdc].
 
 ---

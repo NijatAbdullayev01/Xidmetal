@@ -2,8 +2,9 @@
 
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Filter, SlidersHorizontal, X } from 'lucide-react';
+import { Filter, PackageSearch, SlidersHorizontal, X } from 'lucide-react';
 import type { CategorySummary, ServiceSummary } from '@xidmetal/shared';
 import { ServiceCard } from '@/components/services/service-card';
 import {
@@ -20,9 +21,11 @@ import {
   sortServices,
   type ServiceSortOption,
 } from '@/components/services/service-sort';
-import { Button } from '@/components/ui/button';
+import { Button, buttonStyles } from '@/components/ui/button';
+import { getCategoryIcon } from '@/lib/category-icons';
 import { getServiceTypesForCategory } from '@/lib/service-types';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
+import { cn } from '@/lib/utils';
 
 interface CategoryContentProps {
   category: CategorySummary;
@@ -200,9 +203,20 @@ export function CategoryContent({
   }, [showEmptyState, filters, serviceTypes, typeCounts]);
 
   return (
-    <section className="py-8 sm:py-12">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-6 sm:mb-8">
+    <section
+      className={cn(
+        'py-8 sm:py-12',
+        !hasServices &&
+          'flex min-h-[calc(100dvh-3.5rem)] flex-col pb-[40px] sm:min-h-[calc(100vh-4rem)] sm:pb-[40px]',
+      )}
+    >
+      <div
+        className={cn(
+          'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8',
+          !hasServices && 'flex w-full min-h-0 flex-1 flex-col',
+        )}
+      >
+        <div className="mb-6 shrink-0 sm:mb-8">
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{category.name}</h1>
           {category.description ? (
             <p className="mt-2 max-w-2xl text-muted-foreground">{category.description}</p>
@@ -210,9 +224,7 @@ export function CategoryContent({
         </div>
 
         {!hasServices ? (
-          <p className="py-16 text-center text-muted-foreground">
-            Bu kateqoriyada hələ aktiv xidmət yoxdur.
-          </p>
+          <CategoryEmptyState category={category} />
         ) : (
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
             {/* Desktop sidebar */}
@@ -387,6 +399,48 @@ export function CategoryContent({
           )
         : null}
     </section>
+  );
+}
+
+function CategoryEmptyState({ category }: { category: CategorySummary }) {
+  const CategoryIcon = getCategoryIcon(category.slug);
+
+  return (
+    <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/30 px-6 py-14 text-center sm:py-16">
+      <div className="relative flex h-16 w-16 items-center justify-center sm:h-[4.5rem] sm:w-[4.5rem]">
+        <span
+          className="absolute inset-0 rounded-2xl bg-brand/15"
+          aria-hidden
+        />
+        <CategoryIcon
+          className="relative h-8 w-8 text-foreground/70 sm:h-9 sm:w-9"
+          aria-hidden
+        />
+        <span
+          className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background shadow-sm"
+          aria-hidden
+        >
+          <PackageSearch className="h-3.5 w-3.5 text-muted-foreground" />
+        </span>
+      </div>
+
+      <h2 className="mt-6 text-lg font-semibold tracking-tight sm:text-xl">
+        Bu kateqoriyada hələ xidmət yoxdur
+      </h2>
+      <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">
+        «{category.name}» kateqoriyasında aktiv təklif hələ paylaşılmayıb. Digər
+        kateqoriyalara baxın və ya tezliklə yenidən yoxlayın.
+      </p>
+
+      <div className="mt-7 flex w-full max-w-sm flex-col gap-3 sm:max-w-none sm:w-auto sm:flex-row sm:justify-center">
+        <Link
+          href="/"
+          className={buttonStyles('default', 'md') + ' min-h-11 w-full touch-manipulation sm:w-auto'}
+        >
+          Ana səhifə
+        </Link>
+      </div>
+    </div>
   );
 }
 

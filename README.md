@@ -2,7 +2,9 @@
 
 **Xidmət verənlərlə xidmət alanları bir araya gətirən veb platforma.**
 
-Xidmətal, provider (xidmət verən) və customer (xidmət alan) rollarını birləşdirən marketplace tipli platformadır. İstifadəçilər xidmət axtara, sifariş verə, rəy yaza və provider kimi xidmət təklif edə bilərlər.
+Xidmətal, provider (xidmət verən) və customer (xidmət alan) rollarını birləşdirən marketplace tipli platformadır. İstifadəçilər xidmət axtara, planlaşdırılmış sifariş verə, mesajlaşa, rəy yaza və provider kimi xidmət təklif edə bilərlər.
+
+**Cari vəziyyət:** scheduled (randevu) MVP — auth, kateqoriya/xidmət, təqvim, sifariş, chat, in-app bildiriş, rəy. On-demand çağırış, canlı izləmə və ödəniş hələ yol xəritəsindədir (`docs/ROADMAP.md`).
 
 ## Texnologiya yığını
 
@@ -58,10 +60,12 @@ pnpm dev
 
 | Servis | URL |
 |--------|-----|
-| Web (Frontend) | http://localhost:3001 |
+| Web (Frontend) | http://localhost:3020 |
 | API (Backend) | http://localhost:4000/api/v1 |
 | Swagger Docs | http://localhost:4000/docs |
 | Prisma Studio | `pnpm db:studio` |
+| PostgreSQL (Docker) | `localhost:5434` |
+| Redis (Docker) | `localhost:6380` (API hələ istifadə etmir) |
 
 ## Layihə strukturu
 

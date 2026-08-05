@@ -1,3 +1,5 @@
+import { TRANSPORT_SERVICE_TYPES } from '@xidmetal/shared';
+
 /** Kateqoriya slug → xidmət növləri */
 export const CATEGORY_SERVICE_TYPES: Record<string, readonly string[]> = {
   temizlik: [
@@ -48,6 +50,26 @@ export const CATEGORY_SERVICE_TYPES: Record<string, readonly string[]> = {
     'SPA xidmətləri',
     'Estetik prosedurlar',
     'Bədən baxımı',
+  ],
+  dezinfeksiya: [
+    'Ev və ofis dezinfeksiyası',
+    'Dezinseksiya (həşərat)',
+    'Deratizasiya (gəmirici)',
+    'Kompleks sanitariya',
+    'Küf və nəmlik müalicəsi',
+    'Qoxu aradan qaldırma',
+    'Restoran və obyekt sanitariyası',
+    'Avtomobil dezinfeksiyası',
+    'Profilaktik müalicə',
+  ],
+  neqliyyat: [...TRANSPORT_SERVICE_TYPES],
+  catdirilma: [
+    'Sənəd çatdırılması (piyada)',
+    'Bağlama çatdırılması (piyada)',
+    'Sənəd çatdırılması (moto)',
+    'Bağlama çatdırılması (moto)',
+    'Sənəd çatdırılması (avtomobil)',
+    'Bağlama çatdırılması (avtomobil)',
   ],
 };
 

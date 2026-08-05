@@ -1,0 +1,126 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { UserRole } from '@xidmetal/shared';
+import { AdminService } from './admin.service';
+import {
+  AdminBookingsQueryDto,
+  AdminReviewsQueryDto,
+  AdminServicesQueryDto,
+  AdminUsersQueryDto,
+  CreateAnnouncementDto,
+  CreateCategoryDto,
+  SetProviderVerifiedDto,
+  SetReviewStatusDto,
+  SetServiceStatusDto,
+  SetUserActiveDto,
+  UpdateCategoryDto,
+} from './dto';
+import { JwtAuthGuard, RolesGuard } from '../../common/guards';
+import { Roles } from '../../common/decorators';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+
+@ApiTags('Admin')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN)
+@Controller('admin')
+export class AdminController {
+  constructor(private adminService: AdminService) {}
+
+  @Get('stats')
+  @ApiOperation({ summary: 'Platforma statistikası' })
+  getStats() {
+    return this.adminService.getStats();
+  }
+
+  @Get('users')
+  @ApiOperation({ summary: 'İstifadəçilər siyahısı' })
+  listUsers(@Query() query: AdminUsersQueryDto) {
+    return this.adminService.listUsers(query);
+  }
+
+  @Get('users/:id')
+  @ApiOperation({ summary: 'İstifadəçi detalları' })
+  getUser(@Param('id') id: string) {
+    return this.adminService.getUser(id);
+  }
+
+  @Patch('users/:id/active')
+  @ApiOperation({ summary: 'İstifadəçini aktiv/deaktiv et' })
+  setUserActive(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: SetUserActiveDto,
+  ) {
+    return this.adminService.setUserActive(id, adminId, dto);
+  }
+
+  @Patch('providers/:userId/verify')
+  @ApiOperation({ summary: 'Xidmət verəni təsdiqlə / təsdiqi ləğv et' })
+  setProviderVerified(@Param('userId') userId: string, @Body() dto: SetProviderVerifiedDto) {
+    return this.adminService.setProviderVerified(userId, dto);
+  }
+
+  @Get('categories')
+  @ApiOperation({ summary: 'Bütün kateqoriyalar (aktiv + deaktiv)' })
+  listCategories() {
+    return this.adminService.listCategories();
+  }
+
+  @Post('categories')
+  @ApiOperation({ summary: 'Yeni kateqoriya yarat' })
+  createCategory(@Body() dto: CreateCategoryDto) {
+    return this.adminService.createCategory(dto);
+  }
+
+  @Patch('categories/:id')
+  @ApiOperation({ summary: 'Kateqoriyanı yenilə' })
+  updateCategory(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
+    return this.adminService.updateCategory(id, dto);
+  }
+
+  @Get('services')
+  @ApiOperation({ summary: 'Bütün xidmətlər' })
+  listServices(@Query() query: AdminServicesQueryDto) {
+    return this.adminService.listServices(query);
+  }
+
+  @Patch('services/:id/status')
+  @ApiOperation({ summary: 'Xidmət statusunu dəyiş' })
+  setServiceStatus(@Param('id') id: string, @Body() dto: SetServiceStatusDto) {
+    return this.adminService.setServiceStatus(id, dto);
+  }
+
+  @Get('bookings')
+  @ApiOperation({ summary: 'Bütün sifarişlər' })
+  listBookings(@Query() query: AdminBookingsQueryDto) {
+    return this.adminService.listBookings(query);
+  }
+
+  @Get('reviews')
+  @ApiOperation({ summary: 'Rəylər (moderation)' })
+  listReviews(@Query() query: AdminReviewsQueryDto) {
+    return this.adminService.listReviews(query);
+  }
+
+  @Patch('reviews/:id/status')
+  @ApiOperation({ summary: 'Rəyi təsdiqlə / rədd et' })
+  setReviewStatus(@Param('id') id: string, @Body() dto: SetReviewStatusDto) {
+    return this.adminService.setReviewStatus(id, dto);
+  }
+
+  @Post('announcements')
+  @ApiOperation({ summary: 'Platforma bildirişi göndər' })
+  createAnnouncement(@Body() dto: CreateAnnouncementDto) {
+    return this.adminService.createAnnouncement(dto);
+  }
+}

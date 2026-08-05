@@ -11,6 +11,7 @@ import { AvailabilityModule } from './modules/availability/availability.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { HealthModule } from './modules/health/health.module';
 import { DatabaseModule } from './common/database/database.module';
 import { MailModule } from './common/mail/mail.module';
@@ -32,6 +33,7 @@ import { JwtAuthGuard } from './common/guards';
     ReviewsModule,
     MessagesModule,
     NotificationsModule,
+    AdminModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

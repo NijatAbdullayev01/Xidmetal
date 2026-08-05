@@ -4,18 +4,20 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { loginSchema, type LoginInput } from '@xidmetal/shared';
+import { loginSchema, UserRole, type LoginInput } from '@xidmetal/shared';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api, ApiError } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
+import { getAdminAppUrl } from '@/lib/auth';
 
 export function LoginForm() {
   const setAuth = useAuthStore((state) => state.setAuth);
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [adminHint, setAdminHint] = useState<string | null>(null);
 
   const {
     register,
@@ -31,9 +33,17 @@ export function LoginForm() {
 
   const onSubmit = async (values: LoginInput) => {
     setServerError(null);
+    setAdminHint(null);
 
     try {
       const response = await api.auth.login(values);
+      if (response.user.role === UserRole.ADMIN) {
+        setAdminHint(getAdminAppUrl());
+        setServerError(
+          'Administrator hesabı marketplace-ə aid deyil. Admin panelinə keçin.',
+        );
+        return;
+      }
       setAuth(response.user, response.tokens);
     } catch (error) {
       if (error instanceof ApiError) {
@@ -99,7 +109,15 @@ export function LoginForm() {
           className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
           role="alert"
         >
-          {serverError}
+          <p>{serverError}</p>
+          {adminHint && (
+            <a
+              href={adminHint}
+              className="mt-2 inline-block font-medium underline underline-offset-2"
+            >
+              Admin panelini aç
+            </a>
+          )}
         </div>
       )}
 

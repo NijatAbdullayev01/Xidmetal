@@ -65,42 +65,22 @@ export class ReviewsService {
       throw new BadRequestException('Xidmət verənin profili tapılmadı');
     }
 
-    const review = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.review.create({
-        data: {
-          bookingId: booking.id,
-          authorId,
-          rating: dto.rating,
-          comment,
-          status: ReviewStatus.APPROVED,
-        },
-        include: {
-          author: { select: { firstName: true, lastName: true } },
-          booking: {
-            select: {
-              service: { select: { title: true } },
-            },
+    const review = await this.prisma.review.create({
+      data: {
+        bookingId: booking.id,
+        authorId,
+        rating: dto.rating,
+        comment,
+        status: ReviewStatus.PENDING,
+      },
+      include: {
+        author: { select: { firstName: true, lastName: true } },
+        booking: {
+          select: {
+            service: { select: { title: true } },
           },
         },
-      });
-
-      const previousCount = profile.reviewCount;
-      const previousRating = profile.rating;
-      const newCount = previousCount + 1;
-      const newRating =
-        previousCount === 0
-          ? dto.rating
-          : (previousRating * previousCount + dto.rating) / newCount;
-
-      await tx.providerProfile.update({
-        where: { userId: booking.providerId },
-        data: {
-          rating: Math.round(newRating * 100) / 100,
-          reviewCount: newCount,
-        },
-      });
-
-      return created;
+      },
     });
 
     return this.mapReview(review, 'full');

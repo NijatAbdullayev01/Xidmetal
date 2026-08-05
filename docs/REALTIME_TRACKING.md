@@ -2,6 +2,8 @@
 
 Bu sənəd xidmət verənin yolda olduğu zaman xəritədə **canlı izlənməsi** üçün texniki dizaynı təsvir edir.
 
+> **Cari vəziyyət (2026-08):** Socket.IO / tracking **yoxdur**. Mesajlar, bildirişlər və sifariş siyahıları frontend-də TanStack Query **polling** ilə yenilənir. Bu fayl hədəf dizayndır — bax: [ROADMAP.md](./ROADMAP.md) Faza 3.
+
 ---
 
 ## 1. Niyə WebSocket, REST deyil?

@@ -18,10 +18,25 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('API_PORT', 4000);
-  const corsOrigin = configService.get<string>('CORS_ORIGIN', 'http://localhost:3001');
+  const corsOriginRaw = configService.get<string>(
+    'CORS_ORIGIN',
+    'http://localhost:3020,http://localhost:3021',
+  );
+  // Marketplace + admin URL-ləri CORS_ORIGIN unudulsa belə whitelist-ə düşsün
+  const corsOrigins = [
+    ...corsOriginRaw.split(','),
+    configService.get<string>('NEXT_PUBLIC_APP_URL'),
+    configService.get<string>('NEXT_PUBLIC_ADMIN_URL'),
+  ]
+    .map((origin) => origin?.trim())
+    .filter((origin): origin is string => Boolean(origin))
+    .filter((origin, index, all) => all.indexOf(origin) === index);
 
   app.use(helmet());
-  app.enableCors({ origin: corsOrigin, credentials: true });
+  app.enableCors({
+    origin: corsOrigins.length <= 1 ? corsOrigins[0] : corsOrigins,
+    credentials: true,
+  });
   app.setGlobalPrefix(API.prefix);
 
   app.useGlobalPipes(

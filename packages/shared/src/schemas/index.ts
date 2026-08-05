@@ -1,7 +1,20 @@
 import { z } from 'zod';
-import { UserRole, PriceUnit, AvailabilityOverrideType } from '../enums';
+import {
+  UserRole,
+  PriceUnit,
+  AvailabilityOverrideType,
+  ReviewStatus,
+  ServiceStatus,
+  BookingStatus,
+} from '../enums';
 import { PRICE_UNIT_VALUES } from '../price-units';
 import { SERVICE_VENUE_VALUES } from '../service-venues';
+import { CARGO_ROUTE_SCOPE_VALUES } from '../vehicle-cargo';
+
+const vehicleDimensionSchema = z
+  .number({ invalid_type_error: 'Maşın ölçüsü rəqəm olmalıdır' })
+  .positive('Maşın ölçüsü 0-dan böyük olmalıdır')
+  .max(30, 'Maşın ölçüsü maksimum 30 m ola bilər');
 
 const timeHhMmSchema = z
   .string()
@@ -70,6 +83,10 @@ export const createServiceSchema = z.object({
   location: z.string().min(1, 'Ünvan seçin'),
   isRemote: z.boolean().default(false),
   serviceVenue: z.enum(SERVICE_VENUE_VALUES).optional(),
+  vehicleLength: vehicleDimensionSchema.optional(),
+  vehicleWidth: vehicleDimensionSchema.optional(),
+  vehicleHeight: vehicleDimensionSchema.optional(),
+  cargoRouteScope: z.enum(CARGO_ROUTE_SCOPE_VALUES).optional(),
   images: serviceImagesSchema,
 });
 
@@ -101,6 +118,10 @@ export const updateServiceSchema = z.object({
   location: z.string().min(1, 'Ünvan seçin').optional(),
   isRemote: z.boolean().optional(),
   serviceVenue: z.enum(SERVICE_VENUE_VALUES).optional(),
+  vehicleLength: vehicleDimensionSchema.optional(),
+  vehicleWidth: vehicleDimensionSchema.optional(),
+  vehicleHeight: vehicleDimensionSchema.optional(),
+  cargoRouteScope: z.enum(CARGO_ROUTE_SCOPE_VALUES).optional(),
   status: z.enum(['DRAFT', 'ACTIVE', 'PAUSED', 'ARCHIVED']).optional(),
   /** Göndərildikdə mövcud şəkilləri tam əvəz edir */
   images: serviceImagesSchema.optional(),
@@ -202,6 +223,67 @@ export const availabilityQuerySchema = z.object({
   to: dateYmdSchema,
 });
 
+export const createCategorySchema = z.object({
+  name: z.string().min(2, 'Ad minimum 2 simvol olmalıdır').max(100),
+  slug: z
+    .string()
+    .min(2)
+    .max(100)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug yalnız kiçik hərf, rəqəm və tire ola bilər')
+    .optional(),
+  description: z.string().max(2000).optional(),
+  icon: z.string().max(32).optional(),
+  sortOrder: z.number().int().min(0).max(9999).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const updateCategorySchema = createCategorySchema.partial().extend({
+  name: z.string().min(2).max(100).optional(),
+});
+
+export const adminSetUserActiveSchema = z.object({
+  isActive: z.boolean(),
+});
+
+export const adminSetProviderVerifiedSchema = z.object({
+  isVerified: z.boolean(),
+});
+
+export const adminSetServiceStatusSchema = z.object({
+  status: z.nativeEnum(ServiceStatus),
+});
+
+export const adminSetReviewStatusSchema = z.object({
+  status: z.enum([ReviewStatus.APPROVED, ReviewStatus.REJECTED]),
+});
+
+export const adminAnnouncementSchema = z.object({
+  title: z.string().min(3, 'Başlıq minimum 3 simvol olmalıdır').max(200),
+  body: z.string().min(5, 'Mətn minimum 5 simvol olmalıdır').max(2000),
+  /** Boş = bütün aktiv istifadəçilər; əks halda yalnız bu rollar */
+  roles: z.array(z.enum([UserRole.CUSTOMER, UserRole.PROVIDER])).min(1).optional(),
+});
+
+export const adminUsersQuerySchema = paginationSchema.extend({
+  role: z.nativeEnum(UserRole).optional(),
+  isActive: z.coerce.boolean().optional(),
+  search: z.string().max(100).optional(),
+});
+
+export const adminServicesQuerySchema = paginationSchema.extend({
+  status: z.nativeEnum(ServiceStatus).optional(),
+  categoryId: z.string().uuid().optional(),
+  search: z.string().max(100).optional(),
+});
+
+export const adminBookingsQuerySchema = paginationSchema.extend({
+  status: z.nativeEnum(BookingStatus).optional(),
+});
+
+export const adminReviewsQuerySchema = paginationSchema.extend({
+  status: z.nativeEnum(ReviewStatus).optional(),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateServiceInput = z.infer<typeof createServiceSchema>;
@@ -219,3 +301,10 @@ export type PaginationInput = z.infer<typeof paginationSchema>;
 export type UpsertWorkingHoursInput = z.infer<typeof upsertWorkingHoursSchema>;
 export type CreateAvailabilityOverrideInput = z.infer<typeof createAvailabilityOverrideSchema>;
 export type AvailabilityQueryInput = z.infer<typeof availabilityQuerySchema>;
+export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
+export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
+export type AdminSetUserActiveInput = z.infer<typeof adminSetUserActiveSchema>;
+export type AdminSetProviderVerifiedInput = z.infer<typeof adminSetProviderVerifiedSchema>;
+export type AdminSetServiceStatusInput = z.infer<typeof adminSetServiceStatusSchema>;
+export type AdminSetReviewStatusInput = z.infer<typeof adminSetReviewStatusSchema>;
+export type AdminAnnouncementInput = z.infer<typeof adminAnnouncementSchema>;

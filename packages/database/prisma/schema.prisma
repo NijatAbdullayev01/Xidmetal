@@ -131,6 +131,12 @@ enum ServiceVenue {
   AT_SALON
 }
 
+enum CargoRouteScope {
+  INTRA_CITY
+  INTERCITY
+  BOTH
+}
+
 model Service {
   id          String        @id @default(uuid())
   title       String
@@ -141,6 +147,14 @@ model Service {
   location    String?
   isRemote    Boolean       @default(false) @map("is_remote")
   serviceVenue ServiceVenue? @map("service_venue")
+  /** Yükdaşıma: yük yeri uzunluğu (metr) */
+  vehicleLength Float?      @map("vehicle_length")
+  /** Yükdaşıma: yük yeri eni (metr) */
+  vehicleWidth  Float?      @map("vehicle_width")
+  /** Yükdaşıma: yük yeri hündürlüyü (metr) */
+  vehicleHeight Float?      @map("vehicle_height")
+  /** Yükdaşıma: şəhərdaxili / şəhərlərarası */
+  cargoRouteScope CargoRouteScope? @map("cargo_route_scope")
   status      ServiceStatus @default(DRAFT)
   providerId  String        @map("provider_id")
   categoryId  String        @map("category_id")

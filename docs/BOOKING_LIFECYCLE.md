@@ -2,7 +2,7 @@
 
 Bu sənəd sifarişin **rezervdən rəyə** qədər keçdiyi tam axını və status keçidləri qaydalarını müəyyən edir.
 
-> **Problem (mövcud):** `bookings.service.ts` `updateStatus()` istənilən statusdan istənilən statusa keçidə icazə verir və müştəri özü `COMPLETED` edə bilər. Bu sənəd düzgün state machine-i təyin edir.
+> **Cari kod (2026-08):** `bookings.service.ts` içində əsas rol matrisi var — müştəri `COMPLETED` edə bilmir; provider `PENDING→CONFIRMED|REJECTED`, `CONFIRMED→IN_PROGRESS|CANCELLED`, `IN_PROGRESS→COMPLETED`. Bu sənəd isə **hədəf** axını təyin edir (`EN_ROUTE` / `ARRIVED`, `BookingType`, timestamp-lər, dispatch) — onlar hələ schema/API-də yoxdur.
 
 ---
 

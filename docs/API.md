@@ -2,13 +2,17 @@
 
 **Base URL:** `http://localhost:4000/api/v1`
 
-**Swagger UI:** http://localhost:4000/docs
+**Swagger UI:** http://localhost:4000/docs (həmişə ən güncəl mənbə)
+
+> **Son yenilənmə:** 2026-08 — cari Nest modul səthinə uyğun.
 
 ## Autentifikasiya
 
 Protected endpoint-lər `Authorization: Bearer <access_token>` header tələb edir.
 
-Token-lər `/auth/register` və `/auth/login` endpoint-lərindən alınır.
+Token-lər `/auth/register` və `/auth/login`-dən alınır; yeniləmə `/auth/refresh`.
+
+🔒 = JWT tələb olunur. Rəllər `@Roles` və ya service-layer yoxlaması ilə tətbiq olunur.
 
 ---
 
@@ -16,7 +20,7 @@ Token-lər `/auth/register` və `/auth/login` endpoint-lərindən alınır.
 
 ### POST /auth/register
 
-Yeni istifadəçi qeydiyyatı.
+Yeni istifadəçi. `role`: `CUSTOMER` | `PROVIDER` (`ADMIN` qeydiyyatı qadağandır).
 
 **Body:**
 ```json
@@ -30,36 +34,15 @@ Yeni istifadəçi qeydiyyatı.
 }
 ```
 
-**Response:** `200`
-```json
-{
-  "user": { "id": "...", "email": "...", "role": "CUSTOMER", ... },
-  "tokens": { "accessToken": "...", "refreshToken": "..." }
-}
-```
+**Response:** `200` — `{ user, tokens: { accessToken, refreshToken } }`
 
 ### POST /auth/login
 
-Sistemə daxil ol.
-
-**Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePass1"
-}
-```
-
 ### POST /auth/refresh
 
-Access token yenilə.
+**Body:** `{ "refreshToken": "..." }`
 
-**Body:**
-```json
-{
-  "refreshToken": "..."
-}
-```
+> Server-side logout / token revoke endpoint-i hələ yoxdur.
 
 ---
 
@@ -67,7 +50,27 @@ Access token yenilə.
 
 ### GET /users/me 🔒
 
-Cari istifadəçi profili.
+Cari profil (`providerProfile` daxil ola bilər).
+
+### PATCH /users/me 🔒
+
+Profil yeniləmə (ad, telefon, avatar və s.).
+
+### PATCH /users/me/password 🔒
+
+Şifrə dəyişimi.
+
+### POST /users/me/heartbeat 🔒
+
+Onlayn presence (`lastSeenAt`); throttled.
+
+### POST /users/me/email/request-change 🔒
+
+Yeni e-poçt üçün kod (SMTP varsa mail; yoxdursa dev log).
+
+### POST /users/me/email/confirm-change 🔒
+
+Kod ilə e-poçt təsdiqi.
 
 ---
 
@@ -75,25 +78,13 @@ Cari istifadəçi profili.
 
 ### GET /categories
 
-Bütün aktiv kateqoriyalar.
-
-**Response:**
-```json
-[
-  {
-    "id": "uuid",
-    "name": "Təmizlik",
-    "slug": "temizlik",
-    "description": "...",
-    "icon": "🧹",
-    "serviceCount": 0
-  }
-]
-```
+Aktiv kateqoriyalar (+ `serviceCount`).
 
 ### GET /categories/:slug
 
 Kateqoriya detalları.
+
+> Yazma (CRUD) API-si yoxdur — seed ilə idarə olunur.
 
 ---
 
@@ -101,51 +92,45 @@ Kateqoriya detalları.
 
 ### GET /services
 
-Xidmətlər siyahısı (paginated).
+Paginated siyahı.
 
-**Query params:**
-| Param | Tip | Təsvir |
-|-------|-----|--------|
-| `page` | number | Səhifə (default: 1) |
-| `limit` | number | Limit (default: 20, max: 100) |
-| `categoryId` | uuid | Kateqoriya filter |
-| `providerId` | uuid | Provider filter |
-| `search` | string | Axtarış |
+**Əsas query params:** `page`, `limit`, `categoryId`, `providerId`, `search`, status/filter sahələri (Swagger-ə baxın).
 
-**Response:**
-```json
-{
-  "items": [...],
-  "total": 100,
-  "page": 1,
-  "limit": 20,
-  "totalPages": 5
-}
-```
+### GET /services/mine 🔒 PROVIDER
+
+Öz xidmətləri.
 
 ### GET /services/:id
 
-Xidmət detalları.
+Xidmət detalları (şəkillər, venue, yük ölçüləri / `cargoRouteScope` və s.).
 
 ### POST /services 🔒 PROVIDER
 
-Yeni xidmət yarat.
-
-**Body:**
-```json
-{
-  "title": "Ev təmizliyi",
-  "description": "Peşəkar ev təmizliyi xidməti",
-  "categoryId": "uuid",
-  "price": 50,
-  "priceUnit": "FIXED",
-  "isRemote": false
-}
-```
+Yeni xidmət. Qiymət, kateqoriya, təsvir, şəkillər (`data:image/...` və ya URL), `serviceVenue`, (yükdaşıma) `vehicleLength` / `vehicleWidth` / `vehicleHeight`, `cargoRouteScope`.
 
 ### PATCH /services/:id 🔒 PROVIDER/ADMIN
 
-Xidməti yenilə.
+### DELETE /services/:id 🔒 PROVIDER/ADMIN
+
+---
+
+## Availability (path: `/services/:serviceId/...`)
+
+### GET /services/:serviceId/availability
+
+Boş/dolu slotlar (public). Query: `from`, `to` (ISO date).
+
+### GET /services/:serviceId/working-hours 🔒 PROVIDER
+
+### PUT /services/:serviceId/working-hours 🔒 PROVIDER
+
+Həftəlik iş saatlarını yenilə.
+
+### GET /services/:serviceId/availability/overrides 🔒 PROVIDER
+
+### POST /services/:serviceId/availability/overrides 🔒 PROVIDER
+
+### DELETE /services/:serviceId/availability/overrides/:overrideId 🔒 PROVIDER
 
 ---
 
@@ -153,34 +138,163 @@ Xidməti yenilə.
 
 ### GET /bookings 🔒
 
-Sifarişlər siyahısı (rola görə filter).
+Rola görə siyahı. Query: `page`, `limit`, `status`.
 
 ### POST /bookings 🔒
 
-Yeni sifariş yarat.
-
-**Body:**
+**Body (nümunə):**
 ```json
 {
   "serviceId": "uuid",
-  "scheduledAt": "2026-07-15T10:00:00.000Z",
+  "scheduledAt": "2026-08-15T10:00:00.000Z",
   "notes": "3 otaqlı mənzil",
-  "address": "Bakı, Nəsimi rayonu"
+  "address": "Bakı, Nəsimi rayonu",
+  "imageUrl": "data:image/jpeg;base64,..."
 }
 ```
+
+Slot `availability` ilə yoxlanır; gələcək tarix məcburidir.
 
 ### PATCH /bookings/:id/status 🔒
 
-Sifariş statusunu yenilə.
+**Body:** `{ "status": "CONFIRMED" }`
 
-**Body:**
-```json
-{
-  "status": "CONFIRMED"
-}
-```
+**Statuslar:** `PENDING`, `CONFIRMED`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`, `REJECTED`
 
-**Status dəyərləri:** `PENDING`, `CONFIRMED`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`, `REJECTED`
+İcazəli keçidlər (qısaca):
+- Provider: `PENDING→CONFIRMED|REJECTED`, `CONFIRMED→IN_PROGRESS|CANCELLED`, `IN_PROGRESS→COMPLETED`
+- Customer: `PENDING|CONFIRMED→CANCELLED`
+- Admin: bypass
+
+### PATCH /bookings/:id/reschedule 🔒 PROVIDER
+
+Yeni tarix təklifi + müştəriyə mesaj.
+
+### PATCH /bookings/:id/reschedule/confirm 🔒
+
+### PATCH /bookings/:id/reschedule/reject 🔒
+
+---
+
+## Reviews
+
+### GET /reviews/provider/:providerId
+
+İctimai rəylər (qismən anonim ad).
+
+### POST /reviews 🔒
+
+Tamamlanmış sifarişə rəy; provider rating aggregate transaction-da yenilənir. Status birbaşa `APPROVED`.
+
+### GET /reviews/received 🔒 PROVIDER
+
+Provider-ə gələn rəylər.
+
+---
+
+## Messages
+
+### GET /messages/unread-count 🔒
+
+### GET /messages/conversations 🔒
+
+### POST /messages/conversations 🔒
+
+Söhbət aç / tap (customer–provider cütü).
+
+### GET /messages/conversations/:id 🔒
+
+### DELETE /messages/conversations/:id 🔒
+
+Soft-delete (yalnız öz siyahısından).
+
+### GET /messages/conversations/:id/messages 🔒
+
+### POST /messages/conversations/:id/messages 🔒
+
+### POST /messages/conversations/:id/read 🔒
+
+### POST /messages/conversations/:id/typing 🔒
+
+Typing indicator (in-memory; multi-instance üçün uyğun deyil).
+
+> Real-time WebSocket yoxdur — frontend polling istifadə edir.
+
+---
+
+## Notifications
+
+### GET /notifications 🔒
+
+### GET /notifications/unread-count 🔒
+
+Admin/platforma tipləri (zəng ikonu).
+
+### GET /notifications/booking-unread-count 🔒
+
+Sifariş hadisələri.
+
+### PATCH /notifications/:id/read 🔒
+
+### POST /notifications/read-all 🔒
+
+### POST /notifications/booking-read-all 🔒
+
+> Booking/reschedule axınları DB-yə yazır. Admin platforma bildirişi: `POST /admin/announcements`. `BOOKING_COMPLETED` / `REVIEW_RECEIVED` enum-da var, lakin hələ emit olunmur.
+
+---
+
+## Admin 🔒 ADMIN
+
+Bütün endpoint-lər `@Roles(ADMIN)` tələb edir. Admin qeydiyyatla yaradıla bilməz — seed (`ADMIN_EMAIL` / `ADMIN_PASSWORD`). UI ayrıca app-dədir: `apps/admin` → `http://localhost:3021` (marketplace `apps/web` daxilində deyil).
+
+### GET /admin/stats
+
+Platforma icmalı (istifadəçi, xidmət, sifariş, rəy, kateqoriya sayları).
+
+### GET /admin/users
+
+Query: `page`, `limit`, `role`, `isActive`, `search`.
+
+### GET /admin/users/:id
+
+### PATCH /admin/users/:id/active
+
+Body: `{ "isActive": boolean }` — deaktivdə refresh token-lər silinir.
+
+### PATCH /admin/providers/:userId/verify
+
+Body: `{ "isVerified": boolean }`.
+
+### GET /admin/categories
+
+Bütün kateqoriyalar (aktiv + deaktiv).
+
+### POST /admin/categories
+
+### PATCH /admin/categories/:id
+
+### GET /admin/services
+
+Query: `page`, `limit`, `status`, `categoryId`, `search`.
+
+### PATCH /admin/services/:id/status
+
+Body: `{ "status": "DRAFT"|"ACTIVE"|"PAUSED"|"ARCHIVED" }`.
+
+### GET /admin/bookings
+
+### GET /admin/reviews
+
+Query: `status` (`PENDING`|`APPROVED`|`REJECTED`).
+
+### PATCH /admin/reviews/:id/status
+
+Body: `{ "status": "APPROVED"|"REJECTED" }` — reytinq aggregate yenilənir.
+
+### POST /admin/announcements
+
+Body: `{ "title", "body", "roles?": ["CUSTOMER"|"PROVIDER"] }` — boş `roles` = bütün aktiv istifadəçilər.
 
 ---
 
@@ -188,13 +302,10 @@ Sifariş statusunu yenilə.
 
 ### GET /health
 
-API sağlamlıq yoxlaması.
-
-**Response:**
 ```json
 {
   "status": "ok",
-  "timestamp": "2026-07-10T...",
+  "timestamp": "...",
   "service": "xidmetal-api"
 }
 ```
@@ -205,15 +316,14 @@ API sağlamlıq yoxlaması.
 
 | Kod | Məna |
 |-----|------|
-| 400 | Yanlış sorğu (validation error) |
+| 400 | Yanlış sorğu (validation) |
 | 401 | Autentifikasiya tələb olunur |
 | 403 | İcazə yoxdur |
 | 404 | Tapılmadı |
-| 409 | Konflikt (məs: email artıq mövcuddur) |
-| 429 | Rate limit aşıldı |
+| 409 | Konflikt (məs. email mövcuddur) |
+| 429 | Rate limit |
 | 500 | Server xətası |
 
-**Xəta response formatı:**
 ```json
 {
   "statusCode": 400,

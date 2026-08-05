@@ -15,7 +15,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ServiceStatus, PriceUnit, ServiceVenue, MAX_SERVICE_IMAGES } from '@xidmetal/shared';
+import { ServiceStatus, PriceUnit, ServiceVenue, CargoRouteScope, MAX_SERVICE_IMAGES } from '@xidmetal/shared';
 
 export class CreateServiceDto {
   @ApiProperty()
@@ -64,6 +64,32 @@ export class CreateServiceDto {
   @IsOptional()
   @IsEnum(ServiceVenue)
   serviceVenue?: ServiceVenue;
+
+  @ApiPropertyOptional({ description: 'Yük yeri uzunluğu (metr)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.1, { message: 'Maşın uzunluğu 0-dan böyük olmalıdır' })
+  @Max(30, { message: 'Maşın uzunluğu maksimum 30 m ola bilər' })
+  vehicleLength?: number;
+
+  @ApiPropertyOptional({ description: 'Yük yeri eni (metr)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.1, { message: 'Maşın eni 0-dan böyük olmalıdır' })
+  @Max(30, { message: 'Maşın eni maksimum 30 m ola bilər' })
+  vehicleWidth?: number;
+
+  @ApiPropertyOptional({ description: 'Yük yeri hündürlüyü (metr)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.1, { message: 'Maşın hündürlüyü 0-dan böyük olmalıdır' })
+  @Max(30, { message: 'Maşın hündürlüyü maksimum 30 m ola bilər' })
+  vehicleHeight?: number;
+
+  @ApiPropertyOptional({ enum: CargoRouteScope, description: 'Şəhərdaxili / şəhərlərarası' })
+  @IsOptional()
+  @IsEnum(CargoRouteScope)
+  cargoRouteScope?: CargoRouteScope;
 
   @ApiProperty({
     description: 'Xidmət şəkilləri (data URL və ya http URL)',
@@ -127,6 +153,32 @@ export class UpdateServiceDto {
   @IsOptional()
   @IsEnum(ServiceVenue)
   serviceVenue?: ServiceVenue;
+
+  @ApiPropertyOptional({ description: 'Yük yeri uzunluğu (metr)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.1, { message: 'Maşın uzunluğu 0-dan böyük olmalıdır' })
+  @Max(30, { message: 'Maşın uzunluğu maksimum 30 m ola bilər' })
+  vehicleLength?: number;
+
+  @ApiPropertyOptional({ description: 'Yük yeri eni (metr)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.1, { message: 'Maşın eni 0-dan böyük olmalıdır' })
+  @Max(30, { message: 'Maşın eni maksimum 30 m ola bilər' })
+  vehicleWidth?: number;
+
+  @ApiPropertyOptional({ description: 'Yük yeri hündürlüyü (metr)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.1, { message: 'Maşın hündürlüyü 0-dan böyük olmalıdır' })
+  @Max(30, { message: 'Maşın hündürlüyü maksimum 30 m ola bilər' })
+  vehicleHeight?: number;
+
+  @ApiPropertyOptional({ enum: CargoRouteScope, description: 'Şəhərdaxili / şəhərlərarası' })
+  @IsOptional()
+  @IsEnum(CargoRouteScope)
+  cargoRouteScope?: CargoRouteScope;
 
   @ApiPropertyOptional({ enum: ServiceStatus })
   @IsOptional()

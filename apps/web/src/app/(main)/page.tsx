@@ -9,11 +9,9 @@ import {
   BrushCleaning,
   Wrench,
   Scissors,
-  GraduationCap,
+  Bug,
   Car,
-  Monitor,
-  Camera,
-  ChefHat,
+  Package,
   type LucideIcon,
 } from 'lucide-react';
 import type { CategorySummary } from '@xidmetal/shared';
@@ -50,34 +48,22 @@ const FALLBACK_CATEGORIES: {
     description: 'Gözəllik və sağlamlıq',
   },
   {
-    icon: GraduationCap,
-    name: 'Təhsil',
-    slug: 'tehsil',
-    description: 'Repetitorluq və kurslar',
+    icon: Bug,
+    name: 'Dezinfeksiya',
+    slug: 'dezinfeksiya',
+    description: 'Dezinfeksiya və sanitariya',
   },
   {
     icon: Car,
     name: 'Nəqliyyat',
     slug: 'neqliyyat',
-    description: 'Daşınma və çatdırılma',
+    description: 'Daşınma və sərnişin daşıma',
   },
   {
-    icon: Monitor,
-    name: 'İT Xidmətləri',
-    slug: 'it-xidmetleri',
-    description: 'Proqramlaşdırma və dəstək',
-  },
-  {
-    icon: Camera,
-    name: 'Foto & Video',
-    slug: 'foto-video',
-    description: 'Fotoqrafiya və videomontaj',
-  },
-  {
-    icon: ChefHat,
-    name: 'Qidalanma',
-    slug: 'qidalanma',
-    description: 'Aşpazlıq və qida xidmətləri',
+    icon: Package,
+    name: 'Çatdırılma',
+    slug: 'catdirilma',
+    description: 'Bağlama və sifariş çatdırılması',
   },
 ];
 

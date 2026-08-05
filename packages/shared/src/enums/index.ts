@@ -32,6 +32,13 @@ export enum ServiceVenue {
   AT_SALON = 'AT_SALON',
 }
 
+/** Yükdaşıma: şəhərdaxili / şəhərlərarası */
+export enum CargoRouteScope {
+  INTRA_CITY = 'INTRA_CITY',
+  INTERCITY = 'INTERCITY',
+  BOTH = 'BOTH',
+}
+
 export enum ReviewStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',

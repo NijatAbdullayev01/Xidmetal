@@ -64,22 +64,23 @@ Mövcud stack (Next.js 15, NestJS 11, Prisma, PostgreSQL, Redis) saxlanılır. A
 
 ## 3. Backend modulları
 
-Mövcud: `auth`, `users`, `categories`, `services`, `bookings`, `health`.
+**Artıq mövcud (2026-08):** `auth`, `users`, `categories`, `services`, `availability`, `bookings`, `reviews`, `messages`, `notifications`, `health`.
 
-Əlavə olunmalı modullar:
+Cari vəziyyət üçün: [ARCHITECTURE.md](./ARCHITECTURE.md). Aşağıdakı cədvəl **hədəfə qalan** və ya **tamamlanmamış** hissələri göstərir.
 
-| Modul | Məsuliyyət | Status |
-|-------|------------|--------|
-| `reviews` | Rəy CRUD, rating aggregate | Schema var, modul **yox** |
-| `notifications` | In-app + push + email/SMS bildirişlər | Schema var, modul **yox** |
-| `realtime` (gateway) | Socket.IO gateway, otaqlar, presence | **Yox** |
-| `tracking` | Provider lokasiya axını, marşrut, ETA | **Yox** |
-| `dispatch` | On-demand provider tapma/təklif/timeout | **Yox** |
-| `geo` | Geokodlaşdırma, yaxınlıq sorğuları (PostGIS) | **Yox** |
-| `payments` | Payment intent, hold/capture, komissiya, payout, refund | **Yox** |
-| `messaging` | Müştəri↔provider chat (opsional "çağırış") | **Yox** |
+| Modul | Məsuliyyət | Status (cari) |
+|-------|------------|----------------|
+| `reviews` | Rəy yaratma + rating aggregate | ✅ MVP (auto-APPROVED; moderation API yox) |
+| `notifications` | In-app oxu/siyahı | ✅ qismən (push/SMS/email kanalı yox; admin announce ✅; bəzi `NotificationType` emit olunmur) |
+| `messages` | Müştəri↔provider chat | ✅ REST + polling (WebSocket yox; typing in-memory) |
+| `realtime` (gateway) | Socket.IO gateway, otaqlar, presence | ❌ |
+| `tracking` | Provider lokasiya axını, marşrut, ETA | ❌ |
+| `dispatch` | On-demand provider tapma/təklif/timeout | ❌ |
+| `geo` | Geokodlaşdırma, yaxınlıq sorğuları (PostGIS) | ❌ |
+| `payments` | Payment intent, hold/capture, komissiya, payout, refund | ❌ |
+| Admin panel / CRUD | Kateqoriya yazma, verify, moderation | ✅ (`/api/v1/admin/*` + ayrı `apps/admin`) |
 
-Hər modul mövcud konvensiyaya tabedir: `Controller → Service → Prisma`, DTO validation (class-validator), AZ dilində error mesajları. Bax: [.cursor/rules/backend.mdc].
+Hər yeni modul mövcud konvensiyaya tabedir: `Controller → Service → Prisma`, DTO validation (class-validator), AZ dilində error mesajları. Bax: [.cursor/rules/backend.mdc].
 
 ---
 

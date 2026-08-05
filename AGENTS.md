@@ -24,13 +24,15 @@ Bu layihə xidmət verənlərlə xidmət alanları birləşdirən marketplace pl
 ## Arxitektura
 
 - Backend: Controller → Service → Prisma (Clean Architecture)
-- Modullar domain-ə görə ayrılıb: auth, users, services, categories, bookings
-- RBAC: CUSTOMER, PROVIDER, ADMIN rolları
+- Modullar domain-ə görə ayrılıb: auth, users, services, categories, availability, bookings, reviews, messages, notifications, health
+- RBAC: CUSTOMER, PROVIDER, ADMIN rolları (admin UI: ayrı `apps/admin` app, port 3021)
 - JWT auth + refresh token rotation
 - API prefix: `/api/v1`
 
 ## Frontend
 
+- **Marketplace:** `apps/web` — Next.js 15 App Router, Tailwind CSS 4, TypeScript (port 3020)
+- **Admin:** `apps/admin` — ayrı Next.js app (port 3021); marketplace daxilində admin UI yoxdur
 - Server Components default, `'use client'` yalnız interaktiv UI üçün
 - Tailwind brend rəngləri: `bg-brand`, `text-brand-foreground`, `hover:bg-brand-dark`
 - State: Zustand (auth), TanStack Query (server data)

@@ -10,12 +10,18 @@ interface ServiceDescriptionProps {
   /** Modal başlığında göstərilən xidmət adı */
   title?: string;
   className?: string;
+  /**
+   * false olduqda yalnız kəsilmiş mətn — modal parent (məs. kart preview) idarə edir.
+   * @default true
+   */
+  enableModal?: boolean;
 }
 
 export function ServiceDescription({
   description,
   title,
   className,
+  enableModal = true,
 }: ServiceDescriptionProps) {
   const [open, setOpen] = useState(false);
   const [truncated, setTruncated] = useState(false);
@@ -35,6 +41,7 @@ export function ServiceDescription({
     return () => observer.disconnect();
   }, [description]);
 
+  const canOpen = enableModal && truncated;
   const openModal = () => setOpen(true);
   const closeModal = () => setOpen(false);
 
@@ -44,15 +51,15 @@ export function ServiceDescription({
         ref={textRef}
         className={cn(
           'mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground',
-          truncated &&
+          canOpen &&
             'cursor-pointer transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
           className,
         )}
-        onClick={truncated ? openModal : undefined}
-        role={truncated ? 'button' : undefined}
-        tabIndex={truncated ? 0 : undefined}
+        onClick={canOpen ? openModal : undefined}
+        role={canOpen ? 'button' : undefined}
+        tabIndex={canOpen ? 0 : undefined}
         onKeyDown={
-          truncated
+          canOpen
             ? (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
@@ -61,42 +68,44 @@ export function ServiceDescription({
               }
             : undefined
         }
-        aria-label={truncated ? 'Tam təsvirə bax' : undefined}
-        title={truncated ? 'Tam təsvirə baxmaq üçün klikləyin' : undefined}
+        aria-label={canOpen ? 'Tam təsvirə bax' : undefined}
+        title={canOpen ? 'Tam təsvirə baxmaq üçün klikləyin' : undefined}
       >
         {description}
       </p>
 
-      <Modal
-        open={open}
-        onClose={closeModal}
-        title={title ? `${title} — təsvir` : 'Xidmət təsviri'}
-        description="Xidmətin tam təsviri"
-        panelClassName="max-w-md"
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold tracking-tight">Təsvir</h2>
-            {title ? (
-              <p className="mt-0.5 truncate text-sm text-muted-foreground">{title}</p>
-            ) : null}
+      {enableModal ? (
+        <Modal
+          open={open}
+          onClose={closeModal}
+          title={title ? `${title} — təsvir` : 'Xidmət təsviri'}
+          description="Xidmətin tam təsviri"
+          panelClassName="max-w-md"
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold tracking-tight">Təsvir</h2>
+              {title ? (
+                <p className="mt-0.5 truncate text-sm text-muted-foreground">{title}</p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={closeModal}
+              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label="Bağla"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={closeModal}
-            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label="Bağla"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-            {description}
-          </p>
-        </div>
-      </Modal>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+              {description}
+            </p>
+          </div>
+        </Modal>
+      ) : null}
     </>
   );
 }

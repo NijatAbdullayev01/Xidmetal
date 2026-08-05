@@ -18,6 +18,10 @@ interface ServiceImageUploaderProps {
   className?: string;
   /** Form validasiya xətası (məs. məcburi sahə) */
   error?: string | null;
+  /** Başlıq — default: iş nümunəsi */
+  label?: string;
+  /** Köməkçi mətn */
+  hint?: string;
 }
 
 export function ServiceImageUploader({
@@ -27,11 +31,16 @@ export function ServiceImageUploader({
   id = 'service-images',
   className,
   error: externalError = null,
+  label = 'İş nümunəsi şəkilləri',
+  hint,
 }: ServiceImageUploaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const canAddMore = images.length < MAX_SERVICE_IMAGES;
   const displayError = error ?? externalError;
+  const hintText =
+    hint ??
+    `Xidmətinizi göstərən ən azı 1 şəkil əlavə edin. JPG, PNG və ya WEBP, hər biri maksimum 1 MB. Ən çox ${MAX_SERVICE_IMAGES} şəkil.`;
 
   const handleSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -94,11 +103,8 @@ export function ServiceImageUploader({
 
   return (
     <div className={cn('space-y-2', className)}>
-      <Label htmlFor={id}>İş nümunəsi şəkilləri</Label>
-      <p className="text-sm text-muted-foreground">
-        Xidmətinizi göstərən ən azı 1 şəkil əlavə edin. JPG, PNG və ya WEBP, hər biri maksimum 1 MB.
-        Ən çox {MAX_SERVICE_IMAGES} şəkil.
-      </p>
+      <Label htmlFor={id}>{label}</Label>
+      <p className="text-sm text-muted-foreground">{hintText}</p>
 
       <input
         ref={fileInputRef}
