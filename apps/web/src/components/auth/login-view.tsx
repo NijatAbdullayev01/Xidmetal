@@ -13,7 +13,7 @@ function LoginViewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const hydrated = useAuthHydrated();
-  const isAuthenticated = useAuthStore((state) => !!state.tokens?.accessToken);
+  const isAuthenticated = useAuthStore((state) => state.session && !!state.user);
   const user = useAuthStore((state) => state.user);
   const showSuccess = hydrated && isAuthenticated;
 
@@ -21,6 +21,10 @@ function LoginViewContent() {
     if (!showSuccess || !user) return;
 
     const redirect = searchParams.get('redirect');
+    if (!user.isVerified) {
+      router.replace('/verify-email');
+      return;
+    }
     router.replace(
       redirect && redirect.startsWith('/') ? redirect : getPostAuthRedirectPath(user.role),
     );

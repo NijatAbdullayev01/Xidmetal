@@ -12,8 +12,8 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ServicesService } from './services.service';
 import { CreateServiceDto, UpdateServiceDto, ServiceQueryDto } from './dto';
-import { Public, Roles } from '../../common/decorators';
-import { JwtAuthGuard, RolesGuard, OptionalJwtAuthGuard } from '../../common/guards';
+import { Public, Roles, RequireEmailVerified } from '../../common/decorators';
+import { JwtAuthGuard, RolesGuard, OptionalJwtAuthGuard, EmailVerifiedGuard } from '../../common/guards';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '@xidmetal/shared';
 
@@ -51,8 +51,9 @@ export class ServicesController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, EmailVerifiedGuard)
   @Roles(UserRole.PROVIDER)
+  @RequireEmailVerified()
   @Post()
   @ApiOperation({ summary: 'Yeni xidmət yarat (Provider)' })
   create(@CurrentUser('id') userId: string, @Body() dto: CreateServiceDto) {
@@ -60,8 +61,9 @@ export class ServicesController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, EmailVerifiedGuard)
   @Roles(UserRole.PROVIDER, UserRole.ADMIN)
+  @RequireEmailVerified()
   @Patch(':id')
   @ApiOperation({ summary: 'Xidməti yenilə' })
   update(
@@ -74,8 +76,9 @@ export class ServicesController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, EmailVerifiedGuard)
   @Roles(UserRole.PROVIDER, UserRole.ADMIN)
+  @RequireEmailVerified()
   @Delete(':id')
   @ApiOperation({ summary: 'Xidməti sil' })
   remove(

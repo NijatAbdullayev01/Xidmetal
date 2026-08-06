@@ -1,33 +1,45 @@
-/** Ephemeral typing state — DB-yə yazılmır; TTL bitəndə silinir. */
-const TYPING_TTL_MS = 4_000;
+/** Ephemeral typing — DB-backed (multi-instance). TTL bitəndə oxunanda silinir. */
+import { PrismaService } from '../../common/database/prisma.service';
 
-type TypingEntry = {
-  userId: string;
-  expiresAt: number;
-};
+export const TYPING_TTL_MS = 4_000;
 
-const typingByConversation = new Map<string, TypingEntry>();
-
-export function setTyping(conversationId: string, userId: string): void {
-  typingByConversation.set(conversationId, {
-    userId,
-    expiresAt: Date.now() + TYPING_TTL_MS,
+export async function setTypingDb(
+  prisma: PrismaService,
+  conversationId: string,
+  userId: string,
+): Promise<void> {
+  const expiresAt = new Date(Date.now() + TYPING_TTL_MS);
+  await prisma.typingPresence.upsert({
+    where: { conversationId },
+    create: { conversationId, userId, expiresAt },
+    update: { userId, expiresAt },
   });
 }
 
-export function clearTyping(conversationId: string, userId: string): void {
-  const entry = typingByConversation.get(conversationId);
-  if (entry?.userId === userId) {
-    typingByConversation.delete(conversationId);
-  }
+export async function clearTypingDb(
+  prisma: PrismaService,
+  conversationId: string,
+  userId: string,
+): Promise<void> {
+  await prisma.typingPresence.deleteMany({
+    where: { conversationId, userId },
+  });
 }
 
-export function isPeerTyping(conversationId: string, viewerId: string): boolean {
-  const entry = typingByConversation.get(conversationId);
+export async function isPeerTypingDb(
+  prisma: PrismaService,
+  conversationId: string,
+  viewerId: string,
+): Promise<boolean> {
+  const entry = await prisma.typingPresence.findUnique({
+    where: { conversationId },
+  });
   if (!entry) return false;
-  if (entry.expiresAt < Date.now()) {
-    typingByConversation.delete(conversationId);
+
+  if (entry.expiresAt.getTime() < Date.now()) {
+    await prisma.typingPresence.deleteMany({ where: { conversationId } });
     return false;
   }
+
   return entry.userId !== viewerId;
 }

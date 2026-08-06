@@ -92,7 +92,7 @@ export class CreateServiceDto {
   cargoRouteScope?: CargoRouteScope;
 
   @ApiProperty({
-    description: 'Xidmət şəkilləri (data URL və ya http URL)',
+    description: 'Xidmət şəkilləri (http/https URL)',
     type: [String],
     minItems: 1,
     maxItems: MAX_SERVICE_IMAGES,

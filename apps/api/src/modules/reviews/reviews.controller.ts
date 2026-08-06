@@ -2,8 +2,8 @@ import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/co
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto, ReviewQueryDto } from './dto';
-import { JwtAuthGuard, RolesGuard } from '../../common/guards';
-import { Public, Roles } from '../../common/decorators';
+import { JwtAuthGuard, RolesGuard, EmailVerifiedGuard } from '../../common/guards';
+import { Public, Roles, RequireEmailVerified } from '../../common/decorators';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '@xidmetal/shared';
 
@@ -24,8 +24,9 @@ export class ReviewsController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, EmailVerifiedGuard)
   @Roles(UserRole.CUSTOMER, UserRole.PROVIDER)
+  @RequireEmailVerified()
   @Post()
   @ApiOperation({ summary: 'Tamamlanmış sifarişə rəy və reytinq yaz' })
   create(@CurrentUser('id') userId: string, @Body() dto: CreateReviewDto) {
@@ -36,7 +37,7 @@ export class ReviewsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.PROVIDER)
   @Get('received')
-  @ApiOperation({ summary: 'Provider-ə gələn rəylər' })
+  @ApiOperation({ summary: 'Provider-ə gələn rəylər (PENDING daxil)' })
   findReceived(
     @CurrentUser('id') userId: string,
     @Query() query: ReviewQueryDto,

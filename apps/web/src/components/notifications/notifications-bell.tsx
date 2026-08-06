@@ -2,9 +2,11 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, Loader2 } from 'lucide-react';
 import type { NotificationSummary } from '@xidmetal/shared';
+import { UserRole } from '@xidmetal/shared';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
@@ -13,6 +15,7 @@ import {
   UNREAD_NOTIFICATIONS_QUERY_KEY,
   useNotifications,
 } from '@/hooks/use-notifications';
+import { resolveNotificationHref } from '@/lib/notification-href';
 import { useAuthStore } from '@/store/auth.store';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +47,7 @@ function computePanelPosition(trigger: DOMRect): PanelPosition {
 
 export function NotificationsBell() {
   const token = useAuthToken();
+  const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
   const { unreadCount } = useNotifications(!!user);
@@ -135,6 +139,12 @@ export function NotificationsBell() {
       markReadMutation.mutate(notification.id);
     }
     setOpen(false);
+
+    const role = user?.role ?? UserRole.CUSTOMER;
+    const href = resolveNotificationHref(notification, role);
+    if (href) {
+      router.push(href);
+    }
   };
 
   const panel =
@@ -148,7 +158,7 @@ export function NotificationsBell() {
         style={{ top: panelPosition.top, left: panelPosition.left }}
       >
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
-          <p className="text-sm font-medium">Platforma bildirişləri</p>
+          <p className="text-sm font-medium">Bildirişlər</p>
           <Button
             type="button"
             variant="ghost"
@@ -168,7 +178,7 @@ export function NotificationsBell() {
           )}
           {!isLoading && (data?.items.length ?? 0) === 0 && (
             <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-              Platforma bildirişi yoxdur
+              Bildiriş yoxdur
             </p>
           )}
           {data?.items.map((notification) => (
@@ -212,7 +222,7 @@ export function NotificationsBell() {
         type="button"
         onClick={() => setOpen((value) => !value)}
         className="relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md hover:bg-muted"
-        aria-label="Platforma bildirişləri"
+        aria-label="Bildirişlər"
         aria-expanded={open}
       >
         <Bell className="h-5 w-5" />

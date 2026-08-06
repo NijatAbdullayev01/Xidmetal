@@ -15,7 +15,9 @@ import { AdminModule } from './modules/admin/admin.module';
 import { HealthModule } from './modules/health/health.module';
 import { DatabaseModule } from './common/database/database.module';
 import { MailModule } from './common/mail/mail.module';
+import { StorageModule } from './common/storage/storage.module';
 import { JwtAuthGuard } from './common/guards';
+import { UploadsModule } from './modules/uploads/uploads.module';
 
 @Module({
   imports: [
@@ -23,6 +25,7 @@ import { JwtAuthGuard } from './common/guards';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     DatabaseModule,
     MailModule,
+    StorageModule,
     HealthModule,
     AuthModule,
     UsersModule,
@@ -34,6 +37,7 @@ import { JwtAuthGuard } from './common/guards';
     MessagesModule,
     NotificationsModule,
     AdminModule,
+    UploadsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

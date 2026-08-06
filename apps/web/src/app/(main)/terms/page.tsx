@@ -146,13 +146,14 @@ const sections: {
     title: '9. Qiymətlər, ödəniş və komissiya',
     paragraphs: [
       'Xidmət qiymətləri xidmət verənlər tərəfindən müəyyən edilir və Platformada göstərilir. Qiymətlər Azərbaycan manatı (AZN) və ya Platformada qeyd olunan digər valyutada ifadə oluna bilər.',
-      'Hazırda ödənişlər tərəflər arasında birbaşa razılaşdırıla bilər. Platforma daxili ödəniş, hold/capture, komissiya və ya payout mexanizmləri tətbiq edildikdə, müvafiq şərtlər Platformada əlavə olaraq dərc olunacaq və bu Qaydaların tərkib hissəsi hesab ediləcək.',
+      'Hal-hazırda Platforma xidmət verənlərdən və xidmət alanlardan heç bir komissiya, abunə və ya platforma haqqı tutmur. Ödəniş (əgər lazımdırsa) tərəflər arasında birbaşa razılaşdırılır; Platforma daxilində ödəniş/hold/capture mexanizmi yoxdur.',
+      'Gələcəkdə daxili ödəniş və ya komissiya tətbiq edilərsə, müvafiq şərtlər Platformada əlavə olaraq dərc olunacaq və bu Qaydaların tərkib hissəsi hesab ediləcək.',
     ],
     list: [
-      'Platforma xidmət verəndən və ya xidmət alandan komissiya / xidmət haqqı tutmaq hüququnu özündə saxlayır',
-      'Ödəniş provayderi (bank, PSP və s.) istifadə olunduqda onların şərtləri də tətbiq olunur',
+      'Hal-hazırda xidmət verənlərdən Platforma haqqı / komissiya alınmır',
+      'Xidmət haqqı (müştəri ↔ xidmət verən) tərəflərin öz razılaşmasına əsasən ödənilir',
       'Vergi, sosial ödəniş və digər dövlət öhdəlikləri hər tərəfin öz qanuni məsuliyyətidir',
-      'Qiymət və komissiya dəyişiklikləri barədə Platformada məlumat veriləcək',
+      'Qiymət və komissiya dəyişiklikləri barədə Platformada əvvəlcədən məlumat veriləcək',
     ],
   },
   {

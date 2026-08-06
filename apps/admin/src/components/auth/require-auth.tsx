@@ -10,7 +10,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const hydrated = useAuthHydrated();
   const user = useAuthStore((state) => state.user);
-  const token = useAuthStore((state) => state.tokens?.accessToken);
+  const token = useAuthStore((state) => (state.session && state.user ? 'session' : null));
 
   useEffect(() => {
     if (hydrated && (!user || !token)) {

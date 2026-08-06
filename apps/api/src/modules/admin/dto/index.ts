@@ -234,4 +234,13 @@ export class CreateAnnouncementDto {
   @ArrayMinSize(1)
   @IsEnum(UserRole, { each: true })
   roles?: Array<UserRole.CUSTOMER | UserRole.PROVIDER>;
+
+  @ApiPropertyOptional({
+    description: 'Klikdə açılacaq daxili yol (məs. /dashboard/customer/bookings)',
+    example: '/dashboard/provider',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  href?: string;
 }

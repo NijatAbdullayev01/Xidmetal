@@ -295,6 +295,7 @@ export interface UnreadMessagesSummary {
   latestUnreadAt: string | null;
 }
 
+/** Yalnız server daxili / legacy — HTTP JSON cavabında artıq göndərilmir (httpOnly cookie). */
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
@@ -302,7 +303,8 @@ export interface AuthTokens {
 
 export interface AuthResponse {
   user: UserProfile;
-  tokens: AuthTokens;
+  mailDelivered?: boolean;
+  previewCode?: string;
 }
 
 export interface WorkingHoursDay {

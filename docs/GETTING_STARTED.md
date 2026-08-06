@@ -38,16 +38,18 @@ cp .env.example .env
 |---------|--------|-------------------------|
 | `DATABASE_URL` | PostgreSQL | `postgresql://xidmetal:xidmetal_dev@localhost:5434/xidmetal` |
 | `REDIS_URL` | Redis (API hələ istifadə etmir) | `redis://localhost:6380` |
-| `JWT_SECRET` | JWT imzalama açarı | Dəyişdirin! |
+| `NODE_ENV` | `development` / `production` | `development` |
+| `JWT_SECRET` | JWT imzalama açarı (prod-da uzun random) | Dəyişdirin! |
 | `API_PORT` | Backend port | `4000` |
 | `CORS_ORIGIN` | İcazəli frontend origin-lər (vergüllə) | `http://localhost:3020,http://localhost:3021` |
-| `NEXT_PUBLIC_API_URL` | API URL (web + admin) | `http://localhost:4000` |
+| `NEXT_PUBLIC_API_URL` | Boş = cookie rewrite (local); prod-da API URL | `""` |
 | `NEXT_PUBLIC_APP_URL` | Marketplace URL | `http://localhost:3020` |
 | `NEXT_PUBLIC_ADMIN_URL` | Admin panel URL | `http://localhost:3021` |
-| `NEXT_PUBLIC_API_URL` | Frontend → API | `http://localhost:4000` |
-| `NEXT_PUBLIC_APP_URL` | Frontend URL | `http://localhost:3020` |
+| `SMTP_*` | E-poçt (verify / şifrə bərpası). **Prod-da məcburi** | local-da boş olar |
+| `STORAGE_DRIVER` | `local` və ya `s3` | `local` |
+| `STORAGE_PUBLIC_BASE_URL` | Yüklənən şəkillərin ictimai bazası | `http://localhost:4000/uploads` |
 
-Mövcud `.env` varsa, portları yuxarıdakı ilə uyğunlaşdırın.
+Mövcud `.env` varsa, portları yuxarıdakı ilə uyğunlaşdırın. Production-da `NODE_ENV=production`, güclü `JWT_SECRET` və işlək `SMTP_*` təyin edin.
 
 ## 4. Verilənlər bazasını işə salmaq
 
@@ -58,13 +60,20 @@ docker compose ps
 
 ## 5. Database schema
 
-Hazırda production migration history yoxdur — local üçün `db:push` istifadə olunur.
-
 ```bash
 pnpm db:generate
-pnpm db:push
+pnpm db:migrate:deploy   # production / təmiz mühit
 pnpm --filter @xidmetal/database seed
 ```
+
+**Mövcud local DB** əvvəl `db:push` ilə yaradılıbsa (migration history yoxdursa):
+
+```bash
+pnpm db:push
+pnpm --filter @xidmetal/database exec prisma migrate resolve --applied 20260806120000_init
+```
+
+Lokal yeni dəyişiklik üçün: `pnpm db:migrate` (`prisma migrate dev`).
 
 ## 6. Development serverləri
 

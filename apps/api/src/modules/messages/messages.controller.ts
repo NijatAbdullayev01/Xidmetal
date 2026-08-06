@@ -18,8 +18,8 @@ import {
   ConversationQueryDto,
   MessagesQueryDto,
 } from './dto';
-import { JwtAuthGuard, RolesGuard } from '../../common/guards';
-import { Roles } from '../../common/decorators';
+import { JwtAuthGuard, RolesGuard, EmailVerifiedGuard } from '../../common/guards';
+import { Roles, RequireEmailVerified } from '../../common/decorators';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Messages')
@@ -85,12 +85,16 @@ export class MessagesController {
 
   @Post('conversations/:id/typing')
   @Throttle({ default: { limit: 60, ttl: 60000 } })
-  @ApiOperation({ summary: 'Yazır... siqnalı göndər (ephemeral, ~4s)' })
+  @UseGuards(EmailVerifiedGuard)
+  @RequireEmailVerified()
+  @ApiOperation({ summary: 'Yazır... siqnalı göndər (DB, multi-instance, ~4s TTL)' })
   setTyping(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.messagesService.setTyping(id, userId);
   }
 
   @Post('conversations')
+  @UseGuards(EmailVerifiedGuard)
+  @RequireEmailVerified()
   @ApiOperation({ summary: 'Yeni söhbət yarat və ya mövcud olanı aç' })
   createConversation(
     @CurrentUser('id') userId: string,
@@ -102,6 +106,8 @@ export class MessagesController {
 
   @Post('conversations/:id/messages')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @UseGuards(EmailVerifiedGuard)
+  @RequireEmailVerified()
   @ApiOperation({ summary: 'Mesaj göndər' })
   sendMessage(
     @Param('id') id: string,

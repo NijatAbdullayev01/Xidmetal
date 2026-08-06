@@ -150,7 +150,12 @@ const faqs: { question: string; answer: string }[] = [
   {
     question: 'Qeydiyyat pulsuzdur?',
     answer:
-      'Bəli, Xidmətal-da xidmət verən kimi qeydiyyat tamamilə pulsuzdur. Hesab yaradıb dərhal xidmət əlavə edə bilərsiniz.',
+      'Bəli, Xidmətal-da xidmət verən kimi qeydiyyat tamamilə pulsuzdur. Platforma hazırda xidmət verənlərdən komissiya və ya abunə haqqı tutmur — hesab yaradıb dərhal xidmət əlavə edə bilərsiniz.',
+  },
+  {
+    question: 'Platforma komissiya alır?',
+    answer:
+      'Xeyr. Hal-hazırda Xidmətal xidmət verənlərdən heç bir ödəniş / komissiya almır. Müştəri ilə razılaşdırılan xidmət haqqı birbaşa sizin aranızda həll olunur.',
   },
   {
     question: 'Neçə xidmət yarada bilərəm?',

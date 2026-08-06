@@ -19,10 +19,20 @@ import { cn } from '@/lib/utils';
 
 type TabKey = 'all' | 'pending' | 'active' | 'completed' | 'cancelled';
 
-const TABS: { key: TabKey; label: string; status?: BookingStatus }[] = [
+const TABS: {
+  key: TabKey;
+  label: string;
+  status?: BookingStatus;
+  /** Bir neçə status (Aktiv = təsdiqlənmiş + icrada) */
+  statuses?: BookingStatus[];
+}[] = [
   { key: 'all', label: 'Hamısı' },
   { key: 'pending', label: 'Gözləyən', status: BookingStatus.PENDING },
-  { key: 'active', label: 'Aktiv', status: BookingStatus.IN_PROGRESS },
+  {
+    key: 'active',
+    label: 'Aktiv',
+    statuses: [BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS],
+  },
   { key: 'completed', label: 'Tamamlanan', status: BookingStatus.COMPLETED },
   { key: 'cancelled', label: 'Ləğv edilmiş', status: BookingStatus.CANCELLED },
 ];
@@ -48,7 +58,11 @@ export default function CustomerBookingsPage() {
     queryFn: () =>
       api.bookings(token!, {
         limit: '50',
-        ...(currentTab.status && { status: currentTab.status }),
+        ...(currentTab.statuses
+          ? { statuses: currentTab.statuses.join(',') }
+          : currentTab.status
+            ? { status: currentTab.status }
+            : {}),
       }),
     enabled: !!token,
     refetchInterval: 5_000,
@@ -233,6 +247,11 @@ export default function CustomerBookingsPage() {
                     <span>Tarix: {formatDateTime(booking.scheduledAt)}</span>
                     <span>Qiymət: {formatPrice(booking.totalPrice)}</span>
                   </div>
+                  {booking.address && (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Ünvan: <span className="text-foreground">{booking.address}</span>
+                    </p>
+                  )}
                   {booking.proposedScheduledAt && booking.status === BookingStatus.PENDING && (
                     <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 dark:border-amber-700/50 dark:bg-amber-950/30">
                       <div className="flex items-start gap-2">

@@ -2,6 +2,9 @@ import type {
   AuthResponse,
   LoginInput,
   RegisterInput,
+  ForgotPasswordInput,
+  RequestEmailVerificationInput,
+  ConfirmEmailVerificationInput,
   UserProfile,
   ServiceSummary,
   BookingSummary,
@@ -34,10 +37,14 @@ import type {
   UpsertWorkingHoursInput,
   CreateAvailabilityOverrideInput,
 } from '@xidmetal/shared';
-import { BookingStatus } from '@xidmetal/shared';
+import { BookingStatus, CLIENT_APP, CLIENT_APP_HEADER } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+/**
+ * Boş/undefined → eyni origin (Next rewrite → API).
+ * Absolute URL yalnız SSR və ya birbaşa API üçün.
+ */
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 const API_PREFIX = '/api/v1';
 
 /** İctimai GET-lər üçün ISR (server fetch cache). Client-də Next ignore edir. */
@@ -54,6 +61,7 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions extends Omit<RequestInit, 'next'> {
+  /** Truthy = cookie sessiyası gözlənilir (Bearer localStorage-dan göndərilmir) */
   token?: string;
   /** Server Components: Next.js fetch cache (ISR). Brauzerdə ignore olunur. */
   next?: {
@@ -62,29 +70,28 @@ interface RequestOptions extends Omit<RequestInit, 'next'> {
   };
 }
 
-// Bir vaxtda yalnız bir refresh sorğusu getsin deyə (eyni access token ilə
-// paralel çağırışlar) nəticə paylaşılan promise ilə keşlənir.
 let refreshPromise: Promise<string | null> | null = null;
 
 async function refreshAccessToken(): Promise<string | null> {
-  const { tokens, setAuth, logout } = useAuthStore.getState();
-  if (!tokens?.refreshToken) return null;
+  const { session, setAuth, logout } = useAuthStore.getState();
+  if (!session) return null;
 
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
         const response = await fetch(`${API_URL}${API_PREFIX}/auth/refresh`, {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+          body: JSON.stringify({}),
         });
         if (!response.ok) {
           logout();
           return null;
         }
         const data: AuthResponse = await response.json();
-        setAuth(data.user, data.tokens);
-        return data.tokens.accessToken;
+        setAuth(data.user);
+        return 'session';
       } catch {
         logout();
         return null;
@@ -103,22 +110,22 @@ export async function apiClient<T>(
   allowRefresh = true,
 ): Promise<T> {
   const { token, headers, ...rest } = options;
+  const isFormData = typeof FormData !== 'undefined' && rest.body instanceof FormData;
 
   const response = await fetch(`${API_URL}${API_PREFIX}${endpoint}`, {
     ...rest,
-    // Auth-lu cavablar heç vaxt paylaşılan keşə düşməsin
+    credentials: 'include',
     ...(token ? { cache: 'no-store' as const } : {}),
     headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...headers,
     },
   });
 
   if (response.status === 401 && token && allowRefresh) {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
-      return apiClient<T>(endpoint, { ...options, token: newToken }, false);
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      return apiClient<T>(endpoint, { ...options, token: refreshed }, false);
     }
   }
 
@@ -146,6 +153,22 @@ export async function apiClient<T>(
   return JSON.parse(text) as T;
 }
 
+export async function uploadImage(
+  token: string,
+  file: File,
+  folder: 'services' | 'avatars' | 'bookings',
+): Promise<string> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('folder', folder);
+  const result = await apiClient<{ url: string }>('/uploads', {
+    method: 'POST',
+    token,
+    body: form,
+  });
+  return result.url;
+}
+
 export const api = {
   health: () => apiClient<{ status: string }>('/health'),
 
@@ -158,12 +181,45 @@ export const api = {
     login: (data: LoginInput) =>
       apiClient<AuthResponse>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, clientApp: CLIENT_APP.MARKETPLACE }),
+        headers: { [CLIENT_APP_HEADER]: CLIENT_APP.MARKETPLACE },
       }),
-    refresh: (refreshToken: string) =>
+    refresh: () =>
       apiClient<AuthResponse>('/auth/refresh', {
         method: 'POST',
-        body: JSON.stringify({ refreshToken }),
+        body: JSON.stringify({}),
+        token: 'session',
+      }),
+    logout: () =>
+      apiClient<{ message: string }>('/auth/logout', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      }),
+    forgotPassword: (data: ForgotPasswordInput) =>
+      apiClient<{ message: string; mailDelivered?: boolean; previewCode?: string }>(
+        '/auth/forgot-password',
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+        },
+      ),
+    resetPassword: (data: { email: string; code: string; newPassword: string }) =>
+      apiClient<{ message: string }>('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    requestEmailVerification: (data: RequestEmailVerificationInput) =>
+      apiClient<{ message: string; mailDelivered?: boolean; previewCode?: string }>(
+        '/auth/verify-email/request',
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+        },
+      ),
+    confirmEmailVerification: (data: ConfirmEmailVerificationInput) =>
+      apiClient<{ message: string; user: AuthResponse['user'] }>('/auth/verify-email/confirm', {
+        method: 'POST',
+        body: JSON.stringify(data),
       }),
   },
 
@@ -403,6 +459,13 @@ export const api = {
       apiClient<BookingAttentionSummary>('/notifications/booking-unread-count', { token }),
     markBookingReadAll: (token: string) =>
       apiClient<{ markedCount: number }>('/notifications/booking-read-all', {
+        method: 'POST',
+        token,
+      }),
+    reviewUnreadCount: (token: string) =>
+      apiClient<BookingAttentionSummary>('/notifications/review-unread-count', { token }),
+    markReviewReadAll: (token: string) =>
+      apiClient<{ markedCount: number }>('/notifications/review-read-all', {
         method: 'POST',
         token,
       }),

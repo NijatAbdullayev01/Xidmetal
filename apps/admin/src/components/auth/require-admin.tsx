@@ -7,14 +7,15 @@ import { Loader2 } from 'lucide-react';
 import { UserRole } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
 import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
+import { useLogout } from '@/hooks/use-logout';
 
-/** Yalnız ADMIN — digər rollar dərhal logout + login */
+/** Yalnız ADMIN — digər rollar dərhal logout (cookie + store) + login */
 export function RequireAdmin({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const hydrated = useAuthHydrated();
   const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
+  const logout = useLogout();
 
   useEffect(() => {
     if (!hydrated) return;

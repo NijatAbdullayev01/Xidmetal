@@ -50,6 +50,20 @@ export class NotificationsController {
     return this.notificationsService.markBookingNotificationsRead(userId);
   }
 
+  @Get('review-unread-count')
+  @ApiOperation({ summary: 'Rəy bildirişləri sayı (provider reytinq badge)' })
+  @Roles(UserRole.PROVIDER)
+  getReviewUnreadCount(@CurrentUser('id') userId: string) {
+    return this.notificationsService.getReviewAttentionCount(userId);
+  }
+
+  @Post('review-read-all')
+  @ApiOperation({ summary: 'Rəy bildirişlərini oxundu et' })
+  @Roles(UserRole.PROVIDER)
+  markReviewReadAll(@CurrentUser('id') userId: string) {
+    return this.notificationsService.markReviewNotificationsRead(userId);
+  }
+
   @Patch(':id/read')
   @ApiOperation({ summary: 'Admin bildirişini oxundu et' })
   markRead(@Param('id') id: string, @CurrentUser('id') userId: string) {

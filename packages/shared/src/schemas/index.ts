@@ -54,15 +54,46 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Şifrə tələb olunur'),
 });
 
+const verificationCodeSchema = z
+  .string()
+  .length(6, 'Təsdiq kodu 6 rəqəm olmalıdır')
+  .regex(/^\d{6}$/, 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır');
+
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+
+export const resetPasswordSchema = z
+  .object({
+    email: emailSchema,
+    code: verificationCodeSchema,
+    newPassword: passwordSchema,
+    confirmNewPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmNewPassword, {
+    message: 'Şifrələr uyğun gəlmir',
+    path: ['confirmNewPassword'],
+  });
+
+export const requestEmailVerificationSchema = z.object({
+  email: emailSchema,
+});
+
+export const confirmEmailVerificationSchema = z.object({
+  email: emailSchema,
+  code: verificationCodeSchema,
+});
+
+export const logoutSchema = z.object({
+  refreshToken: z.string().min(1, 'Refresh token tələb olunur'),
+});
+
 const imageUrlSchema = z
   .string()
-  .max(2_000_000, 'Şəkil çox böyükdür')
+  .max(2048, 'Şəkil URL çox uzundur')
   .refine(
-    (val) =>
-      val.startsWith('data:image/') ||
-      val.startsWith('http://') ||
-      val.startsWith('https://'),
-    'Düzgün şəkil formatı daxil edin',
+    (val) => val.startsWith('http://') || val.startsWith('https://'),
+    'Şəkil əvvəlcə yüklənməlidir (http/https URL)',
   );
 
 /** Xidmət elanına əlavə oluna bilən maksimum şəkil sayı */
@@ -286,6 +317,11 @@ export const adminReviewsQuerySchema = paginationSchema.extend({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type RequestEmailVerificationInput = z.infer<typeof requestEmailVerificationSchema>;
+export type ConfirmEmailVerificationInput = z.infer<typeof confirmEmailVerificationSchema>;
+export type LogoutInput = z.infer<typeof logoutSchema>;
 export type CreateServiceInput = z.infer<typeof createServiceSchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type RescheduleBookingInput = z.infer<typeof rescheduleBookingSchema>;

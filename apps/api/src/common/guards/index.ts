@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
-import { IS_PUBLIC_KEY, ROLES_KEY } from '../decorators';
+import { IS_PUBLIC_KEY, REQUIRE_EMAIL_VERIFIED_KEY, ROLES_KEY } from '../decorators';
 import { UserRole } from '@xidmetal/shared';
 
 @Injectable()
@@ -67,6 +67,43 @@ export class RolesGuard implements CanActivate {
     const hasRole = requiredRoles.includes(user.role);
     if (!hasRole) {
       throw new ForbiddenException('Bu əməliyyat üçün icazəniz yoxdur');
+    }
+
+    return true;
+  }
+}
+
+/**
+ * Marketplace yazma əməliyyatları üçün e-poçt təsdiqi.
+ * Login soft qalır; sifariş/mesaj/rəy/upload/xidmət yaratma təsdiq tələb edir.
+ * ADMIN bypass.
+ */
+@Injectable()
+export class EmailVerifiedGuard implements CanActivate {
+  constructor(@Inject(Reflector) private reflector: Reflector) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    const required = this.reflector.getAllAndOverride<boolean>(REQUIRE_EMAIL_VERIFIED_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (!required) return true;
+
+    const { user } = context.switchToHttp().getRequest<{
+      user?: { role?: string; isVerified?: boolean };
+    }>();
+
+    if (!user) {
+      throw new ForbiddenException('Bu əməliyyat üçün icazəniz yoxdur');
+    }
+
+    if (user.role === UserRole.ADMIN) return true;
+
+    if (!user.isVerified) {
+      throw new ForbiddenException(
+        'Bu əməliyyat üçün e-poçt ünvanınızı təsdiqləyin',
+      );
     }
 
     return true;

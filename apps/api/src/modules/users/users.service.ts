@@ -10,6 +10,8 @@ import { randomInt } from 'crypto';
 import { EmailVerificationPurpose, UserRole } from '@prisma/client';
 import { PrismaService } from '../../common/database/prisma.service';
 import { MailService } from '../../common/mail/mail.service';
+import { assertValidEmailCode } from '../../common/auth/email-verification-codes';
+import { StorageService } from '../../common/storage/storage.service';
 import {
   ChangePasswordDto,
   UpdateProfileDto,
@@ -24,6 +26,7 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
+    private storageService: StorageService,
   ) {}
 
   async findById(id: string) {
@@ -66,13 +69,7 @@ export class UsersService {
     if (!existing) throw new NotFoundException('İstifadəçi tapılmadı');
 
     if (dto.avatarUrl !== undefined && dto.avatarUrl !== null && dto.avatarUrl !== '') {
-      const isValidAvatar =
-        dto.avatarUrl.startsWith('data:image/') ||
-        dto.avatarUrl.startsWith('http://') ||
-        dto.avatarUrl.startsWith('https://');
-      if (!isValidAvatar) {
-        throw new BadRequestException('Düzgün şəkil formatı daxil edin');
-      }
+      this.storageService.assertAllowedMediaUrl(dto.avatarUrl);
     }
 
     if (dto.experience !== undefined && existing.role !== UserRole.PROVIDER) {
@@ -89,6 +86,10 @@ export class UsersService {
         throw new ConflictException('Bu telefon nömrəsi artıq istifadə olunur');
       }
     }
+
+    const previousAvatarUrl = existing.avatarUrl;
+    const nextAvatarUrl =
+      dto.avatarUrl !== undefined ? dto.avatarUrl || null : previousAvatarUrl;
 
     const user = await this.prisma.user.update({
       where: { id: userId },
@@ -123,6 +124,14 @@ export class UsersService {
       },
     });
 
+    if (
+      dto.avatarUrl !== undefined &&
+      previousAvatarUrl &&
+      previousAvatarUrl !== nextAvatarUrl
+    ) {
+      await this.storageService.deleteByPublicUrl(previousAvatarUrl);
+    }
+
     return this.mapUserProfile(user);
   }
 
@@ -144,7 +153,7 @@ export class UsersService {
     await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: userId },
-        data: { passwordHash },
+        data: { passwordHash, passwordChangedAt: new Date() },
       }),
       // Şifrə dəyişəndə oğurlanmış refresh token-lər etibarsızlaşsın deyə
       // bütün mövcud sessiyaları ləğv edirik.
@@ -187,9 +196,14 @@ export class UsersService {
       }),
     ]);
 
-    await this.mailService.sendEmailChangeCode(newEmail, code);
+    const mail = await this.mailService.sendEmailChangeCode(newEmail, code);
 
-    return { message: 'Təsdiq kodu yeni e-poçt ünvanına göndərildi' };
+    return {
+      message: mail.delivered
+        ? 'Təsdiq kodu yeni e-poçt ünvanına göndərildi'
+        : 'SMTP qurulmayıb — təsdiq kodu server loguna yazıldı (DEV)',
+      ...(mail.previewCode ? { previewCode: mail.previewCode } : {}),
+    };
   }
 
   async confirmEmailChange(userId: string, dto: ConfirmEmailChangeDto) {
@@ -197,28 +211,12 @@ export class UsersService {
     if (!user) throw new NotFoundException('İstifadəçi tapılmadı');
 
     const newEmail = dto.newEmail.trim().toLowerCase();
-    const verification = await this.prisma.emailVerificationCode.findFirst({
-      where: {
-        userId,
-        email: newEmail,
-        purpose: EmailVerificationPurpose.EMAIL_CHANGE,
-      },
-      orderBy: { createdAt: 'desc' },
+    await assertValidEmailCode(this.prisma, {
+      userId,
+      email: newEmail,
+      purpose: EmailVerificationPurpose.EMAIL_CHANGE,
+      code: dto.code,
     });
-
-    if (!verification) {
-      throw new BadRequestException('Təsdiq kodu tapılmadı. Yenidən kod tələb edin');
-    }
-
-    if (verification.expiresAt < new Date()) {
-      await this.prisma.emailVerificationCode.delete({ where: { id: verification.id } });
-      throw new BadRequestException('Təsdiq kodunun müddəti bitib. Yenidən kod tələb edin');
-    }
-
-    const validCode = await bcrypt.compare(dto.code, verification.codeHash);
-    if (!validCode) {
-      throw new BadRequestException('Təsdiq kodu səhvdir');
-    }
 
     const existing = await this.prisma.user.findUnique({ where: { email: newEmail } });
     if (existing && existing.id !== userId) {
@@ -236,7 +234,7 @@ export class UsersService {
 
       return tx.user.update({
         where: { id: userId },
-        data: { email: newEmail },
+        data: { email: newEmail, isVerified: true },
         select: {
           id: true,
           email: true,

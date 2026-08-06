@@ -676,6 +676,11 @@ export class AdminService {
 
     const title = dto.title.trim();
     const body = dto.body.trim();
+    const href = dto.href?.trim();
+    const safeHref =
+      href && href.startsWith('/') && !href.startsWith('//') && !href.includes('://')
+        ? href
+        : undefined;
 
     await this.prisma.notification.createMany({
       data: users.map((u) => ({
@@ -683,7 +688,10 @@ export class AdminService {
         type: NotificationType.ADMIN_ANNOUNCEMENT,
         title,
         body,
-        data: { source: 'admin' } as Prisma.InputJsonValue,
+        data: {
+          source: 'admin',
+          ...(safeHref ? { href: safeHref } : {}),
+        } as Prisma.InputJsonValue,
       })),
     });
 

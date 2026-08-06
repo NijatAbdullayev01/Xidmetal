@@ -6,6 +6,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/database/prisma.service';
+import { StorageService } from '../../common/storage/storage.service';
 import { CreateServiceDto, UpdateServiceDto, ServiceQueryDto } from './dto';
 import {
   UserRole,
@@ -21,17 +22,12 @@ import { BookingStatus, ReviewStatus, ServiceStatus } from '@prisma/client';
 
 const SERVICE_IMAGES_INCLUDE = { orderBy: { sortOrder: 'asc' as const } };
 
-function isValidImageUrl(url: string): boolean {
-  return (
-    url.startsWith('data:image/') ||
-    url.startsWith('http://') ||
-    url.startsWith('https://')
-  );
-}
-
 @Injectable()
 export class ServicesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private storageService: StorageService,
+  ) {}
 
   async findMine(providerId: string, query: ServiceQueryDto) {
     const { page = 1, limit = 20, categoryId, search } = query;
@@ -97,6 +93,7 @@ export class ServicesService {
 
     const where = {
       status: ServiceStatus.ACTIVE,
+      category: { isActive: true },
       ...(categoryId && { categoryId }),
       ...(providerId && { providerId }),
       ...(search && {
@@ -179,6 +176,9 @@ export class ServicesService {
     if (service.status !== ServiceStatus.ACTIVE && !isOwner && !isAdmin) {
       throw new NotFoundException('Xidmət tapılmadı');
     }
+    if (!service.category.isActive && !isOwner && !isAdmin) {
+      throw new NotFoundException('Xidmət tapılmadı');
+    }
 
     const reviewStats = await this.getReviewStatsByService([service.id]);
     const stats = reviewStats.get(service.id);
@@ -196,6 +196,9 @@ export class ServicesService {
     });
     if (!category) {
       throw new NotFoundException('Kateqoriya tapılmadı');
+    }
+    if (!category.isActive) {
+      throw new BadRequestException('Bu kateqoriya hazırda aktiv deyil');
     }
 
     await this.assertNoDuplicateService(providerId, dto.categoryId, dto.title);
@@ -267,6 +270,9 @@ export class ServicesService {
       });
       if (!category) {
         throw new NotFoundException('Kateqoriya tapılmadı');
+      }
+      if (!category.isActive) {
+        throw new BadRequestException('Bu kateqoriya hazırda aktiv deyil');
       }
     }
 
@@ -362,10 +368,30 @@ export class ServicesService {
       }
     }
 
+    if (dto.status === ServiceStatus.ACTIVE && role !== UserRole.ADMIN) {
+      const profile = await this.prisma.providerProfile.findUnique({
+        where: { userId: service.providerId },
+        select: { isVerified: true },
+      });
+      if (!profile?.isVerified) {
+        throw new ForbiddenException(
+          'Xidməti aktivləşdirmək üçün hesabınız admin tərəfindən təsdiqlənməlidir',
+        );
+      }
+    }
+
     const { images, vehicleLength, vehicleWidth, vehicleHeight, cargoRouteScope, ...serviceFields } =
       dto;
     const normalizedImages =
       images !== undefined ? this.normalizeServiceImages(images) : undefined;
+
+    const previousImages =
+      normalizedImages !== undefined
+        ? await this.prisma.serviceImage.findMany({
+            where: { serviceId: id },
+            select: { url: true },
+          })
+        : [];
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (normalizedImages !== undefined) {
@@ -410,6 +436,14 @@ export class ServicesService {
       });
     });
 
+    if (normalizedImages !== undefined) {
+      const kept = new Set(normalizedImages);
+      const orphaned = previousImages
+        .map((image) => image.url)
+        .filter((url) => !kept.has(url));
+      await this.storageService.deleteManyByPublicUrls(orphaned);
+    }
+
     return this.mapService({ ...updated, provider: undefined });
   }
 
@@ -441,7 +475,13 @@ export class ServicesService {
       return { message: 'Xidmət arxivləndi' };
     }
 
+    const images = await this.prisma.serviceImage.findMany({
+      where: { serviceId: id },
+      select: { url: true },
+    });
+
     await this.prisma.service.delete({ where: { id } });
+    await this.storageService.deleteManyByPublicUrls(images.map((image) => image.url));
     return { message: 'Xidmət silindi' };
   }
 
@@ -676,9 +716,7 @@ export class ServicesService {
       );
     }
     for (const url of images) {
-      if (!isValidImageUrl(url)) {
-        throw new BadRequestException('Düzgün şəkil formatı daxil edin');
-      }
+      this.storageService.assertAllowedMediaUrl(url);
     }
     return images;
   }

@@ -10,7 +10,7 @@ import { LiveToastHost } from '@/components/notifications/live-toast';
  * və mesaj/sifariş siyahılarının avtomatik yenilənməsi.
  */
 export function AttentionProvider({ children }: { children: React.ReactNode }) {
-  const enabled = useAuthStore((state) => Boolean(state.tokens?.accessToken && state.user));
+  const enabled = useAuthStore((state) => Boolean(state.session && state.user));
   const { toasts, dismissToast } = useLiveAttention(enabled);
 
   return (

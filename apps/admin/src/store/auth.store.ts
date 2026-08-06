@@ -1,30 +1,33 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { UserProfile, AuthTokens } from '@xidmetal/shared';
+import type { UserProfile } from '@xidmetal/shared';
 
 interface AuthState {
   user: UserProfile | null;
-  tokens: AuthTokens | null;
-  setAuth: (user: UserProfile, tokens: AuthTokens) => void;
+  session: boolean;
+  setAuth: (user: UserProfile) => void;
   updateUser: (updates: Partial<UserProfile>) => void;
   logout: () => void;
   isAuthenticated: () => boolean;
 }
 
-/** Marketplace (`xidmetal-auth`) ilə eyni localStorage açarını paylaşmır */
+/** Marketplace (`xidmetal-auth-v2`) ilə eyni localStorage açarını paylaşmır */
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
-      tokens: null,
-      setAuth: (user, tokens) => set({ user, tokens }),
+      session: false,
+      setAuth: (user) => set({ user, session: true }),
       updateUser: (updates) =>
         set((state) => ({
           user: state.user ? { ...state.user, ...updates } : null,
         })),
-      logout: () => set({ user: null, tokens: null }),
-      isAuthenticated: () => !!get().tokens?.accessToken,
+      logout: () => set({ user: null, session: false }),
+      isAuthenticated: () => get().session && !!get().user,
     }),
-    { name: 'xidmetal-admin-auth' },
+    {
+      name: 'xidmetal-admin-auth-v2',
+      partialize: (state) => ({ user: state.user, session: state.session }),
+    },
   ),
 );

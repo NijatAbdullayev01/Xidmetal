@@ -19,7 +19,7 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const hydrated = useAuthHydrated();
   const user = useAuthStore((state) => state.user);
-  const token = useAuthStore((state) => state.tokens?.accessToken);
+  const token = useAuthStore((state) => (state.session && state.user ? 'session' : null));
   const setAuth = useAuthStore((state) => state.setAuth);
   const logout = useAuthStore((state) => state.logout);
   const [showPassword, setShowPassword] = useState(false);
@@ -44,15 +44,14 @@ export default function AdminLoginPage() {
     setServerError(null);
     try {
       const response = await api.auth.login(values);
-      if (response.user.role !== UserRole.ADMIN) {
-        logout();
-        setServerError('Bu panel yalnız administrator üçündür');
-        return;
-      }
-      setAuth(response.user, response.tokens);
+      setAuth(response.user);
       router.replace('/');
     } catch (error) {
       if (error instanceof ApiError) {
+        if (error.status === 403) {
+          // Audience rəddində API cookie silib; Zustand-ı da təmizlə
+          logout();
+        }
         setServerError(error.message);
       } else {
         setServerError('Daxil olmaq mümkün olmadı');

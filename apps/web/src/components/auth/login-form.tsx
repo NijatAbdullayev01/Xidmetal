@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { loginSchema, UserRole, type LoginInput } from '@xidmetal/shared';
+import { loginSchema, type LoginInput } from '@xidmetal/shared';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,16 +37,12 @@ export function LoginForm() {
 
     try {
       const response = await api.auth.login(values);
-      if (response.user.role === UserRole.ADMIN) {
-        setAdminHint(getAdminAppUrl());
-        setServerError(
-          'Administrator hesabı marketplace-ə aid deyil. Admin panelinə keçin.',
-        );
-        return;
-      }
-      setAuth(response.user, response.tokens);
+      setAuth(response.user);
     } catch (error) {
       if (error instanceof ApiError) {
+        if (error.status === 403) {
+          setAdminHint(getAdminAppUrl());
+        }
         setServerError(error.message);
       } else {
         setServerError('Daxil olmaq mümkün olmadı. Yenidən cəhd edin.');
@@ -102,6 +98,14 @@ export function LoginForm() {
             {errors.password.message}
           </p>
         )}
+        <div className="flex justify-end">
+          <Link
+            href="/forgot-password"
+            className="text-xs font-medium text-brand-dark hover:underline sm:text-sm"
+          >
+            Şifrəni unutdum?
+          </Link>
+        </div>
       </div>
 
       {serverError && (

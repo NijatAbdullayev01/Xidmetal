@@ -1,6 +1,6 @@
-import { IsUUID, IsString, IsOptional, IsEnum, IsDateString, MaxLength, MinLength, Min, Max } from 'class-validator';
+import { IsUUID, IsString, IsOptional, IsEnum, IsDateString, MaxLength, MinLength, Min, Max, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { BookingStatus } from '@xidmetal/shared';
 
 export class CreateBookingDto {
@@ -24,10 +24,10 @@ export class CreateBookingDto {
   @MaxLength(500)
   address?: string;
 
-  @ApiPropertyOptional({ description: 'Görüləcək işin şəkli (data URL və ya http URL)' })
+  @ApiPropertyOptional({ description: 'Görüləcək işin şəkli (http/https URL)' })
   @IsOptional()
   @IsString()
-  @MaxLength(2_000_000)
+  @MaxLength(2048)
   imageUrl?: string;
 }
 
@@ -66,4 +66,25 @@ export class BookingQueryDto {
   @IsOptional()
   @IsEnum(BookingStatus)
   status?: BookingStatus;
+
+  @ApiPropertyOptional({
+    description: 'Vergüllə ayrılmış statuslar (məs. CONFIRMED,IN_PROGRESS). `status`-dan üstündür.',
+    example: 'CONFIRMED,IN_PROGRESS',
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    if (Array.isArray(value)) {
+      return value.map(String);
+    }
+    if (typeof value === 'string') {
+      return value
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean);
+    }
+    return undefined;
+  })
+  @IsArray()
+  @IsEnum(BookingStatus, { each: true })
+  statuses?: BookingStatus[];
 }

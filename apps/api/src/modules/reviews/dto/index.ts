@@ -3,6 +3,7 @@ import {
   IsUUID,
   IsInt,
   IsString,
+  IsEnum,
   Min,
   Max,
   MinLength,
@@ -10,6 +11,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { ReviewStatus } from '@prisma/client';
 
 export class CreateReviewDto {
   @ApiProperty()
@@ -50,4 +52,10 @@ export class ReviewQueryDto {
   @IsOptional()
   @IsUUID()
   serviceId?: string;
+
+  /** Provider received üçün: PENDING | APPROVED | REJECTED */
+  @ApiPropertyOptional({ enum: ReviewStatus })
+  @IsOptional()
+  @IsEnum(ReviewStatus)
+  status?: ReviewStatus;
 }

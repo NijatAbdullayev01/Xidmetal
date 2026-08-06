@@ -6,24 +6,28 @@ Bu sənəd hədəf arxitekturaya çatmaq üçün mərhələli, prioritetləşdir
 
 > **Cari baza (2026-08):** scheduled marketplace MVP — auth, services, availability, bookings (əsas state machine), reviews, messages (REST), in-app notifications. Aşağıdakı checkbox-lar hədəf on-demand yoluna nisbətən yenilənib.
 
+> **Məhsul qərarı (rol):** bir hesab = bir rol (`CUSTOMER` **və ya** `PROVIDER`). Eyni hesabla müştəridən xidmət verənə keçid / dual-role **yoxdur** — bu boşluq deyil, qəsdən qərardır. Xidmət verən olmaq üçün ayrı qeydiyyat. Ətraflı: [ARCHITECTURE.md](./ARCHITECTURE.md) § Rollar.
+
 ---
 
 ## Faza 0 — Bünövrə & təhlükəsizlik (əvvəlcə)
-- [ ] Test infrastrukturu: Vitest + Supertest qurulumu.
-- [ ] CI: lint + typecheck + test (GitHub Actions).
+- [x] Test infrastrukturu: Vitest (unit) qurulumu; kritik auth/storage helper-lər.
+- [x] CI: lint + typecheck + test + build (GitHub Actions).
 - [ ] Structured logging (`pino`) + Sentry.
-- [ ] Production migration axını: `prisma migrate deploy` (hazırda yalnız `db:push`).
+- [x] Production migration axını: `prisma migrate deploy` (`pnpm db:migrate:deploy`).
+- [x] Auth/security hardening: cookie-only tokens, clientApp audience, refresh family revoke, passwordChangedAt, JWT prod fail-fast, media URL allowlist, `/health/ready`, API Dockerfile.
+
 
 ## Faza 1 — Domain tamlığı (mövcud boşluqlar)
-- [x] **Reviews modulu** — yaratma + rating aggregate (transaction); moderation hələ yox.
-- [x] **Notifications modulu** — in-app siyahı + oxundu; push/SMS və bütün tip emit-ləri hələ natamam.
+- [x] **Reviews modulu** — yaratma + rating aggregate (transaction); admin moderation var.
+- [x] **Notifications modulu** — in-app siyahı + oxundu; push/SMS hələ yox.
 - [x] **Messages modulu** — REST chat (WebSocket ayrı fazada).
 - [x] **Booking state machine (əsas)** — icazəli keçidlər + rol matrisi (`PENDING`…`COMPLETED`); admin bypass.
 - [ ] Booking lifecycle tam hədəf: `EN_ROUTE`, `ARRIVED`; `BookingType` (INSTANT/SCHEDULED); timestamp sahələri.
-- [ ] Bildiriş tamlığı: `BOOKING_COMPLETED`, `REVIEW_RECEIVED` (admin announce ✅).
+- [x] Bildiriş tamlığı: `BOOKING_COMPLETED`, `REVIEW_RECEIVED`, ləğv emit-ləri (admin announce ✅).
 - [x] Admin səthi: kateqoriya CRUD, provider verify, rəy moderation, stats, user/service idarə, announce API.
-- [ ] Auth tamamlığı: logout/revoke, şifrə unutma, qeydiyyat email verify.
-
+- [x] Auth tamamlığı: logout/revoke, şifrə unutma, qeydiyyat email verify (yazma əməliyyatları üçün məcburi; login soft).
+- [x] Booking slot race: advisory lock + transaction re-check; upload throttle/orphan GC; Swagger prod gate.
 ## Faza 2 — Geospatial
 - [ ] PostGIS extension + `ProviderProfile` mövqe sahələri + availability.
 - [ ] `geo` modulu: geokodlaşdırma, `ST_DWithin` yaxınlıq sorğuları.
@@ -42,12 +46,13 @@ Bu sənəd hədəf arxitekturaya çatmaq üçün mərhələli, prioritetləşdir
 - [ ] Presence (online/offline) idarəetməsi (hazırda yalnız `heartbeat` / `lastSeenAt`).
 
 ## Faza 5 — Ödəniş & bildiriş kanalları
-- [ ] `payments` modulu: intent + hold/capture + komissiya + refund.
+> **Cari məhsul qərarı (2026-08):** Platforma **ödənişsizdir** — xidmət verənlərdən komissiya/abunə alınmır; tərəflər öz aralarında razılaşır. Daxili ödəniş modulunun tətbiqi gələcək məhsul qərarından asılıdır.
+- [ ] `payments` modulu (opsional gələcək): intent + hold/capture + komissiya + refund.
 - [ ] İdempotency açarları.
 - [ ] Push (FCM) + SMS (OTP/status) inteqrasiyası.
 
 ## Faza 6 — Miqyas & keyfiyyət
-- [ ] Fayl saxlama (S3/R2) — şəkillər (hazırda çox vaxt base64 DB-də).
+- [x] Fayl saxlama (local + S3/R2 driver) — `POST /uploads`; magic-byte yoxlama + orphan silinmə.
 - [ ] E2E testlər (Playwright) — kritik axınlar.
 - [ ] Metrics/dashboards, yük testi.
 - [ ] (Opsional) `apps/mobile` — React Native.

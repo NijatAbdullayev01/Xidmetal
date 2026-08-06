@@ -1,28 +1,65 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { randomBytes } from 'crypto';
-import { Prisma } from '@prisma/client';
+import { randomBytes, randomInt } from 'crypto';
+import { EmailVerificationPurpose, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/database/prisma.service';
-import { RegisterDto, LoginDto } from './dto';
-import { UserRole } from '@xidmetal/shared';
+import { MailService, type MailSendResult } from '../../common/mail/mail.service';
+import {
+  RegisterDto,
+  LoginDto,
+  ResetPasswordDto,
+  ConfirmEmailVerificationDto,
+} from './dto';
+import { CLIENT_APP, UserRole, type ClientApp } from '@xidmetal/shared';
+import { parseDurationMs } from '../../common/auth/auth-cookies';
+import { assertValidEmailCode } from '../../common/auth/email-verification-codes';
+import { hashRefreshToken } from '../../common/auth/refresh-token';
 
 const UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
+const EMAIL_CODE_EXPIRY_MS = 15 * 60 * 1000;
 
+/** İstifadəçi enumeration / timing attack-ə qarşı vahid cavab */
+const FORGOT_PASSWORD_MESSAGE =
+  'Əgər bu e-poçt qeydiyyatdadırsa, təsdiq kodu göndərildi';
+const VERIFY_REQUEST_MESSAGE =
+  'Əgər bu e-poçt təsdiqlənməyibsə, təsdiq kodu göndərildi';
+
+/** Login timing pad — mövcud olmayan email üçün də bcrypt dəyəri */
+let timingPadHash: string | null = null;
+
+async function compareWithTimingPad(password: string, hash: string | null): Promise<boolean> {
+  if (hash) {
+    return bcrypt.compare(password, hash);
+  }
+  if (!timingPadHash) {
+    timingPadHash = await bcrypt.hash('__xidmetal_timing_pad__', 12);
+  }
+  await bcrypt.compare(password, timingPadHash);
+  return false;
+}
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private config: ConfigService,
+    private mailService: MailService,
   ) {}
 
   async register(dto: RegisterDto) {
+    const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findFirst({
       where: {
         OR: [
-          { email: dto.email },
+          { email },
           ...(dto.phone ? [{ phone: dto.phone }] : []),
         ],
       },
@@ -30,7 +67,7 @@ export class AuthService {
     });
 
     if (existing) {
-      if (existing.email === dto.email) {
+      if (existing.email === email) {
         throw new ConflictException('Bu e-poçt artıq qeydiyyatdan keçib');
       }
       throw new ConflictException('Bu telefon nömrəsi artıq qeydiyyatdan keçib');
@@ -47,12 +84,13 @@ export class AuthService {
     try {
       user = await this.prisma.user.create({
         data: {
-          email: dto.email,
+          email,
           passwordHash,
           firstName: dto.firstName,
           lastName: dto.lastName,
           phone: dto.phone,
           role,
+          isVerified: false,
           ...(role === UserRole.PROVIDER && {
             providerProfile: { create: {} },
           }),
@@ -68,31 +106,66 @@ export class AuthService {
       throw error;
     }
 
+    const mail = await this.issueEmailCode(
+      user.id,
+      user.email,
+      EmailVerificationPurpose.SIGNUP_VERIFY,
+      (to, code) => this.mailService.sendSignupVerificationCode(to, code),
+    );
+
     const tokens = await this.generateTokens(user.id, user.email, user.role);
-    return { user: this.sanitizeUser(user), tokens };
+    return {
+      user: this.sanitizeUser(user),
+      tokens,
+      ...this.mailMeta(mail),
+    };
   }
 
-  async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (!user || !user.isActive) {
+  async login(dto: LoginDto, clientApp?: ClientApp) {
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    const usable =
+      user && user.isActive && !user.deletedAt ? user : null;
+
+    const valid = await compareWithTimingPad(
+      dto.password,
+      usable?.passwordHash ?? null,
+    );
+    if (!usable || !valid) {
       throw new UnauthorizedException('E-poçt və ya şifrə səhvdir');
     }
 
-    const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) {
-      throw new UnauthorizedException('E-poçt və ya şifrə səhvdir');
-    }
+    this.assertClientAudience(usable.role, clientApp);
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role);
-    return { user: this.sanitizeUser(user), tokens };
+    const tokens = await this.generateTokens(usable.id, usable.email, usable.role);
+    return { user: this.sanitizeUser(usable), tokens };
+  }
+
+  /**
+   * Marketplace yalnız CUSTOMER/PROVIDER; admin panel yalnız ADMIN.
+   * Token/cookie audiense uyğun olmadan yaradılmır.
+   */
+  assertClientAudience(role: string, clientApp?: ClientApp): void {
+    if (!clientApp) return;
+
+    if (clientApp === CLIENT_APP.MARKETPLACE && role === UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'Administrator hesabı marketplace-ə aid deyil. Admin panelinə keçin.',
+      );
+    }
+    if (clientApp === CLIENT_APP.ADMIN && role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Bu panel yalnız administrator üçündür');
+    }
   }
 
   async refresh(refreshToken: string) {
+    const tokenHash = hashRefreshToken(refreshToken);
     const stored = await this.prisma.refreshToken.findUnique({
-      where: { token: refreshToken },
+      where: { token: tokenHash },
       select: {
         id: true,
         expiresAt: true,
+        userId: true,
         user: {
           select: {
             id: true,
@@ -104,22 +177,30 @@ export class AuthService {
             role: true,
             isVerified: true,
             isActive: true,
+            deletedAt: true,
             createdAt: true,
           },
         },
       },
     });
 
-    if (!stored || stored.expiresAt < new Date() || !stored.user.isActive) {
+    if (
+      !stored ||
+      stored.expiresAt < new Date() ||
+      !stored.user.isActive ||
+      stored.user.deletedAt
+    ) {
       throw new UnauthorizedException('Refresh token etibarsızdır');
     }
 
     // Atomic silinmə: eyni token ilə paralel refresh sorğularının hər ikisinin
     // yeni token cütlüyü yaratmasının (token reuse) qarşısını alır.
     const { count } = await this.prisma.refreshToken.deleteMany({
-      where: { id: stored.id, token: refreshToken },
+      where: { id: stored.id, token: tokenHash },
     });
     if (count === 0) {
+      // Reuse aşkarlandı — oğurlanmış refresh artıq işlədilmiş ola bilər; bütün ailəni ləğv et
+      await this.prisma.refreshToken.deleteMany({ where: { userId: stored.userId } });
       throw new UnauthorizedException('Refresh token etibarsızdır');
     }
 
@@ -131,33 +212,210 @@ export class AuthService {
     return { user: this.sanitizeUser(stored.user), tokens };
   }
 
+  /** Cari sessiyanı (refresh token) serverdə ləğv edir */
+  async logout(refreshToken: string) {
+    const tokenHash = hashRefreshToken(refreshToken);
+    await this.prisma.refreshToken.deleteMany({ where: { token: tokenHash } });
+    return { message: 'Çıxış edildi' };
+  }
+
+  /** İstifadəçinin bütün sessiyalarını ləğv edir */
+  async logoutAll(userId: string) {
+    await this.prisma.refreshToken.deleteMany({ where: { userId } });
+    return { message: 'Bütün cihazlardan çıxış edildi' };
+  }
+
+  async forgotPassword(email: string) {
+    const normalized = email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalized },
+      select: { id: true, email: true, isActive: true, deletedAt: true },
+    });
+
+    // Enumeration-a qarşı: həmişə eyni mesaj; previewCode yalnız mövcud user + DEV
+    if (user?.isActive && !user.deletedAt) {
+      const mail = await this.issueEmailCode(
+        user.id,
+        user.email,
+        EmailVerificationPurpose.PASSWORD_RESET,
+        (to, code) => this.mailService.sendPasswordResetCode(to, code),
+      );
+      return { message: FORGOT_PASSWORD_MESSAGE, ...this.mailMeta(mail) };
+    }
+
+    return { message: FORGOT_PASSWORD_MESSAGE };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, isActive: true, deletedAt: true },
+    });
+
+    if (!user || !user.isActive || user.deletedAt) {
+      throw new BadRequestException('Təsdiq kodu səhvdir və ya müddəti bitib');
+    }
+
+    await assertValidEmailCode(this.prisma, {
+      userId: user.id,
+      email,
+      purpose: EmailVerificationPurpose.PASSWORD_RESET,
+      code: dto.code,
+    });
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 12);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash, passwordChangedAt: new Date() },
+      }),
+      this.prisma.refreshToken.deleteMany({ where: { userId: user.id } }),
+      this.prisma.emailVerificationCode.deleteMany({
+        where: { userId: user.id, purpose: EmailVerificationPurpose.PASSWORD_RESET },
+      }),
+    ]);
+
+    return { message: 'Şifrə uğurla yeniləndi. Yenidən daxil olun' };
+  }
+
+  async requestEmailVerification(email: string) {
+    const normalized = email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalized },
+      select: { id: true, email: true, isActive: true, isVerified: true, deletedAt: true },
+    });
+
+    if (user?.isActive && !user.deletedAt && !user.isVerified) {
+      const mail = await this.issueEmailCode(
+        user.id,
+        user.email,
+        EmailVerificationPurpose.SIGNUP_VERIFY,
+        (to, code) => this.mailService.sendSignupVerificationCode(to, code),
+      );
+      return { message: VERIFY_REQUEST_MESSAGE, ...this.mailMeta(mail) };
+    }
+
+    return { message: VERIFY_REQUEST_MESSAGE };
+  }
+
+  async confirmEmailVerification(dto: ConfirmEmailVerificationDto) {
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        avatarUrl: true,
+        role: true,
+        isVerified: true,
+        isActive: true,
+        deletedAt: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user || !user.isActive || user.deletedAt) {
+      throw new BadRequestException('Təsdiq kodu səhvdir və ya müddəti bitib');
+    }
+
+    if (user.isVerified) {
+      return {
+        message: 'E-poçt artıq təsdiqlənib',
+        user: this.sanitizeUser(user),
+      };
+    }
+
+    await assertValidEmailCode(this.prisma, {
+      userId: user.id,
+      email,
+      purpose: EmailVerificationPurpose.SIGNUP_VERIFY,
+      code: dto.code,
+    });
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.emailVerificationCode.deleteMany({
+        where: { userId: user.id, purpose: EmailVerificationPurpose.SIGNUP_VERIFY },
+      });
+
+      return tx.user.update({
+        where: { id: user.id },
+        data: { isVerified: true },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          avatarUrl: true,
+          role: true,
+          isVerified: true,
+          createdAt: true,
+        },
+      });
+    });
+
+    return {
+      message: 'E-poçt uğurla təsdiqləndi',
+      user: this.sanitizeUser(updated),
+    };
+  }
+
+  private async issueEmailCode(
+    userId: string,
+    email: string,
+    purpose: EmailVerificationPurpose,
+    send: (email: string, code: string) => Promise<MailSendResult>,
+  ): Promise<MailSendResult> {
+    const code = randomInt(100000, 1000000).toString();
+    const codeHash = await bcrypt.hash(code, 10);
+    const expiresAt = new Date(Date.now() + EMAIL_CODE_EXPIRY_MS);
+
+    await this.prisma.$transaction([
+      this.prisma.emailVerificationCode.deleteMany({
+        where: { userId, purpose },
+      }),
+      this.prisma.emailVerificationCode.create({
+        data: { userId, email, codeHash, purpose, expiresAt },
+      }),
+    ]);
+
+    return send(email, code);
+  }
+
+  private mailMeta(mail: MailSendResult): {
+    mailDelivered: boolean;
+    previewCode?: string;
+  } {
+    return {
+      mailDelivered: mail.delivered,
+      ...(mail.previewCode ? { previewCode: mail.previewCode } : {}),
+    };
+  }
+
   private async generateTokens(userId: string, email: string, role: string) {
     const payload = { sub: userId, email, role };
 
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = randomBytes(64).toString('hex');
     const expiresIn = this.config.get<string>('JWT_REFRESH_EXPIRES_IN', '30d');
-    const expiresAt = new Date(Date.now() + this.parseDuration(expiresIn));
+    const expiresAt = new Date(
+      Date.now() + parseDurationMs(expiresIn, 30 * 24 * 60 * 60 * 1000),
+    );
 
     await this.prisma.refreshToken.create({
-      data: { token: refreshToken, userId, expiresAt },
+      data: {
+        token: hashRefreshToken(refreshToken),
+        userId,
+        expiresAt,
+      },
     });
 
     return { accessToken, refreshToken };
-  }
-
-  private parseDuration(duration: string): number {
-    const match = duration.match(/^(\d+)([dhms])$/);
-    if (!match) return 30 * 24 * 60 * 60 * 1000;
-    const [, value, unit] = match;
-    const num = parseInt(value!, 10);
-    const multipliers: Record<string, number> = {
-      d: 86400000,
-      h: 3600000,
-      m: 60000,
-      s: 1000,
-    };
-    return num * (multipliers[unit!] ?? 86400000);
   }
 
   private uniqueConstraintMessage(error: Prisma.PrismaClientKnownRequestError): string {

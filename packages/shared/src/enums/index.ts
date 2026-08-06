@@ -71,6 +71,12 @@ export const BOOKING_NOTIFICATION_TYPES = [
   NotificationType.BOOKING_RESCHEDULE_PROPOSED,
 ] as const;
 
+/** Provider reytinq / rəy badge-i */
+export const REVIEW_NOTIFICATION_TYPES = [NotificationType.REVIEW_RECEIVED] as const;
+
+/** Mesaj zəng / deep-link (söhbət oxunanda bağlanır) */
+export const MESSAGE_NOTIFICATION_TYPES = [NotificationType.MESSAGE_RECEIVED] as const;
+
 export enum AvailabilityOverrideType {
   AVAILABLE = 'AVAILABLE',
   BLOCKED = 'BLOCKED',

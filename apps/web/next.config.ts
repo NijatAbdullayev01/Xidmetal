@@ -5,15 +5,32 @@ import type { NextConfig } from 'next';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
+const apiOrigin = (
+  process.env.API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  'http://localhost:4000'
+).replace(/\/$/, '');
+
 const nextConfig: NextConfig = {
   transpilePackages: ['@xidmetal/shared'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**' },
+      { protocol: 'http', hostname: 'localhost' },
     ],
   },
-  // Next 15 default: dynamic segment staleTime = 0 → hər soft nav serverə gedir.
-  // Qısa client router cache ilə geri/irəli və təkrar keçidlər anlıq olur.
+  async rewrites() {
+    return [
+      {
+        source: '/api/v1/:path*',
+        destination: `${apiOrigin}/api/v1/:path*`,
+      },
+      {
+        source: '/uploads/:path*',
+        destination: `${apiOrigin}/uploads/:path*`,
+      },
+    ];
+  },
   experimental: {
     staleTimes: {
       dynamic: 30,

@@ -26,7 +26,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, uploadImage } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 import { useAuthStore } from '@/store/auth.store';
@@ -286,15 +286,18 @@ export function SettingsForm() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setAvatarPreview(reader.result);
-        setAvatarRemoved(false);
-      }
-    };
-    reader.onerror = () => setAvatarError('Şəkil oxunarkən xəta baş verdi');
-    reader.readAsDataURL(file);
+    if (!token) {
+      setAvatarError('Şəkil yükləmək üçün daxil olun');
+      return;
+    }
+
+    try {
+      const url = await uploadImage(token, file, 'avatars');
+      setAvatarPreview(url);
+      setAvatarRemoved(false);
+    } catch (error) {
+      setAvatarError(error instanceof ApiError ? error.message : 'Şəkil yüklənmədi');
+    }
   };
 
   const handleAvatarRemove = () => {

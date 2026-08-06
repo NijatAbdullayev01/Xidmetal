@@ -29,7 +29,7 @@ export function ServiceOrderButton({ service, className }: ServiceOrderButtonPro
   const router = useRouter();
   const pathname = usePathname();
   const hydrated = useAuthHydrated();
-  const accessToken = useAuthStore((state) => state.tokens?.accessToken);
+  const accessToken = useAuthStore((state) => (state.session && state.user ? 'session' : null));
   const userId = useAuthStore((state) => state.user?.id);
   const [open, setOpen] = useState(false);
   const pendingHandledRef = useRef(false);

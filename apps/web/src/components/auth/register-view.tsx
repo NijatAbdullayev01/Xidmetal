@@ -17,13 +17,15 @@ interface RegisterViewProps {
 export function RegisterView({ defaultRole }: RegisterViewProps) {
   const router = useRouter();
   const hydrated = useAuthHydrated();
-  const isAuthenticated = useAuthStore((state) => !!state.tokens?.accessToken);
+  const isAuthenticated = useAuthStore((state) => state.session && !!state.user);
   const user = useAuthStore((state) => state.user);
   const showSuccess = hydrated && isAuthenticated;
 
   useEffect(() => {
     if (!showSuccess || !user) return;
-    router.replace(getPostAuthRedirectPath(user.role));
+    router.replace(
+      user.isVerified ? getPostAuthRedirectPath(user.role) : '/verify-email',
+    );
   }, [showSuccess, user, router]);
 
   return (
@@ -31,7 +33,9 @@ export function RegisterView({ defaultRole }: RegisterViewProps) {
       title={showSuccess ? 'Xoş gəldiniz!' : 'Qeydiyyat'}
       description={
         showSuccess
-          ? 'Qeydiyyat uğurla tamamlandı. Sizi hesabınıza yönləndiririk…'
+          ? user?.isVerified
+            ? 'Qeydiyyat uğurla tamamlandı. Sizi hesabınıza yönləndiririk…'
+            : 'Qeydiyyat uğurla tamamlandı. E-poçt təsdiqinə yönləndirilirsiniz…'
           : 'Hesab növünü seçin və məlumatlarınızı daxil edin'
       }
     >

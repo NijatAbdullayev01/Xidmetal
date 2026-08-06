@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { getCategoryIcon } from '@/lib/category-icons';
 import type { AdminCategorySummary } from '@xidmetal/shared';
 
 export default function AdminCategoriesPage() {
@@ -191,46 +192,56 @@ export default function AdminCategoriesPage() {
             <p className="py-8 text-center text-sm text-muted-foreground">Yüklənir…</p>
           )}
           <ul className="divide-y divide-border">
-            {data?.map((cat) => (
-              <li
-                key={cat.id}
-                className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-lg" aria-hidden>
-                      {cat.icon}
-                    </span>
-                    <p className="font-medium">{cat.name}</p>
-                    <Badge variant={cat.isActive ? 'success' : 'muted'}>
-                      {cat.isActive ? 'Aktiv' : 'Deaktiv'}
-                    </Badge>
+            {data?.map((cat) => {
+              const Icon = getCategoryIcon(cat.slug);
+
+              return (
+                <li
+                  key={cat.id}
+                  className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand/35 to-brand/15 ring-1 ring-brand/25"
+                        aria-hidden
+                      >
+                        <Icon
+                          className="h-5 w-5 text-foreground"
+                          strokeWidth={1.75}
+                        />
+                      </div>
+                      <p className="font-medium">{cat.name}</p>
+                      <Badge variant={cat.isActive ? 'success' : 'muted'}>
+                        {cat.isActive ? 'Aktiv' : 'Deaktiv'}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      /{cat.slug} · {cat.serviceCount} xidmət · sıra {cat.sortOrder}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    /{cat.slug} · {cat.serviceCount} xidmət · sıra {cat.sortOrder}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="min-h-[44px]"
-                    onClick={() => startEdit(cat)}
-                  >
-                    Redaktə
-                  </Button>
-                  <Button
-                    variant={cat.isActive ? 'outline' : 'default'}
-                    size="sm"
-                    className="min-h-[44px]"
-                    disabled={toggleActive.isPending}
-                    onClick={() => toggleActive.mutate(cat)}
-                  >
-                    {cat.isActive ? 'Deaktiv et' : 'Aktiv et'}
-                  </Button>
-                </div>
-              </li>
-            ))}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="min-h-[44px]"
+                      onClick={() => startEdit(cat)}
+                    >
+                      Redaktə
+                    </Button>
+                    <Button
+                      variant={cat.isActive ? 'outline' : 'default'}
+                      size="sm"
+                      className="min-h-[44px]"
+                      disabled={toggleActive.isPending}
+                      onClick={() => toggleActive.mutate(cat)}
+                    >
+                      {cat.isActive ? 'Deaktiv et' : 'Aktiv et'}
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </CardContent>
       </Card>

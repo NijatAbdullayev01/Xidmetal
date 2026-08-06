@@ -15,7 +15,7 @@ export function RequireAuth({ children }: RequireAuthProps) {
   // `tokens` birbaşa seçilir — `isAuthenticated()` funksiya referansı sabit
   // olduğu üçün Zustand onun dəyişməsini aşkarlaya bilmirdi (logout-dan sonra
   // yenidən render olunmurdu).
-  const isAuthenticated = useAuthStore((state) => !!state.tokens?.accessToken);
+  const isAuthenticated = useAuthStore((state) => state.session && !!state.user);
   const hydrated = useAuthHydrated();
 
   useEffect(() => {

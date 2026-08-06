@@ -26,6 +26,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { useLogout } from '@/hooks/use-logout';
 import { useMessageNotifications } from '@/hooks/use-message-notifications';
 import { useBookingNotifications } from '@/hooks/use-booking-notifications';
+import { useReviewNotifications } from '@/hooks/use-review-notifications';
 import { NotificationsBell } from '@/components/notifications/notifications-bell';
 import { cn } from '@/lib/utils';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
@@ -75,6 +76,10 @@ function isBookingsNavItem(href: string) {
   return href.endsWith('/bookings');
 }
 
+function isRatingsNavItem(href: string) {
+  return href.endsWith('/ratings');
+}
+
 function NavBadge({
   count,
   active,
@@ -108,6 +113,9 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
   const logout = useLogout();
   const { unreadCount: unreadMessages } = useMessageNotifications(!!user);
   const { attentionCount: bookingAttention } = useBookingNotifications(!!user);
+  const { attentionCount: reviewAttention } = useReviewNotifications(
+    !!user && variant === 'provider',
+  );
 
   const navItems = variant === 'provider' ? PROVIDER_NAV : CUSTOMER_NAV;
   const roleLabel = ROLE_LABELS[variant];
@@ -155,6 +163,7 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
         const active = item.href === activeHref;
         const messageBadge = isMessagesNavItem(item.href);
         const bookingBadge = isBookingsNavItem(item.href);
+        const ratingsBadge = isRatingsNavItem(item.href);
         return (
           <Link
             key={item.href}
@@ -181,6 +190,13 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
                 count={bookingAttention}
                 active={active}
                 label={`${bookingAttention} yeni sifariş bildirişi`}
+              />
+            )}
+            {ratingsBadge && (
+              <NavBadge
+                count={reviewAttention}
+                active={active}
+                label={`${reviewAttention} yeni rəy`}
               />
             )}
           </Link>

@@ -1,4 +1,13 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength, Matches } from 'class-validator';
+import {
+  IsEmail,
+  IsEnum,
+  IsIn,
+  IsOptional,
+  IsString,
+  MinLength,
+  Matches,
+  Length,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '@xidmetal/shared';
 
@@ -46,10 +55,71 @@ export class LoginDto {
   @ApiProperty()
   @IsString()
   password!: string;
+
+  @ApiPropertyOptional({
+    enum: ['marketplace', 'admin'],
+    description: 'Klient audinesi — yanlış app-də session cookie qoyulmur',
+  })
+  @IsOptional()
+  @IsIn(['marketplace', 'admin'])
+  clientApp?: 'marketplace' | 'admin';
 }
 
 export class RefreshTokenDto {
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description: 'Opsional — httpOnly cookie varsa lazım deyil',
+  })
+  @IsOptional()
   @IsString()
-  refreshToken!: string;
+  refreshToken?: string;
+}
+
+export class LogoutDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  refreshToken?: string;
+}
+
+export class ForgotPasswordDto {
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail({}, { message: 'Düzgün e-poçt daxil edin' })
+  email!: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail({}, { message: 'Düzgün e-poçt daxil edin' })
+  email!: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @Length(6, 6, { message: 'Təsdiq kodu 6 rəqəm olmalıdır' })
+  @Matches(/^\d{6}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
+  code!: string;
+
+  @ApiProperty({ example: 'SecurePass1' })
+  @IsString()
+  @MinLength(8, { message: 'Şifrə minimum 8 simvol olmalıdır' })
+  @Matches(/[A-Z]/, { message: 'Şifrədə ən azı bir böyük hərf olmalıdır' })
+  @Matches(/[0-9]/, { message: 'Şifrədə ən azı bir rəqəm olmalıdır' })
+  newPassword!: string;
+}
+
+export class RequestEmailVerificationDto {
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail({}, { message: 'Düzgün e-poçt daxil edin' })
+  email!: string;
+}
+
+export class ConfirmEmailVerificationDto {
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail({}, { message: 'Düzgün e-poçt daxil edin' })
+  email!: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @Length(6, 6, { message: 'Təsdiq kodu 6 rəqəm olmalıdır' })
+  @Matches(/^\d{6}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
+  code!: string;
 }

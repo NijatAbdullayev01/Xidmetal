@@ -6,9 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ReviewListItem } from '@/components/reviews/review-list-item';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { useAckReviewNotifications } from '@/hooks/use-ack-review-notifications';
 
 export default function ProviderRatingsPage() {
   const token = useAuthToken();
+  useAckReviewNotifications(!!token);
 
   const { data: profile } = useQuery({
     queryKey: ['users', 'me'],
@@ -62,7 +64,7 @@ export default function ProviderRatingsPage() {
         <CardHeader>
           <CardTitle>Müştəri rəyləri</CardTitle>
           <CardDescription>
-            Təsdiqlənmiş rəylər burada göstərilir
+            Moderasiyada olan və təsdiqlənmiş rəylər burada göstərilir
           </CardDescription>
         </CardHeader>
         <CardContent>

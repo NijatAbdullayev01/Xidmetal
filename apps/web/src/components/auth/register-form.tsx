@@ -58,7 +58,7 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
       };
       const response = await api.auth.register(payload);
 
-      setAuth(response.user, response.tokens);
+      setAuth(response.user);
       // Tənzimləmələr / profil sorğusu dərhal qeydiyyat məlumatlarını görsün
       queryClient.setQueryData(['users', 'me'], response.user);
     } catch (error) {

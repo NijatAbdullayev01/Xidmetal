@@ -7,8 +7,8 @@ import {
 import { PrismaService } from '../../common/database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateConversationDto, SendMessageDto } from './dto';
-import { clearTyping, isPeerTyping, setTyping } from './typing.store';
-import { UserRole } from '@xidmetal/shared';
+import { clearTypingDb, isPeerTypingDb, setTypingDb } from './typing.store';
+import { UserRole, NotificationType } from '@xidmetal/shared';
 import type {
   ConversationDetail,
   ConversationSummary,
@@ -231,7 +231,7 @@ export class MessagesService {
       nextCursor,
       hasMore,
       peerPresence: this.mapPeerPresence(peer?.lastSeenAt ?? null),
-      peerTyping: isPeerTyping(id, userId),
+      peerTyping: await isPeerTypingDb(this.prisma, id, userId),
     };
   }
 
@@ -356,7 +356,7 @@ export class MessagesService {
       throw new NotFoundException('Söhbət tapılmadı');
     }
 
-    setTyping(conversationId, userId);
+    await setTypingDb(this.prisma, conversationId, userId);
     return { ok: true as const };
   }
 
@@ -408,7 +408,7 @@ export class MessagesService {
     });
 
     await this.notificationsService.markMessageNotificationsRead(userId, id);
-    clearTyping(id, userId);
+    await clearTypingDb(this.prisma, id, userId);
 
     return { ok: true as const };
   }
@@ -525,7 +525,12 @@ export class MessagesService {
       throw new BadRequestException('Mesaj boş ola bilməz');
     }
 
-    clearTyping(conversationId, userId);
+    await clearTypingDb(this.prisma, conversationId, userId);
+
+    const recipientId =
+      conversation.customerId === userId
+        ? conversation.providerId
+        : conversation.customerId;
 
     const message = await this.prisma.$transaction(async (tx) => {
       const created = await tx.message.create({
@@ -537,7 +542,6 @@ export class MessagesService {
         include: { sender: { select: { firstName: true, lastName: true } } },
       });
 
-      // Yeni mesaj hər iki tərəf üçün silinmiş söhbəti yenidən görünən edir
       await tx.conversation.update({
         where: { id: conversationId },
         data: {
@@ -547,7 +551,30 @@ export class MessagesService {
         },
       });
 
-      // Mesaj bildirişləri zəngdə deyil — oxunmamış sayı Mesajlarım badge-ində göstərilir
+      // Eyni söhbət üçün oxunmamış MESSAGE_RECEIVED varsa təkrar yazma (spam yox)
+      const existingUnread = await tx.notification.findFirst({
+        where: {
+          userId: recipientId,
+          type: NotificationType.MESSAGE_RECEIVED,
+          isRead: false,
+          data: { path: ['conversationId'], equals: conversationId },
+        },
+        select: { id: true },
+      });
+
+      if (!existingUnread) {
+        const preview = content.length > 80 ? `${content.slice(0, 80)}…` : content;
+        await tx.notification.create({
+          data: {
+            userId: recipientId,
+            type: NotificationType.MESSAGE_RECEIVED,
+            title: 'Yeni mesaj',
+            body: `${created.sender.firstName}: ${preview}`,
+            data: { conversationId, messageId: created.id },
+          },
+        });
+      }
+
       return created;
     });
 

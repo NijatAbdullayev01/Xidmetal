@@ -5,7 +5,8 @@ import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 
 export function useAuthToken(): string | null {
   const hydrated = useAuthHydrated();
-  const accessToken = useAuthStore((state) => state.tokens?.accessToken ?? null);
-  if (!hydrated) return null;
-  return accessToken;
+  const session = useAuthStore((state) => state.session);
+  const user = useAuthStore((state) => state.user);
+  if (!hydrated || !session || !user) return null;
+  return 'session';
 }

@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/database/prisma.service';
+import { StorageService } from '../../common/storage/storage.service';
 import { CreateBookingDto, RescheduleBookingDto, UpdateBookingStatusDto } from './dto';
 import { UserRole, BookingStatus, NotificationType } from '@xidmetal/shared';
 import { ServiceStatus } from '@prisma/client';
@@ -22,7 +23,26 @@ export class BookingsService {
   constructor(
     private prisma: PrismaService,
     private availabilityService: AvailabilityService,
+    private storageService: StorageService,
   ) {}
+
+  async findById(id: string, userId: string, role: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: bookingSummaryInclude,
+    });
+    if (!booking) {
+      throw new NotFoundException('Sifariş tapılmadı');
+    }
+
+    const isParticipant =
+      booking.customerId === userId || booking.providerId === userId;
+    if (role !== UserRole.ADMIN && !isParticipant) {
+      throw new ForbiddenException('Bu sifarişə baxmaq icazəniz yoxdur');
+    }
+
+    return this.mapBooking(booking);
+  }
 
   async findAll(
     userId: string,
@@ -30,8 +50,16 @@ export class BookingsService {
     page = 1,
     limit = 20,
     status?: BookingStatus,
+    statuses?: BookingStatus[],
   ) {
     const skip = (page - 1) * limit;
+    const statusFilter =
+      statuses && statuses.length > 0
+        ? { status: { in: statuses } }
+        : status
+          ? { status }
+          : {};
+
     const where = {
       // PROVIDER hesabı eyni zamanda başqa provider-in xidmətinə sifariş verə
       // bildiyi üçün həm `providerId`, həm də `customerId` üzrə uyğunluğa baxılır.
@@ -40,7 +68,7 @@ export class BookingsService {
         : role === UserRole.ADMIN
           ? {}
           : { customerId: userId }),
-      ...(status && { status }),
+      ...statusFilter,
     };
 
     const [items, total] = await Promise.all([
@@ -70,24 +98,28 @@ export class BookingsService {
     }
 
     if (dto.imageUrl) {
-      const isValidImage =
-        dto.imageUrl.startsWith('data:image/') ||
-        dto.imageUrl.startsWith('http://') ||
-        dto.imageUrl.startsWith('https://');
-      if (!isValidImage) {
-        throw new BadRequestException('Düzgün şəkil formatı daxil edin');
-      }
+      this.storageService.assertAllowedMediaUrl(dto.imageUrl);
     }
-
-    await this.availabilityService.assertSlotIsFree(dto.serviceId, scheduledAt);
 
     const booking = await this.prisma.$transaction(async (tx) => {
       const service = await tx.service.findUnique({
         where: { id: dto.serviceId },
+        include: {
+          category: { select: { isActive: true } },
+          provider: {
+            select: {
+              providerProfile: { select: { isVerified: true } },
+            },
+          },
+        },
       });
 
-      if (!service || service.status !== ServiceStatus.ACTIVE) {
+      if (!service || service.status !== ServiceStatus.ACTIVE || !service.category.isActive) {
         throw new NotFoundException('Xidmət tapılmadı və ya aktiv deyil');
+      }
+
+      if (!service.provider.providerProfile?.isVerified) {
+        throw new BadRequestException('Bu xidmət verən hələ təsdiqlənməyib');
       }
 
       if (service.providerId === customerId) {
@@ -103,6 +135,10 @@ export class BookingsService {
       if (!service.isRemote && !address) {
         throw new BadRequestException('Ünvan daxil edin');
       }
+
+      // Provider üzrə seriyalaşdırma + slot re-check (TOCTOU race-i bağlayır)
+      await this.availabilityService.lockProviderBookings(tx, service.providerId);
+      await this.availabilityService.assertSlotIsFree(dto.serviceId, scheduledAt, { tx });
 
       const created = await tx.booking.create({
         data: {
@@ -166,14 +202,16 @@ export class BookingsService {
       throw new BadRequestException('Müştərinin cavabı gözlənilir. Yeni təklif göndərmək olmaz');
     }
 
-    await this.availabilityService.assertSlotIsFree(booking.serviceId, scheduledAt, {
-      excludeBookingId: booking.id,
-    });
-
     const formattedDate = this.formatScheduledAt(scheduledAt);
     const conversationMessage = `${messageContent}\n\nTəklif olunan yeni tarix: ${formattedDate}`;
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      await this.availabilityService.lockProviderBookings(tx, booking.providerId);
+      await this.availabilityService.assertSlotIsFree(booking.serviceId, scheduledAt, {
+        excludeBookingId: booking.id,
+        tx,
+      });
+
       const result = await tx.booking.update({
         where: { id },
         data: { proposedScheduledAt: scheduledAt },
@@ -250,15 +288,16 @@ export class BookingsService {
       throw new BadRequestException('Bu sifariş üçün tarix təklifi təsdiqlənə bilməz');
     }
 
-    await this.availabilityService.assertSlotIsFree(
-      booking.serviceId,
-      booking.proposedScheduledAt,
-      { excludeBookingId: booking.id },
-    );
-
     const formattedDate = this.formatScheduledAt(booking.proposedScheduledAt);
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      await this.availabilityService.lockProviderBookings(tx, booking.providerId);
+      await this.availabilityService.assertSlotIsFree(
+        booking.serviceId,
+        booking.proposedScheduledAt!,
+        { excludeBookingId: booking.id, tx },
+      );
+
       const result = await tx.booking.update({
         where: { id },
         data: {
@@ -376,6 +415,36 @@ export class BookingsService {
             type: NotificationType.BOOKING_CANCELLED,
             title: 'Sifariş rədd edildi',
             body: `«${result.service.title}» sifarişiniz xidmət verən tərəfindən rədd edildi.`,
+            data: { bookingId: result.id },
+          },
+        });
+      }
+
+      if (dto.status === BookingStatus.COMPLETED) {
+        await tx.notification.create({
+          data: {
+            userId: booking.customerId,
+            type: NotificationType.BOOKING_COMPLETED,
+            title: 'Sifariş tamamlandı',
+            body: `«${result.service.title}» sifarişiniz tamamlandı. İstəsəniz rəy yaza bilərsiniz.`,
+            data: { bookingId: result.id },
+          },
+        });
+      }
+
+      if (dto.status === BookingStatus.CANCELLED) {
+        const recipientId = isCustomer ? booking.providerId : booking.customerId;
+        const actorLabel = isAdmin
+          ? 'idarəçi'
+          : isCustomer
+            ? 'müştəri'
+            : 'xidmət verən';
+        await tx.notification.create({
+          data: {
+            userId: recipientId,
+            type: NotificationType.BOOKING_CANCELLED,
+            title: 'Sifariş ləğv edildi',
+            body: `«${result.service.title}» sifarişi ${actorLabel} tərəfindən ləğv edildi.`,
             data: { bookingId: result.id },
           },
         });

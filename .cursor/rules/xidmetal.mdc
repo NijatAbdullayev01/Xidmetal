@@ -12,6 +12,12 @@ Xidmət verən (PROVIDER) və xidmət alan (CUSTOMER) rollarını birləşdirən
 Monorepo: `apps/web` (Next.js 15, port 3020), `apps/admin` (ayrı admin panel, port 3021), `apps/api` (NestJS 11), `packages/shared`, `packages/database`.
 Admin UI marketplace daxilində olmamalıdır — yalnız `apps/admin`.
 
+## Məhsul qərarı — rollar
+
+- Bir hesab = bir rol: `CUSTOMER` **və ya** `PROVIDER` (ADMIN seed ilə).
+- Eyni hesabla müştəridən xidmət verənə keçid, dual-role və ya rol upgrade **yoxdur** və **əlavə edilməsin** — qəsdən qərardır, boşluq deyil.
+- Xidmət verən olmaq = ayrı `PROVIDER` qeydiyyatı. UI: `BecomeProviderLink`.
+
 ## Brend
 
 - Əsas rəng: `#FFCC00` → Tailwind: `bg-brand`, `text-brand`, `border-brand`

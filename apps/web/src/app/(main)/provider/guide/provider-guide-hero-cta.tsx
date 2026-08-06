@@ -11,7 +11,7 @@ import { useAuthStore } from '@/store/auth.store';
 export function ProviderGuideHeroCta() {
   const hydrated = useAuthHydrated();
   const user = useAuthStore((state) => state.user);
-  const isAuthenticated = useAuthStore((state) => !!state.tokens?.accessToken);
+  const isAuthenticated = useAuthStore((state) => state.session && !!state.user);
 
   const isProvider =
     hydrated && isAuthenticated && user?.role === UserRole.PROVIDER;

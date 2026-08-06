@@ -35,6 +35,11 @@ const faqs: { question: string; answer: string }[] = [
       '«Xidmət verən ol» düyməsinə klikləyərək pulsuz qeydiyyatdan keçin. Ətraflı addım-addım təlimat üçün Xidmət verən bələdçisi səhifəsinə baxın.',
   },
   {
+    question: 'Platforma komissiya və ya ödəniş alır?',
+    answer:
+      'Xeyr. Hal-hazırda Xidmətal xidmət verənlərdən və müştərilərdən platforma haqqı / komissiya tutmur. Xidmət haqqı tərəflər arasında birbaşa razılaşdırılır.',
+  },
+  {
     question: 'Rəy yazmaq məcburidirmi?',
     answer:
       'Xeyr, məcburi deyil. Lakin rəy yazmaq digər istifadəçilərə kömək edir və platformada keyfiyyətli xidmət verənlərin seçilməsini asanlaşdırır.',

@@ -3,13 +3,15 @@
 import { useAuthStore } from '@/store/auth.store';
 import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 
+/** Cookie sessiyası aktivdirsə truthy qaytarır (token localStorage-da yoxdur). */
 export function useAuthToken(): string | null {
   const hydrated = useAuthHydrated();
-  const accessToken = useAuthStore((state) => state.tokens?.accessToken ?? null);
+  const session = useAuthStore((state) => state.session);
+  const user = useAuthStore((state) => state.user);
 
-  if (!hydrated) {
+  if (!hydrated || !session || !user) {
     return null;
   }
 
-  return accessToken;
+  return 'session';
 }

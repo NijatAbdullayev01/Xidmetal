@@ -332,6 +332,11 @@ export default function ProviderBookingsPage() {
                     )}
                     <span>Qiymət: {formatPrice(booking.totalPrice)}</span>
                   </div>
+                  {booking.address && (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Ünvan: <span className="text-foreground">{booking.address}</span>
+                    </p>
+                  )}
                   {booking.notes && (
                     <p className="mt-2 rounded-lg bg-muted px-3 py-2 text-sm">
                       {booking.notes}

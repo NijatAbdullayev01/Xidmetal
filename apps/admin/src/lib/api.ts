@@ -20,10 +20,10 @@ import type {
   AdminSetReviewStatusInput,
   AdminAnnouncementInput,
 } from '@xidmetal/shared';
-import { BookingStatus } from '@xidmetal/shared';
+import { BookingStatus, CLIENT_APP, CLIENT_APP_HEADER } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 const API_PREFIX = '/api/v1';
 
 export class ApiError extends Error {
@@ -43,24 +43,25 @@ interface RequestOptions extends Omit<RequestInit, 'next'> {
 let refreshPromise: Promise<string | null> | null = null;
 
 async function refreshAccessToken(): Promise<string | null> {
-  const { tokens, setAuth, logout } = useAuthStore.getState();
-  if (!tokens?.refreshToken) return null;
+  const { session, setAuth, logout } = useAuthStore.getState();
+  if (!session) return null;
 
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
         const response = await fetch(`${API_URL}${API_PREFIX}/auth/refresh`, {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+          body: JSON.stringify({}),
         });
         if (!response.ok) {
           logout();
           return null;
         }
         const data: AuthResponse = await response.json();
-        setAuth(data.user, data.tokens);
-        return data.tokens.accessToken;
+        setAuth(data.user);
+        return 'session';
       } catch {
         logout();
         return null;
@@ -82,18 +83,18 @@ export async function apiClient<T>(
 
   const response = await fetch(`${API_URL}${API_PREFIX}${endpoint}`, {
     ...rest,
+    credentials: 'include',
     ...(token ? { cache: 'no-store' as const } : {}),
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
       ...headers,
     },
   });
 
   if (response.status === 401 && token && allowRefresh) {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
-      return apiClient<T>(endpoint, { ...options, token: newToken }, false);
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      return apiClient<T>(endpoint, { ...options, token: refreshed }, false);
     }
   }
 
@@ -120,12 +121,19 @@ export const api = {
     login: (data: LoginInput) =>
       apiClient<AuthResponse>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, clientApp: CLIENT_APP.ADMIN }),
+        headers: { [CLIENT_APP_HEADER]: CLIENT_APP.ADMIN },
       }),
-    refresh: (refreshToken: string) =>
+    refresh: () =>
       apiClient<AuthResponse>('/auth/refresh', {
         method: 'POST',
-        body: JSON.stringify({ refreshToken }),
+        body: JSON.stringify({}),
+        token: 'session',
+      }),
+    logout: () =>
+      apiClient<{ message: string }>('/auth/logout', {
+        method: 'POST',
+        body: JSON.stringify({}),
       }),
   },
 

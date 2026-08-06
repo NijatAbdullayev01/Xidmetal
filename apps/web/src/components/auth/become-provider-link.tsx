@@ -12,6 +12,10 @@ import { useAuthStore } from '@/store/auth.store';
 const PROVIDER_REGISTER_HREF = '/register?role=provider';
 const PROVIDER_DASHBOARD_HREF = '/dashboard/provider';
 
+/**
+ * Məhsul qərarı: bir hesab = bir rol. CUSTOMER → PROVIDER upgrade yoxdur.
+ * Mövcud müştəriyə ayrı hesab lazım olduğunu izah edir — bu axını dəyişmə.
+ */
 const CUSTOMER_MESSAGE =
   'Artıq siz bu profillə istifadəçi kimi qeydiyyat etmişsiniz. Əgər xidmət verən olmaq istəyirsinizsə, başqa hesab yaradın.';
 
@@ -23,7 +27,7 @@ interface BecomeProviderLinkProps {
 export function BecomeProviderLink({ children, className }: BecomeProviderLinkProps) {
   const hydrated = useAuthHydrated();
   const user = useAuthStore((state) => state.user);
-  const isAuthenticated = useAuthStore((state) => !!state.tokens?.accessToken);
+  const isAuthenticated = useAuthStore((state) => state.session && !!state.user);
   const [open, setOpen] = useState(false);
 
   const isCustomer = hydrated && isAuthenticated && user?.role === UserRole.CUSTOMER;

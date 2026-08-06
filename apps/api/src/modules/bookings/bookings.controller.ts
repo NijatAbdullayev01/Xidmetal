@@ -16,8 +16,8 @@ import {
   UpdateBookingStatusDto,
   BookingQueryDto,
 } from './dto';
-import { JwtAuthGuard } from '../../common/guards';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { JwtAuthGuard, EmailVerifiedGuard } from '../../common/guards';
+import { CurrentUser, RequireEmailVerified } from '../../common/decorators';
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
@@ -33,16 +33,37 @@ export class BookingsController {
     @CurrentUser('role') role: string,
     @Query() query: BookingQueryDto,
   ) {
-    return this.bookingsService.findAll(userId, role, query.page, query.limit, query.status);
+    return this.bookingsService.findAll(
+      userId,
+      role,
+      query.page,
+      query.limit,
+      query.status,
+      query.statuses,
+    );
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Sifariş detalları' })
+  findOne(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return this.bookingsService.findById(id, userId, role);
   }
 
   @Post()
+  @UseGuards(EmailVerifiedGuard)
+  @RequireEmailVerified()
   @ApiOperation({ summary: 'Yeni sifariş yarat' })
   create(@CurrentUser('id') userId: string, @Body() dto: CreateBookingDto) {
     return this.bookingsService.create(userId, dto);
   }
 
   @Patch(':id/status')
+  @UseGuards(EmailVerifiedGuard)
+  @RequireEmailVerified()
   @ApiOperation({ summary: 'Sifariş statusunu yenilə' })
   updateStatus(
     @Param('id') id: string,
@@ -54,6 +75,8 @@ export class BookingsController {
   }
 
   @Patch(':id/reschedule')
+  @UseGuards(EmailVerifiedGuard)
+  @RequireEmailVerified()
   @ApiOperation({ summary: 'Sifarişə yeni tarix təklif et (xidmət verən)' })
   reschedule(
     @Param('id') id: string,
@@ -64,12 +87,16 @@ export class BookingsController {
   }
 
   @Patch(':id/reschedule/confirm')
+  @UseGuards(EmailVerifiedGuard)
+  @RequireEmailVerified()
   @ApiOperation({ summary: 'Yeni tarix təklifini təsdiqlə (müştəri)' })
   confirmReschedule(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.bookingsService.confirmReschedule(id, userId);
   }
 
   @Patch(':id/reschedule/reject')
+  @UseGuards(EmailVerifiedGuard)
+  @RequireEmailVerified()
   @ApiOperation({ summary: 'Yeni tarix təklifini rədd et (müştəri)' })
   rejectReschedule(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.bookingsService.rejectReschedule(id, userId);

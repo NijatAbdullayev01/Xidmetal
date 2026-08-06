@@ -11,36 +11,26 @@ import { Select } from '@/components/ui/select';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 
-const ROLE_OPTIONS = [
-  { value: '', label: 'Bütün rollar' },
-  { value: UserRole.CUSTOMER, label: 'Müştəri' },
-  { value: UserRole.PROVIDER, label: 'Xidmət verən' },
-];
-
 const ACTIVE_OPTIONS = [
   { value: '', label: 'Hamısı' },
   { value: 'true', label: 'Aktiv' },
   { value: 'false', label: 'Deaktiv' },
 ];
 
-const ROLE_LABEL: Record<string, string> = {
-  CUSTOMER: 'Müştəri',
-  PROVIDER: 'Xidmət verən',
-  ADMIN: 'Admin',
-};
-
 export default function AdminUsersPage() {
   const token = useAuthToken();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
-  const [role, setRole] = useState('');
   const [isActive, setIsActive] = useState('');
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
 
-  const params: Record<string, string> = { page: String(page), limit: '20' };
+  const params: Record<string, string> = {
+    page: String(page),
+    limit: '20',
+    role: UserRole.CUSTOMER,
+  };
   if (search.trim()) params.search = search.trim();
-  if (role) params.role = role;
   if (isActive) params.isActive = isActive;
 
   const { data, isLoading } = useQuery({
@@ -67,14 +57,14 @@ export default function AdminUsersPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">İstifadəçilər</h1>
         <p className="mt-1 text-muted-foreground">
-          Hesabları axtarın, filtrələyin və aktivlik statusunu idarə edin.
+          Müştəri hesablarını axtarın, filtrələyin və aktivlik statusunu idarə edin.
         </p>
       </div>
 
       <Card>
         <CardHeader className="gap-4 space-y-0">
           <CardTitle className="text-base">Filtrlər</CardTitle>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Input
               placeholder="Ad, soyad və ya e-poçt"
               value={search}
@@ -82,16 +72,6 @@ export default function AdminUsersPage() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-            />
-            <Select
-              value={role}
-              onChange={(v) => {
-                setRole(v);
-                setPage(1);
-              }}
-              options={ROLE_OPTIONS}
-              placeholder="Rol"
-              clearable
             />
             <Select
               value={isActive}
@@ -115,7 +95,7 @@ export default function AdminUsersPage() {
             <p className="py-8 text-center text-sm text-muted-foreground">Yüklənir…</p>
           )}
           {!isLoading && data?.items.length === 0 && (
-            <p className="py-8 text-center text-sm text-muted-foreground">İstifadəçi tapılmadı</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">Müştəri tapılmadı</p>
           )}
 
           <ul className="divide-y divide-border">
@@ -132,7 +112,6 @@ export default function AdminUsersPage() {
                     <Badge variant={user.isActive ? 'success' : 'destructive'}>
                       {user.isActive ? 'Aktiv' : 'Deaktiv'}
                     </Badge>
-                    <Badge variant="muted">{ROLE_LABEL[user.role] ?? user.role}</Badge>
                   </div>
                   <p className="truncate text-sm text-muted-foreground">{user.email}</p>
                   <p className="text-xs text-muted-foreground">

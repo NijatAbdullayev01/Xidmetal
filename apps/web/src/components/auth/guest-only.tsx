@@ -14,7 +14,7 @@ export function GuestOnly({ children }: GuestOnlyProps) {
   const router = useRouter();
   // `tokens` birbaşa seçilir — `isAuthenticated()` funksiya referansı sabit
   // olduğu üçün Zustand state dəyişikliyini aşkarlaya bilmirdi.
-  const isAuthenticated = useAuthStore((state) => !!state.tokens?.accessToken);
+  const isAuthenticated = useAuthStore((state) => state.session && !!state.user);
   const user = useAuthStore((state) => state.user);
   const hydrated = useAuthHydrated();
 

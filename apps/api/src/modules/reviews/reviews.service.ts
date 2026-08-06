@@ -5,7 +5,7 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
-import { BookingStatus, ReviewStatus } from '@prisma/client';
+import { BookingStatus, ReviewStatus, NotificationType } from '@prisma/client';
 import { PrismaService } from '../../common/database/prisma.service';
 import { CreateReviewDto, ReviewQueryDto } from './dto';
 
@@ -65,30 +65,46 @@ export class ReviewsService {
       throw new BadRequestException('Xidmət verənin profili tapılmadı');
     }
 
-    const review = await this.prisma.review.create({
-      data: {
-        bookingId: booking.id,
-        authorId,
-        rating: dto.rating,
-        comment,
-        status: ReviewStatus.PENDING,
-      },
-      include: {
-        author: { select: { firstName: true, lastName: true } },
-        booking: {
-          select: {
-            service: { select: { title: true } },
+    const review = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.review.create({
+        data: {
+          bookingId: booking.id,
+          authorId,
+          rating: dto.rating,
+          comment,
+          status: ReviewStatus.PENDING,
+        },
+        include: {
+          author: { select: { firstName: true, lastName: true } },
+          booking: {
+            select: {
+              service: { select: { title: true } },
+            },
           },
         },
-      },
+      });
+
+      await tx.notification.create({
+        data: {
+          userId: booking.providerId,
+          type: NotificationType.REVIEW_RECEIVED,
+          title: 'Yeni rəy alındı',
+          body: `«${booking.service.title}» sifarişi üçün ${dto.rating} ulduzlu rəy yazıldı. Moderasiyadan sonra görünəcək.`,
+          data: { bookingId: booking.id, reviewId: created.id },
+        },
+      });
+
+      return created;
     });
 
     return this.mapReview(review, 'full');
   }
 
-  /** Provider dashboard — tam ad ilə */
+  /** Provider dashboard — PENDING + APPROVED (REJECTED yalnız status filtri ilə) */
   async findReceivedByProvider(providerId: string, query: ReviewQueryDto) {
-    return this.listProviderReviews(providerId, query, 'full');
+    return this.listProviderReviews(providerId, query, 'full', {
+      includePending: true,
+    });
   }
 
   /** İctimai — müştərilər digər rəylərə baxa bilir (qismən anonim ad) */
@@ -111,7 +127,9 @@ export class ReviewsService {
       throw new NotFoundException('Xidmət verən tapılmadı');
     }
 
-    const page = await this.listProviderReviews(providerId, query, 'public');
+    const page = await this.listProviderReviews(providerId, query, 'public', {
+      includePending: false,
+    });
 
     const distributionWhere = {
       status: ReviewStatus.APPROVED,
@@ -170,12 +188,23 @@ export class ReviewsService {
     providerId: string,
     query: ReviewQueryDto,
     authorMode: 'full' | 'public',
+    options: { includePending: boolean },
   ) {
-    const { page = 1, limit = 20, serviceId } = query;
+    const { page = 1, limit = 20, serviceId, status } = query;
     const skip = (page - 1) * limit;
 
+    let statusFilter: ReviewStatus | { in: ReviewStatus[] };
+    if (status) {
+      statusFilter = status;
+    } else if (options.includePending) {
+      // Provider: gözləyən + təsdiqlənmiş (rədd edilmişlər default gizlidir)
+      statusFilter = { in: [ReviewStatus.PENDING, ReviewStatus.APPROVED] };
+    } else {
+      statusFilter = ReviewStatus.APPROVED;
+    }
+
     const where = {
-      status: ReviewStatus.APPROVED,
+      status: statusFilter,
       booking: {
         providerId,
         ...(serviceId ? { serviceId } : {}),

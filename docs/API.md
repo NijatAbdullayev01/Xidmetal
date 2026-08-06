@@ -2,17 +2,19 @@
 
 **Base URL:** `http://localhost:4000/api/v1`
 
-**Swagger UI:** http://localhost:4000/docs (həmişə ən güncəl mənbə)
+**Swagger UI:** http://localhost:4000/docs (dev; production-da default bağlı — `SWAGGER_ENABLED=true`)
 
 > **Son yenilənmə:** 2026-08 — cari Nest modul səthinə uyğun.
 
 ## Autentifikasiya
 
-Protected endpoint-lər `Authorization: Bearer <access_token>` header tələb edir.
+Protected endpoint-lər `Authorization: Bearer <access_token>` **və ya** httpOnly cookie tələb edir.
 
-Token-lər `/auth/register` və `/auth/login`-dən alınır; yeniləmə `/auth/refresh`.
+Brauzer (marketplace/admin): login/register/refresh **yalnız cookie** qoyur — JSON cavabda `tokens` **yoxdur** (XSS səthi bağlanıb).
+`clientApp`: `marketplace` | `admin` (body və ya `x-xidmetal-client` header) — yanlış app-də session yaradılmır və cookie silinir.
+Swagger / xarici klientlər Bearer header dəstəklənir. Access default: `15m`.
 
-🔒 = JWT tələb olunur. Rəllər `@Roles` və ya service-layer yoxlaması ilə tətbiq olunur.
+🔒 = JWT tələb olunur (cookie və ya Bearer). Rəllər `@Roles` və ya service-layer yoxlaması ilə tətbiq olunur.
 
 ---
 
@@ -21,6 +23,8 @@ Token-lər `/auth/register` və `/auth/login`-dən alınır; yeniləmə `/auth/r
 ### POST /auth/register
 
 Yeni istifadəçi. `role`: `CUSTOMER` | `PROVIDER` (`ADMIN` qeydiyyatı qadağandır).
+**Məhsul qərarı:** rol qeydiyyatda seçilir və dəyişmir; `CUSTOMER` → `PROVIDER` upgrade endpoint-i yoxdur (ayrı hesab lazımdır).
+Qeydiyyatdan sonra e-poçt təsdiq kodu göndərilir (`isVerified: false` qalır — soft verify; girişə mane olmur).
 
 **Body:**
 ```json
@@ -34,15 +38,51 @@ Yeni istifadəçi. `role`: `CUSTOMER` | `PROVIDER` (`ADMIN` qeydiyyatı qadağan
 }
 ```
 
-**Response:** `200` — `{ user, tokens: { accessToken, refreshToken } }`
+**Response:** `201/200` — `{ user }` (+ opsional `mailDelivered` / `previewCode` DEV). Token-lər `Set-Cookie`.
 
 ### POST /auth/login
 
+**Body:** `{ "email", "password", "clientApp?: "marketplace"|"admin" }`
+
+**Response:** `{ user }` + cookies. `clientApp=marketplace` + ADMIN → `403` (cookie clear). `clientApp=admin` + qeyri-ADMIN → `403`.
+
 ### POST /auth/refresh
+
+**Body:** `{ "refreshToken": "..." }` (opsional — cookie üstünlük).
+
+Reuse aşkarlananda istifadəçinin **bütün** refresh tokenləri ləğv olunur.
+
+### POST /auth/logout
+
+Cari refresh tokeni serverdə silir (sessiya revoke).
 
 **Body:** `{ "refreshToken": "..." }`
 
-> Server-side logout / token revoke endpoint-i hələ yoxdur.
+### POST /auth/logout-all 🔒
+
+İstifadəçinin bütün refresh tokenlərini silir.
+
+### POST /auth/forgot-password
+
+Şifrə bərpası kodu (6 rəqəm). İstifadəçi olmasa da eyni generic mesaj qaytarılır.
+
+**Body:** `{ "email": "user@example.com" }`
+
+### POST /auth/reset-password
+
+Kod + yeni şifrə. Uğurdan sonra bütün sessiyalar ləğv olunur; `passwordChangedAt` yenilənir (köhnə access JWT keçərsiz).
+
+**Body:** `{ "email": "...", "code": "123456", "newPassword": "SecurePass1" }`
+
+### POST /auth/verify-email/request
+
+E-poçt təsdiq kodunu (yenidən) göndər.
+
+### POST /auth/verify-email/confirm
+
+Kod ilə `isVerified: true`.
+
+**Body:** `{ "email": "...", "code": "123456" }`
 
 ---
 
@@ -84,7 +124,7 @@ Aktiv kateqoriyalar (+ `serviceCount`).
 
 Kateqoriya detalları.
 
-> Yazma (CRUD) API-si yoxdur — seed ilə idarə olunur.
+> Admin yazma: `POST/PATCH /admin/categories` (silmə yoxdur). Seed də mövcuddur.
 
 ---
 
@@ -106,7 +146,7 @@ Xidmət detalları (şəkillər, venue, yük ölçüləri / `cargoRouteScope` v�
 
 ### POST /services 🔒 PROVIDER
 
-Yeni xidmət. Qiymət, kateqoriya, təsvir, şəkillər (`data:image/...` və ya URL), `serviceVenue`, (yükdaşıma) `vehicleLength` / `vehicleWidth` / `vehicleHeight`, `cargoRouteScope`.
+Yeni xidmət. Qiymət, kateqoriya, təsvir, şəkillər (**http(s) URL** — `POST /uploads`), `serviceVenue`, (yükdaşıma) `vehicleLength` / `vehicleWidth` / `vehicleHeight`, `cargoRouteScope`. E-poçt təsdiqi məcburidir. `ACTIVE` status üçün provider admin-təsdiqli olmalıdır.
 
 ### PATCH /services/:id 🔒 PROVIDER/ADMIN
 
@@ -138,6 +178,14 @@ Həftəlik iş saatlarını yenilə.
 
 ### GET /bookings 🔒
 
+Sifarişlər siyahısı (rol üzrə filtr).
+
+### GET /bookings/:id 🔒
+
+Sifariş detalları — yalnız iştirakçı və ya ADMIN.
+
+### POST /bookings 🔒 (+ email verified)
+
 Rola görə siyahı. Query: `page`, `limit`, `status`.
 
 ### POST /bookings 🔒
@@ -149,11 +197,11 @@ Rola görə siyahı. Query: `page`, `limit`, `status`.
   "scheduledAt": "2026-08-15T10:00:00.000Z",
   "notes": "3 otaqlı mənzil",
   "address": "Bakı, Nəsimi rayonu",
-  "imageUrl": "data:image/jpeg;base64,..."
+  "imageUrl": "https://api.example/uploads/bookings/userId/uuid.jpg"
 }
 ```
 
-Slot `availability` ilə yoxlanır; gələcək tarix məcburidir.
+Slot `availability` ilə yoxlanır (transaction + `pg_advisory_xact_lock`); gələcək tarix məcburidir. E-poçt təsdiqi + təsdiqlənmiş provider tələb olunur.
 
 ### PATCH /bookings/:id/status 🔒
 
@@ -184,11 +232,11 @@ Yeni tarix təklifi + müştəriyə mesaj.
 
 ### POST /reviews 🔒
 
-Tamamlanmış sifarişə rəy; provider rating aggregate transaction-da yenilənir. Status birbaşa `APPROVED`.
+Tamamlanmış sifarişə rəy; status **`PENDING`** (admin moderation → `APPROVED`/`REJECTED`). Aggregate yalnız `APPROVED` olduqda yenilənir. E-poçt təsdiqi məcburidir.
 
 ### GET /reviews/received 🔒 PROVIDER
 
-Provider-ə gələn rəylər.
+Provider-ə gələn rəylər (default: `PENDING` + `APPROVED`). Query: `status`, `serviceId`, `page`, `limit`.
 
 ---
 
@@ -216,7 +264,7 @@ Soft-delete (yalnız öz siyahısından).
 
 ### POST /messages/conversations/:id/typing 🔒
 
-Typing indicator (in-memory; multi-instance üçün uyğun deyil).
+Typing indicator (DB `typing_presences`; multi-instance; ~4s TTL). E-poçt təsdiqi məcburidir.
 
 > Real-time WebSocket yoxdur — frontend polling istifadə edir.
 
@@ -240,7 +288,9 @@ Sifariş hadisələri.
 
 ### POST /notifications/booking-read-all 🔒
 
-> Booking/reschedule axınları DB-yə yazır. Admin platforma bildirişi: `POST /admin/announcements`. `BOOKING_COMPLETED` / `REVIEW_RECEIVED` enum-da var, lakin hələ emit olunmur.
+> Booking/reschedule axınları DB-yə yazır. Admin platforma bildirişi: `POST /admin/announcements`.
+> Emit olunanlar: `BOOKING_CREATED`, `BOOKING_CONFIRMED`, `BOOKING_CANCELLED` (ləğv + rədd), `BOOKING_COMPLETED`, `BOOKING_RESCHEDULE_PROPOSED`, `REVIEW_RECEIVED`, `MESSAGE_RECEIVED` (söhbət üzrə dedupe), `ADMIN_ANNOUNCEMENT`.
+> Review unread: `GET/POST …/review-unread-count` / `review-read-all`.
 
 ---
 
@@ -295,6 +345,16 @@ Body: `{ "status": "APPROVED"|"REJECTED" }` — reytinq aggregate yenilənir.
 ### POST /admin/announcements
 
 Body: `{ "title", "body", "roles?": ["CUSTOMER"|"PROVIDER"] }` — boş `roles` = bütün aktiv istifadəçilər.
+
+---
+
+## Uploads
+
+### POST /uploads 🔒
+
+Multipart şəkil yükləmə. `folder`: `services` | `avatars` | `bookings`.
+Cavab: `{ "url": "https://..." }` — DB-yə yalnız URL yazılır (base64 yox).
+Limit: 10 req/dəq, 30/saat/user; e-poçt təsdiqi məcburi; orphan TTL 24 saat.
 
 ---
 

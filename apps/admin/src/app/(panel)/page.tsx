@@ -29,10 +29,8 @@ export default function AdminOverviewPage() {
   const cards = [
     {
       label: 'İstifadəçilər',
-      value: stats?.usersTotal ?? '—',
-      hint: stats
-        ? `${stats.usersCustomers} müştəri · ${stats.usersProviders} provider`
-        : undefined,
+      value: stats?.usersCustomers ?? '—',
+      hint: stats ? `Cəmi ${stats.usersTotal} hesab` : undefined,
       icon: Users,
       href: '/users',
     },

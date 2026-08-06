@@ -39,6 +39,21 @@ const STATUS_BADGE: Record<string, 'muted' | 'success' | 'warning' | 'destructiv
   REJECTED: 'destructive',
 };
 
+/** Admin bypass: istənilən statusa keçid (terminal vəziyyətlər istisna) */
+const ADMIN_NEXT_STATUSES: Partial<Record<BookingStatus, BookingStatus[]>> = {
+  [BookingStatus.PENDING]: [
+    BookingStatus.CONFIRMED,
+    BookingStatus.REJECTED,
+    BookingStatus.CANCELLED,
+  ],
+  [BookingStatus.CONFIRMED]: [
+    BookingStatus.IN_PROGRESS,
+    BookingStatus.CANCELLED,
+    BookingStatus.COMPLETED,
+  ],
+  [BookingStatus.IN_PROGRESS]: [BookingStatus.COMPLETED, BookingStatus.CANCELLED],
+};
+
 export default function AdminBookingsPage() {
   const token = useAuthToken();
   const queryClient = useQueryClient();
@@ -55,9 +70,9 @@ export default function AdminBookingsPage() {
     enabled: !!token,
   });
 
-  const cancel = useMutation({
-    mutationFn: (id: string) =>
-      api.updateBookingStatus(token!, id, BookingStatus.CANCELLED),
+  const updateStatus = useMutation({
+    mutationFn: ({ id, next }: { id: string; next: BookingStatus }) =>
+      api.updateBookingStatus(token!, id, next),
     onSuccess: async () => {
       setError(null);
       await queryClient.invalidateQueries({ queryKey: ['admin', 'bookings'] });
@@ -105,41 +120,48 @@ export default function AdminBookingsPage() {
           )}
 
           <ul className="divide-y divide-border">
-            {data?.items.map((booking) => (
-              <li
-                key={booking.id}
-                className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{booking.serviceTitle}</p>
-                    <Badge variant={STATUS_BADGE[booking.status] ?? 'muted'}>
-                      {STATUS_LABEL[booking.status] ?? booking.status}
-                    </Badge>
+            {data?.items.map((booking) => {
+              const nextStatuses =
+                ADMIN_NEXT_STATUSES[booking.status as BookingStatus] ?? [];
+              return (
+                <li
+                  key={booking.id}
+                  className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{booking.serviceTitle}</p>
+                      <Badge variant={STATUS_BADGE[booking.status] ?? 'muted'}>
+                        {STATUS_LABEL[booking.status] ?? booking.status}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {booking.customerName} → {booking.providerName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(booking.scheduledAt).toLocaleString('az-AZ')} ·{' '}
+                      {formatPrice(booking.totalPrice)}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {booking.customerName} → {booking.providerName}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(booking.scheduledAt).toLocaleString('az-AZ')} ·{' '}
-                    {formatPrice(booking.totalPrice)}
-                  </p>
-                </div>
-                {booking.status !== BookingStatus.CANCELLED &&
-                  booking.status !== BookingStatus.COMPLETED &&
-                  booking.status !== BookingStatus.REJECTED && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="min-h-[44px] shrink-0"
-                      disabled={cancel.isPending}
-                      onClick={() => cancel.mutate(booking.id)}
-                    >
-                      Ləğv et
-                    </Button>
+                  {nextStatuses.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {nextStatuses.map((next) => (
+                        <Button
+                          key={next}
+                          variant={next === BookingStatus.CANCELLED || next === BookingStatus.REJECTED ? 'outline' : 'default'}
+                          size="sm"
+                          className="min-h-[44px] shrink-0"
+                          disabled={updateStatus.isPending}
+                          onClick={() => updateStatus.mutate({ id: booking.id, next })}
+                        >
+                          {STATUS_LABEL[next] ?? next}
+                        </Button>
+                      ))}
+                    </div>
                   )}
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
 
           {data && data.totalPages > 1 && (

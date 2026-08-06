@@ -3,6 +3,8 @@ import { NotificationType as PrismaNotificationType, Prisma } from '@xidmetal/da
 import {
   ADMIN_NOTIFICATION_TYPES,
   BOOKING_NOTIFICATION_TYPES,
+  REVIEW_NOTIFICATION_TYPES,
+  MESSAGE_NOTIFICATION_TYPES,
   NotificationType,
 } from '@xidmetal/shared';
 import type {
@@ -34,6 +36,20 @@ const bookingTypes = notificationTypeList(BOOKING_NOTIFICATION_TYPES, [
   NotificationType.BOOKING_COMPLETED,
   NotificationType.BOOKING_RESCHEDULE_PROPOSED,
 ]);
+const reviewTypes = notificationTypeList(REVIEW_NOTIFICATION_TYPES, [
+  NotificationType.REVIEW_RECEIVED,
+]);
+const messageTypes = notificationTypeList(MESSAGE_NOTIFICATION_TYPES, [
+  NotificationType.MESSAGE_RECEIVED,
+]);
+
+/** Zəng panelində göstərilən / deep-link edilə bilən bildirişlər */
+const inboxTypes: PrismaNotificationType[] = [
+  ...adminTypes,
+  ...bookingTypes,
+  ...reviewTypes,
+  ...messageTypes,
+];
 
 @Injectable()
 export class NotificationsService {
@@ -41,7 +57,6 @@ export class NotificationsService {
 
   /**
    * Söhbət oxunanda həmin söhbətə bağlı MESSAGE_RECEIVED bildirişlərini bağlayır.
-   * Köhnə sətirlər üçün geriyə uyğun təmizlik (yeni mesajlar artıq Notification yaratmır).
    */
   async markMessageNotificationsRead(userId: string, conversationId: string) {
     const result = await this.prisma.notification.updateMany({
@@ -61,7 +76,7 @@ export class NotificationsService {
 
   async findAll(userId: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
-    const where = { userId, type: { in: adminTypes } };
+    const where = { userId, type: { in: inboxTypes } };
 
     const [rows, total] = await Promise.all([
       this.prisma.notification.findMany({
@@ -82,10 +97,10 @@ export class NotificationsService {
     };
   }
 
-  /** Yalnız admin/platforma bildirişləri (zəng ikonu) */
+  /** Inbox (admin + sifariş + rəy) oxunmamış sayı — zəng ikonu */
   async getUnreadCount(userId: string): Promise<UnreadNotificationsSummary> {
     const count = await this.prisma.notification.count({
-      where: { userId, isRead: false, type: { in: adminTypes } },
+      where: { userId, isRead: false, type: { in: inboxTypes } },
     });
     return { count };
   }
@@ -118,6 +133,34 @@ export class NotificationsService {
     return { markedCount: result.count };
   }
 
+  /** Provider reytinq badge — REVIEW_RECEIVED */
+  async getReviewAttentionCount(userId: string): Promise<BookingAttentionSummary> {
+    const where = { userId, isRead: false, type: { in: reviewTypes } };
+
+    const [count, latest] = await Promise.all([
+      this.prisma.notification.count({ where }),
+      this.prisma.notification.findFirst({
+        where,
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, createdAt: true },
+      }),
+    ]);
+
+    return {
+      count,
+      latestUnreadId: latest?.id ?? null,
+      latestUnreadAt: latest?.createdAt.toISOString() ?? null,
+    };
+  }
+
+  async markReviewNotificationsRead(userId: string) {
+    const result = await this.prisma.notification.updateMany({
+      where: { userId, isRead: false, type: { in: reviewTypes } },
+      data: { isRead: true },
+    });
+    return { markedCount: result.count };
+  }
+
   async markRead(id: string, userId: string) {
     const notification = await this.prisma.notification.findUnique({ where: { id } });
     if (!notification) {
@@ -127,8 +170,8 @@ export class NotificationsService {
       throw new ForbiddenException('Bu bildirişə giriş icazəniz yoxdur');
     }
 
-    if (!(adminTypes as string[]).includes(notification.type)) {
-      throw new ForbiddenException('Bu bildiriş zəng bölməsinə aid deyil');
+    if (!(inboxTypes as string[]).includes(notification.type)) {
+      throw new ForbiddenException('Bu bildirişə giriş icazəniz yoxdur');
     }
 
     if (notification.isRead) {
@@ -145,7 +188,7 @@ export class NotificationsService {
 
   async markAllRead(userId: string) {
     const result = await this.prisma.notification.updateMany({
-      where: { userId, isRead: false, type: { in: adminTypes } },
+      where: { userId, isRead: false, type: { in: inboxTypes } },
       data: { isRead: true },
     });
     return { markedCount: result.count };

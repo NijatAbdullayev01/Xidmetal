@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/ui/modal';
 import { Textarea } from '@/components/ui/textarea';
 import { TimePicker, type TimePickerOption } from '@/components/ui/time-picker';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, uploadImage } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { cn, combineDateAndTime, formatPrice, formatTimeInBaku } from '@/lib/utils';
 import { getPriceUnitLabel } from '@/lib/provider-labels';
@@ -148,7 +148,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
 
   const createMutation = useMutation({
     mutationFn: async (values: BookServiceFormValues) => {
-      const token = useAuthStore.getState().tokens?.accessToken;
+      const token = useAuthStore.getState().session ? 'session' : null;
       if (!token) throw new Error('Autentifikasiya tələb olunur');
 
       if (!hasCalendar) {
@@ -189,7 +189,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
 
   const isSubmitting = createMutation.isPending;
 
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
@@ -206,14 +206,18 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setImagePreview(reader.result);
-      }
-    };
-    reader.onerror = () => setImageError('Şəkil oxunarkən xəta baş verdi');
-    reader.readAsDataURL(file);
+    const token = useAuthStore.getState().session ? 'session' : null;
+    if (!token) {
+      setImageError('Şəkil yükləmək üçün daxil olun');
+      return;
+    }
+
+    try {
+      const url = await uploadImage(token, file, 'bookings');
+      setImagePreview(url);
+    } catch (error) {
+      setImageError(error instanceof ApiError ? error.message : 'Şəkil yüklənmədi');
+    }
   };
 
   const handleImageRemove = () => {
@@ -386,7 +390,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
               accept={ACCEPTED_IMAGE_TYPES.join(',')}
               className="hidden"
               disabled={isSubmitting}
-              onChange={handleImageSelect}
+              onChange={(event) => void handleImageSelect(event)}
             />
             {imagePreview ? (
               <div className="relative overflow-hidden rounded-xl border border-border bg-muted">

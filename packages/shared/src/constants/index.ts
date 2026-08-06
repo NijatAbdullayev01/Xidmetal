@@ -19,6 +19,16 @@ export const API = {
   maxPageSize: 100,
 } as const;
 
+/** Brauzer klientləri — login audience (yanlış app-də cookie sızmasının qarşısı) */
+export const CLIENT_APP = {
+  MARKETPLACE: 'marketplace',
+  ADMIN: 'admin',
+} as const;
+
+export type ClientApp = (typeof CLIENT_APP)[keyof typeof CLIENT_APP];
+
+export const CLIENT_APP_HEADER = 'x-xidmetal-client';
+
 export const PAGINATION = {
   defaultPage: 1,
   defaultLimit: 20,

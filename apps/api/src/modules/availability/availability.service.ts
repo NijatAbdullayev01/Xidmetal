@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { BookingStatus } from '@prisma/client';
+import { BookingStatus, type Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/database/prisma.service';
 import {
   AvailabilityOverrideType,
@@ -18,6 +18,7 @@ import {
   UpsertWorkingHoursDto,
   CreateAvailabilityOverrideDto,
 } from './dto';
+import { bookingWindowEndMs, rangesOverlap } from '../../common/booking/booking-overlap';
 
 /** Azərbaycan sabit UTC+4 (DST yoxdur) — iş saatları bu zonada saxlanılır */
 const BAKU_OFFSET = '+04:00';
@@ -32,6 +33,8 @@ interface TimeRange {
   startMin: number;
   endMin: number;
 }
+
+type DbClient = PrismaService | Prisma.TransactionClient;
 
 @Injectable()
 export class AvailabilityService {
@@ -142,10 +145,15 @@ export class AvailabilityService {
     await this.prisma.serviceAvailabilityOverride.delete({ where: { id: overrideId } });
   }
 
-  async resolveSlots(serviceId: string, from: string, to: string): Promise<DayAvailability[]> {
+  async resolveSlots(
+    serviceId: string,
+    from: string,
+    to: string,
+    db: DbClient = this.prisma,
+  ): Promise<DayAvailability[]> {
     this.assertDateRange(from, to);
 
-    const service = await this.prisma.service.findUnique({
+    const service = await db.service.findUnique({
       where: { id: serviceId },
       select: {
         id: true,
@@ -162,16 +170,16 @@ export class AvailabilityService {
     const toDate = this.parseDateOnly(to);
 
     const [workingHours, overrides, bookings] = await Promise.all([
-      this.prisma.serviceWorkingHours.findMany({
+      db.serviceWorkingHours.findMany({
         where: { serviceId, isActive: true },
       }),
-      this.prisma.serviceAvailabilityOverride.findMany({
+      db.serviceAvailabilityOverride.findMany({
         where: {
           serviceId,
           date: { gte: fromDate, lte: toDate },
         },
       }),
-      this.prisma.booking.findMany({
+      db.booking.findMany({
         where: {
           providerId: service.providerId,
           status: { in: ACTIVE_BOOKING_STATUSES },
@@ -194,7 +202,7 @@ export class AvailabilityService {
         b.service.duration && b.service.duration > 0 ? b.service.duration : DEFAULT_DURATION_MINUTES;
       return {
         startMs: start.getTime(),
-        endMs: start.getTime() + bookingDuration * 60_000,
+        endMs: bookingWindowEndMs(start.getTime(), bookingDuration),
       };
     });
 
@@ -216,8 +224,8 @@ export class AvailabilityService {
           const slotEnd = this.combineDateAndMinutes(cursor, endMin);
           const startMs = slotStart.getTime();
           const endMs = slotEnd.getTime();
-          const overlapsBusy = busyRanges.some(
-            (busy) => startMs < busy.endMs && endMs > busy.startMs,
+          const overlapsBusy = busyRanges.some((busy) =>
+            rangesOverlap(startMs, endMs, busy.startMs, busy.endMs),
           );
           slots.push({
             start: slotStart.toISOString(),
@@ -233,13 +241,19 @@ export class AvailabilityService {
     return days;
   }
 
+  /**
+   * Slotun təqvimdə mövcud və boş olduğunu yoxlayır.
+   * Race-safe çağırış üçün `tx` ilə transaction daxilində istifadə edin
+   * (əvvəl `pg_advisory_xact_lock` alınmalıdır).
+   */
   async assertSlotIsFree(
     serviceId: string,
     scheduledAt: Date,
-    options?: { excludeBookingId?: string },
+    options?: { excludeBookingId?: string; tx?: Prisma.TransactionClient },
   ): Promise<void> {
+    const db: DbClient = options?.tx ?? this.prisma;
     const dateStr = this.formatDateOnly(scheduledAt);
-    const days = await this.resolveSlots(serviceId, dateStr, dateStr);
+    const days = await this.resolveSlots(serviceId, dateStr, dateStr, db);
     const day = days[0];
     if (!day || !day.hasCalendar) {
       throw new BadRequestException('Provider hələ təqvim təyin etməyib');
@@ -252,15 +266,15 @@ export class AvailabilityService {
 
     if (slot.status === AvailabilitySlotStatus.BUSY) {
       if (options?.excludeBookingId) {
-        const service = await this.prisma.service.findUnique({
+        const service = await db.service.findUnique({
           where: { id: serviceId },
           select: { providerId: true, duration: true },
         });
         if (!service) throw new NotFoundException('Xidmət tapılmadı');
         const duration =
           service.duration && service.duration > 0 ? service.duration : DEFAULT_DURATION_MINUTES;
-        const end = new Date(scheduledAt.getTime() + duration * 60_000);
-        const candidates = await this.prisma.booking.findMany({
+        const endMs = bookingWindowEndMs(scheduledAt.getTime(), duration);
+        const candidates = await db.booking.findMany({
           where: {
             providerId: service.providerId,
             status: { in: ACTIVE_BOOKING_STATUSES },
@@ -276,15 +290,14 @@ export class AvailabilityService {
           },
         });
         const startMs = scheduledAt.getTime();
-        const endMs = end.getTime();
         const hasConflict = candidates.some((b) => {
           const bDuration =
             b.service.duration && b.service.duration > 0
               ? b.service.duration
               : DEFAULT_DURATION_MINUTES;
           const bStart = b.scheduledAt.getTime();
-          const bEnd = bStart + bDuration * 60_000;
-          return startMs < bEnd && endMs > bStart;
+          const bEnd = bookingWindowEndMs(bStart, bDuration);
+          return rangesOverlap(startMs, endMs, bStart, bEnd);
         });
         if (hasConflict) {
           throw new BadRequestException('Seçilmiş vaxt doludur və ya əlçatan deyil');
@@ -293,6 +306,17 @@ export class AvailabilityService {
       }
       throw new BadRequestException('Seçilmiş vaxt doludur və ya əlçatan deyil');
     }
+  }
+
+  /**
+   * Eyni provider üzrə paralel bronları seriyalaşdırır (transaction-scoped advisory lock).
+   * `create` / `reschedule` / `confirmReschedule` daxilində çağırın.
+   */
+  async lockProviderBookings(
+    tx: Prisma.TransactionClient,
+    providerId: string,
+  ): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${providerId}))`;
   }
 
   private buildDayWindows(

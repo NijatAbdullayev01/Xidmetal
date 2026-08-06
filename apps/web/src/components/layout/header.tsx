@@ -34,7 +34,7 @@ export function Header() {
   const hydrated = useAuthHydrated();
   // `tokens` birbaşa seçilir — `isAuthenticated()` funksiya referansı sabit
   // olduğu üçün Zustand state dəyişikliyini aşkarlaya bilmirdi.
-  const isAuthenticated = useAuthStore((state) => !!state.tokens?.accessToken);
+  const isAuthenticated = useAuthStore((state) => state.session && !!state.user);
   const user = useAuthStore((state) => state.user);
   const logout = useLogout();
   // Persist localStorage-dan client-də sinxron rehydrate edir; server isə
