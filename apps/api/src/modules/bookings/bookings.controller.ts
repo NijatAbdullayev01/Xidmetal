@@ -16,8 +16,9 @@ import {
   UpdateBookingStatusDto,
   BookingQueryDto,
 } from './dto';
-import { JwtAuthGuard, EmailVerifiedGuard } from '../../common/guards';
-import { CurrentUser, RequireEmailVerified } from '../../common/decorators';
+import { JwtAuthGuard, EmailVerifiedGuard, RolesGuard } from '../../common/guards';
+import { CurrentUser, RequireEmailVerified, Roles } from '../../common/decorators';
+import { UserRole } from '@xidmetal/shared';
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
@@ -54,7 +55,8 @@ export class BookingsController {
   }
 
   @Post()
-  @UseGuards(EmailVerifiedGuard)
+  @UseGuards(RolesGuard, EmailVerifiedGuard)
+  @Roles(UserRole.CUSTOMER)
   @RequireEmailVerified()
   @ApiOperation({ summary: 'Yeni sifariş yarat' })
   create(@CurrentUser('id') userId: string, @Body() dto: CreateBookingDto) {
@@ -62,7 +64,8 @@ export class BookingsController {
   }
 
   @Patch(':id/status')
-  @UseGuards(EmailVerifiedGuard)
+  @UseGuards(RolesGuard, EmailVerifiedGuard)
+  @Roles(UserRole.CUSTOMER, UserRole.PROVIDER, UserRole.ADMIN)
   @RequireEmailVerified()
   @ApiOperation({ summary: 'Sifariş statusunu yenilə' })
   updateStatus(
@@ -75,7 +78,8 @@ export class BookingsController {
   }
 
   @Patch(':id/reschedule')
-  @UseGuards(EmailVerifiedGuard)
+  @UseGuards(RolesGuard, EmailVerifiedGuard)
+  @Roles(UserRole.PROVIDER)
   @RequireEmailVerified()
   @ApiOperation({ summary: 'Sifarişə yeni tarix təklif et (xidmət verən)' })
   reschedule(
@@ -87,7 +91,8 @@ export class BookingsController {
   }
 
   @Patch(':id/reschedule/confirm')
-  @UseGuards(EmailVerifiedGuard)
+  @UseGuards(RolesGuard, EmailVerifiedGuard)
+  @Roles(UserRole.CUSTOMER)
   @RequireEmailVerified()
   @ApiOperation({ summary: 'Yeni tarix təklifini təsdiqlə (müştəri)' })
   confirmReschedule(@Param('id') id: string, @CurrentUser('id') userId: string) {
@@ -95,7 +100,8 @@ export class BookingsController {
   }
 
   @Patch(':id/reschedule/reject')
-  @UseGuards(EmailVerifiedGuard)
+  @UseGuards(RolesGuard, EmailVerifiedGuard)
+  @Roles(UserRole.CUSTOMER)
   @RequireEmailVerified()
   @ApiOperation({ summary: 'Yeni tarix təklifini rədd et (müştəri)' })
   rejectReschedule(@Param('id') id: string, @CurrentUser('id') userId: string) {

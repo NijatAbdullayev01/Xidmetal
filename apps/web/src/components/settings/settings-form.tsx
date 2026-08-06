@@ -9,10 +9,12 @@ import {
   changePasswordSchema,
   requestEmailChangeSchema,
   confirmEmailChangeSchema,
+  deleteAccountSchema,
   type UpdateProfileInput,
   type ChangePasswordInput,
   type RequestEmailChangeInput,
   type ConfirmEmailChangeInput,
+  type DeleteAccountInput,
 } from '@xidmetal/shared';
 import {
   Camera,
@@ -32,6 +34,8 @@ import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 import { useAuthStore } from '@/store/auth.store';
 import { AZ_PHONE_PREFIX, azPhoneLocalPart, toAzPhoneValue } from '@/lib/phone';
 import { cn } from '@/lib/utils';
+import { useLogout } from '@/hooks/use-logout';
+import { useRouter } from 'next/navigation';
 
 const MAX_AVATAR_SIZE_BYTES = 1 * 1024 * 1024;
 const ACCEPTED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -78,6 +82,8 @@ export function SettingsForm() {
   const hydrated = useAuthHydrated();
   const token = useAuthToken();
   const queryClient = useQueryClient();
+  const logout = useLogout();
+  const router = useRouter();
   const authUser = useAuthStore((state) => state.user);
   const updateUser = useAuthStore((state) => state.updateUser);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -134,6 +140,16 @@ export function SettingsForm() {
       confirmNewPassword: '',
     },
   });
+
+  const deleteAccountForm = useForm<DeleteAccountInput>({
+    resolver: zodResolver(deleteAccountSchema),
+    defaultValues: {
+      password: '',
+      confirmText: '',
+    },
+  });
+  const [deleteServerError, setDeleteServerError] = useState<string | null>(null);
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
 
   const emailRequestForm = useForm<RequestEmailChangeInput>({
     resolver: zodResolver(requestEmailChangeSchema),
@@ -215,6 +231,21 @@ export function SettingsForm() {
         setPasswordServerError(error.message);
       } else {
         setPasswordServerError('Şifrə dəyişdirilərkən xəta baş verdi');
+      }
+    },
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: (data: DeleteAccountInput) => api.users.deleteAccount(token!, data),
+    onSuccess: () => {
+      logout();
+      router.replace('/');
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setDeleteServerError(error.message);
+      } else {
+        setDeleteServerError('Hesab silinərkən xəta baş verdi');
       }
     },
   });
@@ -782,6 +813,94 @@ export function SettingsForm() {
                 </>
               ) : (
                 'Şifrəni dəyiş'
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border-destructive/40">
+        <CardHeader>
+          <CardTitle className="text-destructive">Təhlükəli zona</CardTitle>
+          <CardDescription>
+            Hesabınız soft-delete olunacaq. Aktiv sifarişiniz varsa əvvəlcə onları tamamlayın
+            və ya ləğv edin. Bu əməliyyat geri qaytarılmır.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="space-y-4"
+            onSubmit={deleteAccountForm.handleSubmit((values) =>
+              deleteAccountMutation.mutate(values),
+            )}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="delete-password">Şifrə</Label>
+              <div className="relative">
+                <Input
+                  id="delete-password"
+                  type={showDeletePassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  className="pr-10"
+                  {...deleteAccountForm.register('password')}
+                />
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowDeletePassword((v) => !v)}
+                  aria-label={showDeletePassword ? 'Şifrəni gizlə' : 'Şifrəni göstər'}
+                >
+                  {showDeletePassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+              {deleteAccountForm.formState.errors.password && (
+                <p className="text-sm text-destructive">
+                  {deleteAccountForm.formState.errors.password.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="delete-confirm">Təsdiq (SIL yazın)</Label>
+              <Input
+                id="delete-confirm"
+                autoComplete="off"
+                placeholder="SIL"
+                {...deleteAccountForm.register('confirmText')}
+              />
+              {deleteAccountForm.formState.errors.confirmText && (
+                <p className="text-sm text-destructive">
+                  {deleteAccountForm.formState.errors.confirmText.message}
+                </p>
+              )}
+            </div>
+
+            {deleteServerError && (
+              <p className="text-sm text-destructive" role="alert">
+                {deleteServerError}
+              </p>
+            )}
+
+            <Button
+              type="submit"
+              variant="destructive"
+              className="min-h-[44px]"
+              disabled={deleteAccountMutation.isPending}
+            >
+              {deleteAccountMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Silinir...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4" />
+                  Hesabı sil
+                </>
               )}
             </Button>
           </form>

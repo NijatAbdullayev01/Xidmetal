@@ -28,13 +28,20 @@ export function isAllowedMediaUrl(url: string, allowedBases: string[]): boolean 
   const trimmed = url.trim();
   if (!trimmed) return false;
 
-  if (trimmed.startsWith('/uploads/')) {
-    return trimmed.length > '/uploads/'.length && !trimmed.includes('..');
+  // İmza query-si validation-a mane olmasın
+  let withoutQuery = trimmed;
+  const q = trimmed.indexOf('?');
+  if (q !== -1) withoutQuery = trimmed.slice(0, q);
+  const hash = withoutQuery.indexOf('#');
+  if (hash !== -1) withoutQuery = withoutQuery.slice(0, hash);
+
+  if (withoutQuery.startsWith('/uploads/')) {
+    return withoutQuery.length > '/uploads/'.length && !withoutQuery.includes('..');
   }
 
   let parsed: URL;
   try {
-    parsed = new URL(trimmed);
+    parsed = new URL(withoutQuery);
   } catch {
     return false;
   }

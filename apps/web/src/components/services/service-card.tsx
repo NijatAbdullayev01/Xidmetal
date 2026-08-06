@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
-import dynamic from 'next/dynamic';
+import type { ReactNode } from 'react';
+import Link from 'next/link';
 import { MapPin, Wifi, User, Briefcase, Ruler, Route, Store, Home, type LucideIcon } from 'lucide-react';
 import type { ServiceSummary } from '@xidmetal/shared';
 import {
@@ -17,14 +17,6 @@ import { ServiceImagesPreview } from '@/components/services/service-images-previ
 import { ProviderReviewsTrigger } from '@/components/reviews/provider-reviews-trigger';
 import { getCategoryIcon } from '@/lib/category-icons';
 import { getPriceUnitLabel } from '@/lib/provider-labels';
-
-const ServicePreviewDialog = dynamic(
-  () =>
-    import('@/components/services/service-preview-dialog').then((mod) => ({
-      default: mod.ServicePreviewDialog,
-    })),
-  { ssr: false },
-);
 
 function ProviderAvatar({
   name,
@@ -45,7 +37,7 @@ function ProviderAvatar({
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={avatarUrl}
-        alt=""
+        alt={`${name} profil şəkli`}
         className="h-11 w-11 rounded-full object-cover"
       />
     );
@@ -105,7 +97,6 @@ export function ServiceCard({
   /** Kateqoriya səhifəsində false — səhifə başlığı artıq konteksti verir */
   showCategoryHeader?: boolean;
 }) {
-  const [previewOpen, setPreviewOpen] = useState(false);
   const Icon = getCategoryIcon(categorySlug ?? '');
   const hasExperience =
     service.providerExperience != null && service.providerExperience > 0;
@@ -131,23 +122,21 @@ export function ServiceCard({
   const hasReviews = service.reviewCount > 0;
 
   return (
-    <>
-      <article
+    <article
+      className={cn(
+        'group relative flex h-full flex-col overflow-hidden rounded-2xl bg-card pb-3.5',
+        'ring-1 ring-border/70 transition-[box-shadow,ring-color] duration-200',
+        'hover:shadow-md hover:ring-brand/30',
+      )}
+    >
+      <Link
+        href={`/services/${service.id}`}
         className={cn(
-          'group relative flex h-full flex-col overflow-hidden rounded-2xl bg-card pb-3.5',
-          'ring-1 ring-border/70 transition-[box-shadow,ring-color] duration-200',
-          'hover:shadow-md hover:ring-brand/30',
+          'absolute inset-0 z-[1] cursor-pointer rounded-2xl',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
         )}
-      >
-        <button
-          type="button"
-          onClick={() => setPreviewOpen(true)}
-          className={cn(
-            'absolute inset-0 z-[1] cursor-pointer rounded-2xl',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
-          )}
-          aria-label={`${service.title} — şəkillər və təsvir`}
-        />
+        aria-label={`${service.title} — ətraflı bax`}
+      />
 
         <div className="relative z-[2] flex min-h-0 flex-1 flex-col pointer-events-none">
           {hasImages ? (
@@ -297,14 +286,5 @@ export function ServiceCard({
           </div>
         </div>
       </article>
-
-      {previewOpen ? (
-        <ServicePreviewDialog
-          service={service}
-          open
-          onClose={() => setPreviewOpen(false)}
-        />
-      ) : null}
-    </>
   );
 }

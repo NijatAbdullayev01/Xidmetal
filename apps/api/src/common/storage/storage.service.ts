@@ -15,6 +15,7 @@ import {
   type UploadFolder,
 } from './storage.types';
 import { collectMediaBaseUrls, isAllowedMediaUrl } from './allowed-media-url';
+import { signPrivateMediaUrl, stripMediaSignature } from './signed-media';
 
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -81,14 +82,28 @@ export class StorageService implements OnModuleInit {
     url: string,
     message = 'Yalnız platforma yükləmələrindən şəkil URL istifadə edin',
   ): void {
+    const canonical = stripMediaSignature(url);
     const bases = collectMediaBaseUrls({
       storagePublicBaseUrl: this.config.get<string>('STORAGE_PUBLIC_BASE_URL'),
       apiUrl: this.config.get<string>('API_URL'),
       s3PublicUrl: this.config.get<string>('S3_PUBLIC_URL'),
     });
-    if (!isAllowedMediaUrl(url, bases)) {
+    if (!isAllowedMediaUrl(canonical, bases)) {
       throw new BadRequestException(message);
     }
+  }
+
+  /** DB-də saxlamaq üçün imzasız canonical URL */
+  toCanonicalMediaUrl(url: string): string {
+    return stripMediaSignature(url);
+  }
+
+  /** Brauzerə qaytarılarkən private (bookings) URL-ləri imzala */
+  toReadableMediaUrl(url: string | null | undefined): string | undefined {
+    if (!url) return undefined;
+    const canonical = stripMediaSignature(url);
+    const secret = this.config.get<string>('JWT_SECRET', '');
+    return signPrivateMediaUrl(canonical, secret);
   }
 
   async uploadImage(
@@ -146,13 +161,17 @@ export class StorageService implements OnModuleInit {
       },
     });
 
-    return stored;
+    const secret = this.config.get<string>('JWT_SECRET', '');
+    return {
+      ...stored,
+      url: signPrivateMediaUrl(stored.url, secret),
+    };
   }
 
   /** Bizim storage-dakı köhnə obyekti silir (best-effort). */
   async deleteByPublicUrl(url: string | null | undefined): Promise<void> {
     if (!url) return;
-    const key = this.driver.keyFromPublicUrl(url);
+    const key = this.driver.keyFromPublicUrl(stripMediaSignature(url));
     if (!key) return;
 
     try {

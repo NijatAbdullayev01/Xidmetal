@@ -10,22 +10,27 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 import { API } from '@xidmetal/shared';
 import { assertJwtSecretForRuntime } from './common/auth/jwt-secret';
+import { createAppLogger } from './common/logging/app.logger';
+import { requestIdMiddleware } from './common/middleware/request-id.middleware';
+import { createPrivateUploadsGuard } from './common/middleware/private-uploads.middleware';
 
 /** Upload URL-ləri JSON-da qısa olduğu üçün böyük body lazım deyil */
 const JSON_BODY_LIMIT = '1mb';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const logger = createAppLogger();
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger,
+  });
+  app.use(requestIdMiddleware);
   app.use(cookieParser());
   app.useBodyParser('json', { limit: JSON_BODY_LIMIT });
   app.useBodyParser('urlencoded', { limit: JSON_BODY_LIMIT, extended: true });
 
   const configService = app.get(ConfigService);
   const nodeEnv = configService.get<string>('NODE_ENV', 'development');
-  assertJwtSecretForRuntime(
-    configService.get<string>('JWT_SECRET', ''),
-    nodeEnv,
-  );
+  const jwtSecret = configService.get<string>('JWT_SECRET', '');
+  assertJwtSecretForRuntime(jwtSecret, nodeEnv);
 
   const trustProxy = configService.get<string>('TRUST_PROXY', '');
   if (trustProxy === 'true' || trustProxy === '1') {
@@ -48,6 +53,8 @@ async function bootstrap() {
     .filter((origin, index, all) => all.indexOf(origin) === index);
 
   const localUploadDir = configService.get<string>('STORAGE_LOCAL_DIR', './uploads');
+  // Booking şəkilləri HMAC imza tələb edir; services/avatars açıqdır
+  app.use('/uploads', createPrivateUploadsGuard(jwtSecret));
   app.useStaticAssets(join(process.cwd(), localUploadDir), {
     prefix: '/uploads/',
   });
@@ -92,9 +99,9 @@ async function bootstrap() {
   }
 
   await app.listen(port);
-  console.log(`🚀 API: http://localhost:${port}${API.prefix}`);
+  logger.log(`API dinləyir: http://localhost:${port}${API.prefix}`, 'Bootstrap');
   if (swaggerEnabled) {
-    console.log(`📚 Swagger: http://localhost:${port}/docs`);
+    logger.log(`Swagger: http://localhost:${port}/docs`, 'Bootstrap');
   }
 }
 

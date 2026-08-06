@@ -6,7 +6,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { randomInt } from 'crypto';
+import { randomBytes, randomInt } from 'crypto';
 import { EmailVerificationPurpose, UserRole } from '@prisma/client';
 import { PrismaService } from '../../common/database/prisma.service';
 import { MailService } from '../../common/mail/mail.service';
@@ -17,6 +17,7 @@ import {
   UpdateProfileDto,
   RequestEmailChangeDto,
   ConfirmEmailChangeDto,
+  DeleteAccountDto,
 } from './dto';
 
 const EMAIL_CODE_EXPIRY_MS = 15 * 60 * 1000;
@@ -251,6 +252,76 @@ export class UsersService {
     });
 
     return this.mapUserProfile(updatedUser);
+  }
+
+  async deleteAccount(userId: string, dto: DeleteAccountDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        deletedAt: true,
+        isActive: true,
+        role: true,
+        avatarUrl: true,
+      },
+    });
+
+    if (!user || user.deletedAt || !user.isActive) {
+      throw new NotFoundException('İstifadəçi tapılmadı');
+    }
+
+    if (user.role === UserRole.ADMIN) {
+      throw new BadRequestException('Administrator hesabı bu yolla silinə bilməz');
+    }
+
+    const valid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Şifrə səhvdir');
+    }
+
+    const activeBooking = await this.prisma.booking.findFirst({
+      where: {
+        OR: [{ customerId: userId }, { providerId: userId }],
+        status: { in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] },
+      },
+      select: { id: true },
+    });
+
+    if (activeBooking) {
+      throw new BadRequestException(
+        'Aktiv sifarişiniz varken hesabı silə bilməzsiniz. Əvvəlcə sifarişləri tamamlayın və ya ləğv edin.',
+      );
+    }
+
+    const tombstoneEmail = `deleted+${userId}@deleted.xidmetal.local`;
+    const scrambledHash = await bcrypt.hash(randomBytes(32).toString('hex'), 12);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          deletedAt: new Date(),
+          isActive: false,
+          email: tombstoneEmail,
+          phone: null,
+          avatarUrl: null,
+          passwordHash: scrambledHash,
+          passwordChangedAt: new Date(),
+          firstName: 'Silinmiş',
+          lastName: 'İstifadəçi',
+        },
+      }),
+      this.prisma.refreshToken.deleteMany({ where: { userId } }),
+      this.prisma.emailVerificationCode.deleteMany({ where: { userId } }),
+    ]);
+
+    if (user.avatarUrl) {
+      await this.storageService.deleteByPublicUrl(user.avatarUrl);
+    }
+
+    return { message: 'Hesabınız silindi' };
   }
 
   private mapUserProfile(user: {

@@ -82,7 +82,10 @@ async function refreshAccessToken(): Promise<string | null> {
         const response = await fetch(`${API_URL}${API_PREFIX}/auth/refresh`, {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            [CLIENT_APP_HEADER]: CLIENT_APP.MARKETPLACE,
+          },
           body: JSON.stringify({}),
         });
         if (!response.ok) {
@@ -189,6 +192,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({}),
         token: 'session',
+        headers: { [CLIENT_APP_HEADER]: CLIENT_APP.MARKETPLACE },
       }),
     logout: () =>
       apiClient<{ message: string }>('/auth/logout', {
@@ -254,6 +258,15 @@ export const api = {
     confirmEmailChange: (token: string, data: ConfirmEmailChangeInput) =>
       apiClient<UserProfile>('/users/me/email/confirm-change', {
         method: 'POST',
+        token,
+        body: JSON.stringify(data),
+      }),
+    deleteAccount: (
+      token: string,
+      data: { password: string; confirmText: string },
+    ) =>
+      apiClient<{ message: string }>('/users/me', {
+        method: 'DELETE',
         token,
         body: JSON.stringify(data),
       }),
@@ -354,11 +367,19 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  updateBookingStatus: (token: string, id: string, status: BookingStatus) =>
+  updateBookingStatus: (
+    token: string,
+    id: string,
+    status: BookingStatus,
+    options?: { cancelReason?: string },
+  ) =>
     apiClient<BookingSummary>(`/bookings/${id}/status`, {
       method: 'PATCH',
       token,
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({
+        status,
+        ...(options?.cancelReason ? { cancelReason: options.cancelReason } : {}),
+      }),
     }),
 
   rescheduleBooking: (token: string, id: string, data: RescheduleBookingInput) =>

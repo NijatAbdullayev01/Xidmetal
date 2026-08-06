@@ -3,12 +3,10 @@ import { ForbiddenException } from '@nestjs/common';
 import { CLIENT_APP, UserRole } from '@xidmetal/shared';
 import { AuthService } from '../../modules/auth/auth.service';
 
-/** assertClientAudience təmiz pure qayda — service instance olmadan yoxlamaq üçün mirror */
 function assertClientAudience(
   role: string,
-  clientApp?: (typeof CLIENT_APP)[keyof typeof CLIENT_APP],
+  clientApp: (typeof CLIENT_APP)[keyof typeof CLIENT_APP],
 ): void {
-  // AuthService ilə eyni məntiq
   const svc = Object.create(AuthService.prototype) as AuthService;
   svc.assertClientAudience(role, clientApp);
 }
@@ -32,7 +30,9 @@ describe('assertClientAudience', () => {
     ).not.toThrow();
   });
 
-  it('clientApp yoxdursa — geriyə uyğun OK', () => {
-    expect(() => assertClientAudience(UserRole.ADMIN, undefined)).not.toThrow();
+  it('admin + ADMIN → OK', () => {
+    expect(() =>
+      assertClientAudience(UserRole.ADMIN, CLIENT_APP.ADMIN),
+    ).not.toThrow();
   });
 });

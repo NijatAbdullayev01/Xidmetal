@@ -52,7 +52,10 @@ async function refreshAccessToken(): Promise<string | null> {
         const response = await fetch(`${API_URL}${API_PREFIX}/auth/refresh`, {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            [CLIENT_APP_HEADER]: CLIENT_APP.ADMIN,
+          },
           body: JSON.stringify({}),
         });
         if (!response.ok) {
@@ -129,6 +132,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({}),
         token: 'session',
+        headers: { [CLIENT_APP_HEADER]: CLIENT_APP.ADMIN },
       }),
     logout: () =>
       apiClient<{ message: string }>('/auth/logout', {

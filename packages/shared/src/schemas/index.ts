@@ -182,6 +182,16 @@ export const changePasswordSchema = z
     path: ['confirmNewPassword'],
   });
 
+/** Hesab soft-delete — şifrə təsdiqi */
+export const deleteAccountSchema = z.object({
+  password: z.string().min(1, 'Şifrə tələb olunur'),
+  confirmText: z
+    .string()
+    .refine((v) => v.trim().toUpperCase() === 'SIL', {
+      message: 'Təsdiq üçün SIL yazın',
+    }),
+});
+
 export const requestEmailChangeSchema = z.object({
   newEmail: emailSchema,
 });
@@ -329,6 +339,7 @@ export type CreateReviewInput = z.infer<typeof createReviewSchema>;
 export type UpdateServiceInput = z.infer<typeof updateServiceSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
 export type RequestEmailChangeInput = z.infer<typeof requestEmailChangeSchema>;
 export type ConfirmEmailChangeInput = z.infer<typeof confirmEmailChangeSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;

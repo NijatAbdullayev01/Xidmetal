@@ -99,6 +99,9 @@ export interface BookingSummary {
   notes?: string;
   address?: string;
   imageUrl?: string;
+  cancelReason?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
   hasReview?: boolean;
   createdAt: string;
 }

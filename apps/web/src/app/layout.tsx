@@ -13,7 +13,13 @@ export const metadata: Metadata = {
     template: `%s | ${APP.name}`,
   },
   description: APP.description,
-  keywords: ['xidmət', 'xidmət verən', 'booking', 'azərbaycan', 'xidmət platforması'],
+  keywords: ['xidmət', 'xidmət verən', 'sifariş', 'azərbaycan', 'xidmət platforması'],
+  openGraph: {
+    title: APP.name,
+    description: APP.description,
+    locale: 'az_AZ',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

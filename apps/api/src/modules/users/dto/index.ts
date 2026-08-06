@@ -77,3 +77,15 @@ export class ConfirmEmailChangeDto {
   @Matches(/^\d{6}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
   code!: string;
 }
+
+export class DeleteAccountDto {
+  @ApiProperty({ description: 'Cari şifrə' })
+  @IsString()
+  @MinLength(1, { message: 'Şifrə tələb olunur' })
+  password!: string;
+
+  @ApiProperty({ example: 'SIL', description: 'Təsdiq üçün SIL yazın' })
+  @IsString()
+  @Matches(/^SIL$/i, { message: 'Təsdiq üçün SIL yazın' })
+  confirmText!: string;
+}

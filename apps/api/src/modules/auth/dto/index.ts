@@ -56,13 +56,12 @@ export class LoginDto {
   @IsString()
   password!: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     enum: ['marketplace', 'admin'],
-    description: 'Klient audinesi — yanlış app-də session cookie qoyulmur',
+    description: 'Klient audinesi — məcburi; yanlış app-də session cookie qoyulmur',
   })
-  @IsOptional()
   @IsIn(['marketplace', 'admin'])
-  clientApp?: 'marketplace' | 'admin';
+  clientApp!: 'marketplace' | 'admin';
 }
 
 export class RefreshTokenDto {

@@ -96,11 +96,14 @@ model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique
   userId    String   @map("user_id")
+  /** marketplace | admin — refresh zamanı audiense saxlanılır */
+  clientApp String   @map("client_app")
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("refresh_tokens")
 }
 
@@ -262,6 +265,11 @@ model Booking {
   notes       String?
   address     String?
   imageUrl    String?       @map("image_url") @db.Text
+  /** Ləğv səbəbi (CANCELLED olduqda) */
+  cancelReason String?      @map("cancel_reason") @db.VarChar(500)
+  /** CUSTOMER | PROVIDER | ADMIN */
+  cancelledBy  String?      @map("cancelled_by") @db.VarChar(20)
+  cancelledAt  DateTime?    @map("cancelled_at")
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
@@ -353,6 +361,7 @@ enum NotificationType {
   BOOKING_CONFIRMED
   BOOKING_CANCELLED
   BOOKING_COMPLETED
+  BOOKING_IN_PROGRESS
   BOOKING_RESCHEDULE_PROPOSED
   REVIEW_RECEIVED
   MESSAGE_RECEIVED

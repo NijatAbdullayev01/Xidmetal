@@ -37,7 +37,7 @@ import {
   type ClientApp,
 } from '@xidmetal/shared';
 
-function resolveClientApp(req: Request, bodyClientApp?: string): ClientApp | undefined {
+function resolveClientApp(req: Request, bodyClientApp?: string): ClientApp {
   if (bodyClientApp === CLIENT_APP.MARKETPLACE || bodyClientApp === CLIENT_APP.ADMIN) {
     return bodyClientApp;
   }
@@ -46,7 +46,9 @@ function resolveClientApp(req: Request, bodyClientApp?: string): ClientApp | und
   if (raw === CLIENT_APP.MARKETPLACE || raw === CLIENT_APP.ADMIN) {
     return raw;
   }
-  return undefined;
+  throw new BadRequestException(
+    'Klient audinesi tələb olunur (x-xidmetal-client və ya clientApp)',
+  );
 }
 
 /** Token-lər yalnız httpOnly cookie — JSON XSS səthi yox */
@@ -124,9 +126,23 @@ export class AuthController {
     if (!refreshToken) {
       throw new BadRequestException('Refresh token tələb olunur');
     }
-    const result = await this.authService.refresh(refreshToken);
-    setAuthCookies(res, this.config, result.tokens);
-    return toAuthResponse(result);
+    const clientAppHint = (() => {
+      try {
+        return resolveClientApp(req, undefined);
+      } catch {
+        return undefined;
+      }
+    })();
+    try {
+      const result = await this.authService.refresh(refreshToken, clientAppHint);
+      setAuthCookies(res, this.config, result.tokens);
+      return toAuthResponse(result);
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        clearAuthCookies(res, this.config);
+      }
+      throw error;
+    }
   }
 
   @Public()

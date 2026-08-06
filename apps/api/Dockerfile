@@ -30,6 +30,6 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/api ./apps/api
 COPY --from=build /app/packages ./packages
 EXPOSE 4000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD wget -qO- http://127.0.0.1:4000/api/v1/health/ready || exit 1
-CMD ["pnpm", "--filter", "@xidmetal/api", "start:prod"]
+CMD ["sh", "-c", "pnpm --filter @xidmetal/database exec prisma migrate deploy && pnpm --filter @xidmetal/api start:prod"]

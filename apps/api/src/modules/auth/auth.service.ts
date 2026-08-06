@@ -113,7 +113,12 @@ export class AuthService {
       (to, code) => this.mailService.sendSignupVerificationCode(to, code),
     );
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.role,
+      CLIENT_APP.MARKETPLACE,
+    );
     return {
       user: this.sanitizeUser(user),
       tokens,
@@ -121,7 +126,7 @@ export class AuthService {
     };
   }
 
-  async login(dto: LoginDto, clientApp?: ClientApp) {
+  async login(dto: LoginDto, clientApp: ClientApp) {
     const email = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
     const usable =
@@ -137,17 +142,20 @@ export class AuthService {
 
     this.assertClientAudience(usable.role, clientApp);
 
-    const tokens = await this.generateTokens(usable.id, usable.email, usable.role);
+    const tokens = await this.generateTokens(
+      usable.id,
+      usable.email,
+      usable.role,
+      clientApp,
+    );
     return { user: this.sanitizeUser(usable), tokens };
   }
 
   /**
    * Marketplace yalnız CUSTOMER/PROVIDER; admin panel yalnız ADMIN.
-   * Token/cookie audiense uyğun olmadan yaradılmır.
+   * clientApp məcburidir — yanlış app-də session yaradılmır.
    */
-  assertClientAudience(role: string, clientApp?: ClientApp): void {
-    if (!clientApp) return;
-
+  assertClientAudience(role: string, clientApp: ClientApp): void {
     if (clientApp === CLIENT_APP.MARKETPLACE && role === UserRole.ADMIN) {
       throw new ForbiddenException(
         'Administrator hesabı marketplace-ə aid deyil. Admin panelinə keçin.',
@@ -158,7 +166,7 @@ export class AuthService {
     }
   }
 
-  async refresh(refreshToken: string) {
+  async refresh(refreshToken: string, clientAppHint?: ClientApp) {
     const tokenHash = hashRefreshToken(refreshToken);
     const stored = await this.prisma.refreshToken.findUnique({
       where: { token: tokenHash },
@@ -166,6 +174,7 @@ export class AuthService {
         id: true,
         expiresAt: true,
         userId: true,
+        clientApp: true,
         user: {
           select: {
             id: true,
@@ -193,6 +202,18 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token etibarsızdır');
     }
 
+    const storedApp =
+      stored.clientApp === CLIENT_APP.ADMIN || stored.clientApp === CLIENT_APP.MARKETPLACE
+        ? stored.clientApp
+        : CLIENT_APP.MARKETPLACE;
+
+    // Client hint varsa session audiense ilə uyğun olmalıdır
+    if (clientAppHint && clientAppHint !== storedApp) {
+      throw new ForbiddenException('Sessiya bu tətbiq üçün etibarsızdır');
+    }
+
+    this.assertClientAudience(stored.user.role, storedApp);
+
     // Atomic silinmə: eyni token ilə paralel refresh sorğularının hər ikisinin
     // yeni token cütlüyü yaratmasının (token reuse) qarşısını alır.
     const { count } = await this.prisma.refreshToken.deleteMany({
@@ -208,6 +229,7 @@ export class AuthService {
       stored.user.id,
       stored.user.email,
       stored.user.role,
+      storedApp,
     );
     return { user: this.sanitizeUser(stored.user), tokens };
   }
@@ -397,8 +419,13 @@ export class AuthService {
     };
   }
 
-  private async generateTokens(userId: string, email: string, role: string) {
-    const payload = { sub: userId, email, role };
+  private async generateTokens(
+    userId: string,
+    email: string,
+    role: string,
+    clientApp: ClientApp,
+  ) {
+    const payload = { sub: userId, email, role, aud: clientApp };
 
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = randomBytes(64).toString('hex');
@@ -411,6 +438,7 @@ export class AuthService {
       data: {
         token: hashRefreshToken(refreshToken),
         userId,
+        clientApp,
         expiresAt,
       },
     });

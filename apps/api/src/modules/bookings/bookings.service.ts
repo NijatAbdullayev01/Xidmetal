@@ -101,6 +101,10 @@ export class BookingsService {
       this.storageService.assertAllowedMediaUrl(dto.imageUrl);
     }
 
+    const imageUrl = dto.imageUrl
+      ? this.storageService.toCanonicalMediaUrl(dto.imageUrl)
+      : undefined;
+
     const booking = await this.prisma.$transaction(async (tx) => {
       const service = await tx.service.findUnique({
         where: { id: dto.serviceId },
@@ -149,7 +153,7 @@ export class BookingsService {
           totalPrice: service.price,
           notes,
           address: address || null,
-          imageUrl: dto.imageUrl,
+          imageUrl: imageUrl ?? null,
           status: BookingStatus.PENDING,
         },
         include: bookingSummaryInclude,
@@ -390,9 +394,22 @@ export class BookingsService {
     );
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      const cancelMeta =
+        dto.status === BookingStatus.CANCELLED
+          ? {
+              cancelReason: dto.cancelReason?.trim() || null,
+              cancelledBy: isAdmin
+                ? 'ADMIN'
+                : isCustomer
+                  ? 'CUSTOMER'
+                  : 'PROVIDER',
+              cancelledAt: new Date(),
+            }
+          : {};
+
       const result = await tx.booking.update({
         where: { id },
-        data: { status: dto.status },
+        data: { status: dto.status, ...cancelMeta },
         include: bookingSummaryInclude,
       });
 
@@ -420,6 +437,18 @@ export class BookingsService {
         });
       }
 
+      if (dto.status === BookingStatus.IN_PROGRESS) {
+        await tx.notification.create({
+          data: {
+            userId: booking.customerId,
+            type: NotificationType.BOOKING_IN_PROGRESS,
+            title: 'Sifariş başladı',
+            body: `«${result.service.title}» sifarişiniz icra olunur.`,
+            data: { bookingId: result.id },
+          },
+        });
+      }
+
       if (dto.status === BookingStatus.COMPLETED) {
         await tx.notification.create({
           data: {
@@ -439,12 +468,15 @@ export class BookingsService {
           : isCustomer
             ? 'müştəri'
             : 'xidmət verən';
+        const reasonSuffix = dto.cancelReason?.trim()
+          ? ` Səbəb: ${dto.cancelReason.trim()}`
+          : '';
         await tx.notification.create({
           data: {
             userId: recipientId,
             type: NotificationType.BOOKING_CANCELLED,
             title: 'Sifariş ləğv edildi',
-            body: `«${result.service.title}» sifarişi ${actorLabel} tərəfindən ləğv edildi.`,
+            body: `«${result.service.title}» sifarişi ${actorLabel} tərəfindən ləğv edildi.${reasonSuffix}`,
             data: { bookingId: result.id },
           },
         });
@@ -481,6 +513,9 @@ export class BookingsService {
     notes: string | null;
     address?: string | null;
     imageUrl?: string | null;
+    cancelReason?: string | null;
+    cancelledBy?: string | null;
+    cancelledAt?: Date | null;
     review?: { id: string } | null;
     createdAt: Date;
   }) {
@@ -498,7 +533,10 @@ export class BookingsService {
       totalPrice: booking.totalPrice.toNumber(),
       notes: booking.notes ?? undefined,
       address: booking.address ?? undefined,
-      imageUrl: booking.imageUrl ?? undefined,
+      imageUrl: this.storageService.toReadableMediaUrl(booking.imageUrl),
+      cancelReason: booking.cancelReason ?? undefined,
+      cancelledBy: booking.cancelledBy ?? undefined,
+      cancelledAt: booking.cancelledAt?.toISOString(),
       hasReview: !!booking.review,
       createdAt: booking.createdAt.toISOString(),
     };

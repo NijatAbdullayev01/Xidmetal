@@ -35,6 +35,12 @@ export class UpdateBookingStatusDto {
   @ApiProperty({ enum: BookingStatus })
   @IsEnum(BookingStatus)
   status!: BookingStatus;
+
+  @ApiPropertyOptional({ description: 'Ləğv səbəbi (CANCELLED olduqda tövsiyə olunur)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  cancelReason?: string;
 }
 
 export class RescheduleBookingDto {
