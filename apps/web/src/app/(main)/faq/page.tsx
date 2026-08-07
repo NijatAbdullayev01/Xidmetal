@@ -37,7 +37,7 @@ const faqs: { question: string; answer: string }[] = [
   {
     question: 'Platforma komissiya və ya ödəniş alır?',
     answer:
-      'Xeyr. Hal-hazırda Xidmətal xidmət verənlərdən və müştərilərdən platforma haqqı / komissiya tutmur. Xidmət haqqı tərəflər arasında birbaşa razılaşdırılır.',
+      'Xeyr. Hal-hazırda Xidmətal xidmət verənlərdən və müştərilərdən platforma haqqı / komissiya tutmur. Kartla onlayn ödəniş də yoxdur — xidmət haqqı tərəflər arasında birbaşa (nağd və ya digər razılaşma) ödənilir.',
   },
   {
     question: 'Rəy yazmaq məcburidirmi?',

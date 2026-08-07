@@ -14,6 +14,7 @@ import {
   Users,
   FolderTree,
   ShieldCheck,
+  Flag,
   Megaphone,
   type LucideIcon,
 } from 'lucide-react';
@@ -40,6 +41,7 @@ const ADMIN_NAV: NavItem[] = [
   { href: '/services', label: 'Xidmətlər', icon: Briefcase },
   { href: '/bookings', label: 'Sifarişlər', icon: ClipboardList },
   { href: '/reviews', label: 'Rəylər', icon: Star },
+  { href: '/reports', label: 'Şikayətlər', icon: Flag },
   { href: '/announcements', label: 'Bildirişlər', icon: Megaphone },
   { href: '/settings', label: 'Tənzimləmələr', icon: Settings },
 ];

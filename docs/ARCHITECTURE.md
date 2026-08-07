@@ -7,7 +7,7 @@
 
 Xidmətal **monorepo** arxitekturası ilə qurulub. Bu yanaşma kod paylaşımını, tip təhlükəsizliyini və vahid development workflow-unu təmin edir.
 
-**Hazırkı məhsul tipi:** planlaşdırılmış (scheduled) randevu marketplace — müştəri xidmət seçir, tarix/slot bron edir, provider təsdiqləyir; chat və rəy REST + polling ilə işləyir. On-demand çağırış, canlı xəritə və ödəniş **hələ yoxdur**.
+**Hazırkı məhsul tipi:** planlaşdırılmış (scheduled) randevu marketplace + **on-demand INSTANT dispatch** (Faza 4) — müştəri tarix/slot bron edir və ya «İndi çağır» ilə yaxın ONLINE provider-lərə təklif göndərir; chat/bildiriş REST polling + Socket.IO (tracking/status/dispatch). Platforma **ödənişsizdir** (cash-only; `PAYMENTS_ENABLED=false` — Faza 5 scaffolding).
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -22,12 +22,12 @@ Xidmətal **monorepo** arxitekturası ilə qurulub. Bu yanaşma kod paylaşımı
 │  │ App Router│ │  + UI    │  │ (Zustand)│              │
 │  └──────────┘  └──────────┘  └──────────┘              │
 └────────────────────────┬────────────────────────────────┘
-                         │ REST API (JSON) + TanStack Query poll
+                         │ REST + WSS (Socket.IO) + TanStack Query poll
 ┌────────────────────────▼────────────────────────────────┐
 │                   apps/api (NestJS 11)                  │
 │  ┌──────────────────────────────────────────────────┐  │
 │  │              Presentation Layer                   │  │
-│  │         Controllers + DTOs + Guards              │  │
+│  │   Controllers + DTOs + Guards + Socket.IO GW     │  │
 │  └──────────────────────┬───────────────────────────┘  │
 │  ┌──────────────────────▼───────────────────────────┐  │
 │  │              Application Layer                    │  │
@@ -35,9 +35,10 @@ Xidmətal **monorepo** arxitekturası ilə qurulub. Bu yanaşma kod paylaşımı
 │  └──────────────────────┬───────────────────────────┘  │
 │  ┌──────────────────────▼───────────────────────────┐  │
 │  │              Infrastructure Layer                 │  │
-│  │         Prisma ORM + PostgreSQL                   │  │
-│  │         (Redis docker-da var, API hələ istifadə   │  │
-│  │          etmir; mail: opsional SMTP/Nodemailer)   │  │
+│  │         Prisma ORM + PostgreSQL (+ PostGIS)       │  │
+│  │         Redis: throttler + Socket.IO adapter      │  │
+│  │         Mail: SMTP/Nodemailer (prod məcburi)      │  │
+│  │         Observability: pino + Sentry + Prometheus │  │
 │  └──────────────────────────────────────────────────┘  │
 └────────────────────────┬────────────────────────────────┘
                          │
@@ -60,12 +61,20 @@ Backend modulları (`apps/api/src/modules/`) — **cari status:**
 | `categories` | Kateqoriya siyahısı (yalnız oxu; seed ilə doldurulur) | ✅ oxu |
 | `services` | Xidmət elanları CRUD, şəkillər, filtrlər | ✅ |
 | `availability` | İş saatları, override, boş slotlar | ✅ |
-| `bookings` | Sifariş, status keçidləri, tarix təklifi | ✅ (scheduled) |
+| `bookings` | Sifariş, status keçidləri (`EN_ROUTE`/`ARRIVED`), `BookingType`, tarix təklifi | ✅ |
+| `dispatch` | On-demand: yaxın provider, `DispatchOffer`, BullMQ timeout, sequential reassign | ✅ |
+| `payments` | Intent/hold/capture/refund scaffolding; `PAYMENTS_ENABLED=false` default (501) | ✅ flag OFF |
 | `reviews` | Rəy yaratma + rating aggregate (PENDING → admin APPROVED) | ✅ |
-| `messages` | Müştəri↔provider söhbət (REST; typing in-memory) | ✅ |
-| `notifications` | In-app bildirişlər (booking/review/admin emit + oxundu) | ✅ |
+| `messages` | Müştəri↔provider söhbət (REST; TypingPresence DB) | ✅ |
+| `notifications` | In-app + best-effort push (FCM/noop); SMS opsional (`SMS_STATUS_ENABLED`) | ✅ |
+| `devices` | DeviceToken register/unregister (JWT) | ✅ |
+| `reports` | İstifadəçi şikayətləri + admin moderation | ✅ |
+| `contact` | İctimai əlaqə formu | ✅ |
 | `health` | Sağlamlıq yoxlaması | ✅ |
-| `payments` / `geo` / `realtime` / `tracking` / `dispatch` | Hədəf arxitektura | ❌ |
+| `metrics` (common) | Prometheus `/api/v1/metrics` — HTTP + business counters; opsional `METRICS_TOKEN` | ✅ |
+| `geo` | Geokodlaşdırma (mock/Nominatim), PostGIS `ST_DWithin` yaxınlıq, provider mövqe/availability | ✅ |
+| `realtime` | Socket.IO gateway, JWT handshake, otaqlar (`booking`/`user`/`provider`), Redis adapter | ✅ |
+| `tracking` | `location:push` → yayım + ETA + `LocationPing` sampling; REST pings | ✅ |
 
 ### 2. Clean Architecture qatları
 
@@ -103,30 +112,34 @@ src/
 ```
 
 **State management:**
-- **Server state:** TanStack Query (API data; mesaj/bildiriş/sifariş **polling**)
+- **Server state:** TanStack Query (API data; mesaj/bildiriş/sifariş **polling** + WS invalidate)
 - **Client state:** Zustand (auth)
 - **Form state:** React Hook Form + Zod (shared schemas)
 
 **Əsas marşrutlar:**
 - İctimai: `/`, `/services`, `/categories/[slug]`, marketing/legal səhifələr
 - Auth: `/login`, `/register`
-- Customer: `/dashboard/customer` (+ bookings, messages, settings)
-- Provider: `/dashboard/provider` (+ services, calendar, bookings, messages, ratings, settings)
-- Xidmət detal: ayrıca `/services/[id]` səhifəsi yoxdur — kart + preview dialog
+- Customer: `/dashboard/customer` (+ bookings, messages, notifications, settings)
+- Provider: `/dashboard/provider` (+ services, calendar, bookings, messages, notifications, ratings, settings)
+- Xidmət detal: `/services/[id]` (SSR səhifə)
 - Admin UI: **ayrı app** (`apps/admin`, port `3021`) — marketplace (`apps/web`) daxilində deyil
 
 ## Data Model
 
 ```
-User ──┬── ProviderProfile
+User ──┬── ProviderProfile (availability, lastLat/lng + PostGIS last_location)
        ├── Service (provider) ── ServiceImage / WorkingHours / Overrides
-       ├── Booking (customer / provider) ── Review?
+       ├── Booking (customer / provider; dest/origin coords) ── Review?
        │                              └── Conversation?
        ├── Notification
        └── Conversation / Message
 ```
 
 Kateqoriyalar seed ilə; `Service`-də venue, (yükdaşıma üçün) ölçü və `cargoRouteScope` sahələri dəstəklənir.
+
+**Geospatial (Faza 2):** Docker `postgis/postgis:16-3.5`; `ProviderAvailability` (`OFFLINE`/`ONLINE`/`BUSY`) domain field-dir — `User.lastSeenAt` presence heartbeat-indən ayrıdır. WS connect/disconnect provider ONLINE→OFFLINE (BUSY toxunulmur); heartbeat `lastSeenAt` saxlayır. Yaxınlıq: PostGIS `ST_DWithin`; extension yoxdursa haversine fallback. Geocoder: `GEOCODER_PROVIDER=mock|nominatim`.
+
+**Dispatch (Faza 4):** `INSTANT` sifariş → `GeoService.findNearby` + sıralama (məsafə, reytinq) → bir anda bir `DispatchOffer` → BullMQ delayed timeout (`DISPATCH_OFFER_TIMEOUT_SEC`) → reject/expire → növbəti; tükənəndə auto-cancel + müştəri bildirişi. Redis yoxdursa development-də in-process `setTimeout`.
 
 ### Rollar
 
@@ -140,8 +153,8 @@ Kateqoriyalar seed ilə; `Service`-də venue, (yükdaşıma üçün) ölçü və
 
 ### Booking status (cari)
 
-`PENDING` → `CONFIRMED` / `REJECTED` / `CANCELLED` → `IN_PROGRESS` → `COMPLETED`  
-Keçidlər `bookings.service` daxilində rol matrisi ilə yoxlanır. Hədəf statuslar (`EN_ROUTE`, `ARRIVED`) və `BookingType` hələ schema-da yoxdur — bax: [BOOKING_LIFECYCLE.md](./BOOKING_LIFECYCLE.md).
+`PENDING` → `CONFIRMED` / `REJECTED` / `CANCELLED` → `EN_ROUTE` → `ARRIVED` → `IN_PROGRESS` → `COMPLETED`  
+Keçidlər shared `booking-lifecycle` + `bookings.service` rol matrisi ilə yoxlanır. `BookingType` (`SCHEDULED`/`INSTANT`): SCHEDULED = slot lock + əl ilə təsdiq; INSTANT = dest coords + avto-dispatch (`dispatch` modulu). Ətraflı: [BOOKING_LIFECYCLE.md](./BOOKING_LIFECYCLE.md).
 
 ## Təhlükəsizlik
 
@@ -154,28 +167,37 @@ Keçidlər `bookings.service` daxilində rol matrisi ilə yoxlanır. Hədəf sta
 - **Input validation** (class-validator + Zod); media URL yalnız öz storage host
 - **RBAC** (`@Roles` + service-layer yoxlamalar)
 - **Health:** `/health` liveness, `/health/ready` DB readiness
+- **Metrics:** `/api/v1/metrics` Prometheus exposition (lokal açıq; prod-da opsional `METRICS_TOKEN`)
 
-**Qeyd:** server-side logout/revoke, şifrə unutma və e-poçt verify mövcuddur. Login soft qalır (unverified user daxil ola bilir); **yazma** əməliyyatları (sifariş, mesaj, rəy, upload, xidmət yarat/yenilə/sil) `@RequireEmailVerified` ilə qorunur. Provider `isVerified` olmadan xidməti `ACTIVE` edə bilməz. Şəkillər `POST /uploads` ilə saxlanır (local və ya S3/R2); DB-də yalnız URL. Soft-delete: `User.deletedAt`; provider hard-delete `Restrict` (xidmətləri gizli silmir).
+**Qeyd:** server-side logout/revoke, şifrə unutma və e-poçt verify mövcuddur. Login soft qalır (unverified user daxil ola bilir); **yazma** əməliyyatları (sifariş, mesaj, rəy, upload, xidmət yarat/yenilə/sil, təqvim yazıları, şikayət) `@RequireEmailVerified` ilə qorunur. Provider `isVerified` olmadan xidməti `ACTIVE` edə bilməz. Şəkillər `POST /uploads` ilə saxlanır (local və ya S3/R2); DB-də yalnız URL. Soft-delete: `User.deletedAt`; provider hard-delete `Restrict` (xidmətləri gizli silmir).
 
 ## Scalability planı
 
 ### Hazırkı (MVP)
 - Monolith API + PostgreSQL (`prisma migrate deploy` + local `db:push` fallback)
-- Redis container var; typing DB-də (multi-instance), Redis API hələ bağlamayıb
+- Redis: Throttler storage (`REDIS_URL`); olmadıqda in-memory fallback
 - Next.js marketplace (**3020**) + ayrı admin (**3021**)
-- Real-time: HTTP polling (Socket.IO yoxdur)
+- Real-time: Socket.IO (tracking/status) + HTTP polling fallback
 - CI: GitHub Actions (lint + typecheck + unit test + build)
 - Upload: throttle + per-user quota + orphan TTL təmizlik
 - Booking: `pg_advisory_xact_lock` + slot re-check (double-book race bağlı)
+- Logging: pino (prod JSON); Sentry opsional (`SENTRY_DSN` API; `NEXT_PUBLIC_SENTRY_DSN` web/admin)
+- Metrics: `prom-client` + Grafana/Prometheus ops (`ops/`, `docker-compose.monitoring.yml` profile)
+- Load: k6 (`pnpm load:smoke`) — əl ilə; CI ağır load default yox
+- E2E: Playwright smoke + kritik UI (`pnpm --filter @xidmetal/web test:e2e`, `E2E_BASE_URL`)
+- Şikayət: `POST /reports` + admin moderation; sifariş statusları best-effort e-poçt + push/SMS (Faza 5)
+- Ödəniş: scaffolding (`PAYMENTS_ENABLED=false`); DeviceToken + FCM/SMS adapter
+- Mobile: deferred — [MOBILE.md](./MOBILE.md); PWA örtür
 
 ### Gələcək
 - **Search:** Elasticsearch/Meilisearch
-- **Real-time:** WebSocket (Socket.io)
-- **Payment:** Stripe/local payment gateway (məhsul qərarı)
+- **Payment:** real Stripe checkout / live charge (məhsul qərarı; flag ON)
 - **Email:** SMTP artıq opsional; production üçün SendGrid/Resend
-- **Monitoring:** Sentry + Prometheus
-- **CI/CD:** E2E + deploy pipeline
+- **Mobile:** React Native (`apps/mobile`) — yalnız tam runnable app
+- **CI/CD:** deploy pipeline (E2E CI-də auth+smoke+critical-flows var)
 - **Deployment:** Docker + Kubernetes / Vercel + Railway
+
+> **Qeyd:** Telefon SMS OTP (`phoneVerifiedAt`, `/users/me/phone/*`) və Turnstile captcha (env ilə) artıq mövcuddur. GDPR JSON ixrac: `GET /users/me/export`.
 
 Ətraflı mərhələlər: [ROADMAP.md](./ROADMAP.md).
 

@@ -17,9 +17,9 @@ import {
   CreateAvailabilityOverrideDto,
   AvailabilityQueryDto,
 } from './dto';
-import { Public, Roles } from '../../common/decorators';
+import { Public, Roles, RequireEmailVerified } from '../../common/decorators';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { JwtAuthGuard, RolesGuard } from '../../common/guards';
+import { JwtAuthGuard, RolesGuard, EmailVerifiedGuard } from '../../common/guards';
 import { UserRole } from '@xidmetal/shared';
 
 @ApiTags('Availability')
@@ -47,8 +47,9 @@ export class AvailabilityController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, EmailVerifiedGuard)
   @Roles(UserRole.PROVIDER)
+  @RequireEmailVerified()
   @Put(':serviceId/working-hours')
   @ApiOperation({ summary: 'Həftəlik iş saatlarını yenilə' })
   upsertWorkingHours(
@@ -73,8 +74,9 @@ export class AvailabilityController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, EmailVerifiedGuard)
   @Roles(UserRole.PROVIDER)
+  @RequireEmailVerified()
   @Post(':serviceId/availability/overrides')
   @ApiOperation({ summary: 'Boş və ya bağlı gün/saat əlavə et' })
   createOverride(
@@ -86,8 +88,9 @@ export class AvailabilityController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, EmailVerifiedGuard)
   @Roles(UserRole.PROVIDER)
+  @RequireEmailVerified()
   @Delete(':serviceId/availability/overrides/:overrideId')
   @HttpCode(204)
   @ApiOperation({ summary: 'Override sil' })

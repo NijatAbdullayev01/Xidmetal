@@ -6,9 +6,15 @@ import {
   Body,
   Param,
   Query,
+  Headers,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiHeader,
+} from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
 import {
   CreateBookingDto,
@@ -59,8 +65,18 @@ export class BookingsController {
   @Roles(UserRole.CUSTOMER)
   @RequireEmailVerified()
   @ApiOperation({ summary: 'Yeni sifariş yarat' })
-  create(@CurrentUser('id') userId: string, @Body() dto: CreateBookingDto) {
-    return this.bookingsService.create(userId, dto);
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description:
+      'Təkrar submit-i eyni sifarişə bağlamaq üçün (INSTANT üçün tövsiyə olunur)',
+  })
+  create(
+    @CurrentUser('id') userId: string,
+    @Body() dto: CreateBookingDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.bookingsService.create(userId, dto, idempotencyKey);
   }
 
   @Patch(':id/status')

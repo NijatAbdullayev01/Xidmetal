@@ -10,5 +10,12 @@
     "tsBuildInfoFile": "./node_modules/.cache/tsconfig.tsbuildinfo"
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    ".next/cache",
+    "test-results",
+    "playwright-report",
+    "blob-report"
+  ]
 }
+

@@ -3,23 +3,29 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  contactFormSchema,
+  contactSubjectLabels,
+  contactSubjectValues,
+  type ContactFormInput,
+} from '@xidmetal/shared';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { api, ApiError } from '@/lib/api';
 import {
-  contactFormSchema,
-  contactSubjectLabels,
-  contactSubjectValues,
-  type ContactFormValues,
-} from '@/components/contact/contact-schema';
-
-const CONTACT_EMAIL = 'info@xidmetal.az';
+  TurnstileWidget,
+  isTurnstileConfigured,
+} from '@/components/auth/turnstile-widget';
 
 export function ContactForm() {
   const [submitted, setSubmitted] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [honeypot, setHoneypot] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const {
     register,
@@ -28,7 +34,7 @@ export function ContactForm() {
     setValue,
     formState: { errors, isSubmitting },
     reset,
-  } = useForm<ContactFormValues>({
+  } = useForm<ContactFormInput>({
     resolver: zodResolver(contactFormSchema),
     defaultValues: {
       name: '',
@@ -41,24 +47,35 @@ export function ContactForm() {
 
   const subject = watch('subject');
 
-  const onSubmit = async (values: ContactFormValues) => {
-    const subjectLabel = contactSubjectLabels[values.subject];
-    const body = [
-      `Ad: ${values.name}`,
-      `E-poçt: ${values.email}`,
-      values.phone?.trim() ? `Telefon: ${values.phone.trim()}` : null,
-      `Mövzu: ${subjectLabel}`,
-      '',
-      values.message,
-    ]
-      .filter(Boolean)
-      .join('\n');
+  const onSubmit = async (values: ContactFormInput) => {
+    setServerError(null);
 
-    const mailtoUrl = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`[Xidmətal] ${subjectLabel}`)}&body=${encodeURIComponent(body)}`;
+    if (isTurnstileConfigured() && !captchaToken) {
+      setServerError('Təhlükəsizlik yoxlamasını tamamlayın');
+      return;
+    }
 
-    window.location.href = mailtoUrl;
-    setSubmitted(true);
-    reset();
+    try {
+      await api.contact.submit({
+        name: values.name.trim(),
+        email: values.email.trim(),
+        phone: values.phone?.trim() || undefined,
+        subject: values.subject,
+        message: values.message.trim(),
+        website: honeypot,
+        captchaToken: captchaToken ?? undefined,
+      });
+      setSubmitted(true);
+      reset();
+      setHoneypot('');
+      setCaptchaToken(null);
+    } catch (error) {
+      setServerError(
+        error instanceof ApiError
+          ? error.message
+          : 'Mesaj göndərilmədi. Bir az sonra yenidən cəhd edin.',
+      );
+    }
   };
 
   if (submitted) {
@@ -67,10 +84,9 @@ export function ContactForm() {
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand/20">
           <CheckCircle2 className="h-7 w-7 text-brand-dark" aria-hidden />
         </div>
-        <h2 className="mt-6 text-xl font-semibold">Mesajınız hazırdır</h2>
+        <h2 className="mt-6 text-xl font-semibold">Mesajınız göndərildi</h2>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          E-poçt proqramınız açıldı. Mesajı göndərdikdən sonra komandamız ən qısa
-          müddətdə sizinlə əlaqə saxlayacaq.
+          Komandamız ən qısa müddətdə sizinlə əlaqə saxlayacaq. Təşəkkür edirik!
         </p>
         <Button
           type="button"
@@ -87,15 +103,32 @@ export function ContactForm() {
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8"
+      className="relative rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8"
       noValidate
     >
       <h2 className="text-xl font-semibold">Bizə yazın</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Formu doldurun — mesajınız e-poçt vasitəsilə komandamıza göndəriləcək.
+        Formu doldurun — mesajınız birbaşa komandamıza çatacaq.
       </p>
 
       <div className="mt-6 space-y-5">
+        {/* Honeypot — ekrandan gizlədilmiş; botlar doldurur */}
+        <div
+          className="absolute -left-[9999px] h-0 w-0 overflow-hidden"
+          aria-hidden="true"
+        >
+          <label htmlFor="contact-website">Website</label>
+          <input
+            id="contact-website"
+            name="website"
+            type="text"
+            tabIndex={-1}
+            autoComplete="off"
+            value={honeypot}
+            onChange={(e) => setHoneypot(e.target.value)}
+          />
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="contact-name">Ad və soyad</Label>
           <Input
@@ -156,7 +189,7 @@ export function ContactForm() {
             id="contact-subject"
             value={subject}
             onChange={(next) =>
-              setValue('subject', next as ContactFormValues['subject'], {
+              setValue('subject', next as ContactFormInput['subject'], {
                 shouldValidate: true,
                 shouldDirty: true,
               })
@@ -189,6 +222,14 @@ export function ContactForm() {
             </p>
           )}
         </div>
+
+        <TurnstileWidget onToken={setCaptchaToken} className="min-h-[65px]" />
+
+        {serverError ? (
+          <p className="text-sm text-destructive" role="alert">
+            {serverError}
+          </p>
+        ) : null}
 
         <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={isSubmitting}>
           {isSubmitting ? (

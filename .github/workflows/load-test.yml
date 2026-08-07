@@ -1,0 +1,33 @@
+name: Load test (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'API BASE_URL (prefix olmadan)'
+        required: true
+        default: 'http://localhost:4000'
+      script:
+        description: 'smoke | stress'
+        required: true
+        default: 'smoke'
+
+jobs:
+  k6:
+    name: k6 load (${{ inputs.script }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run k6
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+        run: |
+          bash ops/load/run.sh "${{ inputs.script }}"
+        # Qeyd: lokal API CI runner-də yoxdur — BASE_URL remote/staging olmalıdır.
+        # Default CI (ci.yml) bu workflow-u işləmir.

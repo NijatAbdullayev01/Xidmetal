@@ -1,21 +1,29 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, MessageSquare, CalendarClock, Star } from 'lucide-react';
-import { BookingStatus } from '@xidmetal/shared';
+import { BookingStatus, BookingType, isCancellableBookingStatus } from '@xidmetal/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ReviewDialog } from '@/components/bookings/review-dialog';
+import { CancelBookingDialog } from '@/components/bookings/cancel-booking-dialog';
+import { InstantWaitingCard } from '@/components/bookings/instant-waiting-card';
+import { BookingLiveTracking } from '@/components/tracking/booking-live-tracking';
+import { useBookingsRealtimeInvalidation } from '@/hooks/use-booking-tracking';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { useAckBookingNotifications } from '@/hooks/use-ack-booking-notifications';
 import { BOOKING_ATTENTION_QUERY_KEY } from '@/hooks/use-booking-notifications';
-import { formatPrice, formatDateTime } from '@/lib/utils';
-import { BOOKING_STATUS_LABELS, BOOKING_STATUS_VARIANTS } from '@/lib/provider-labels';
-import { cn } from '@/lib/utils';
+import { formatPrice, formatDateTime, cn } from '@/lib/utils';
+import {
+  BOOKING_STATUS_LABELS,
+  BOOKING_STATUS_VARIANTS,
+  BOOKING_TYPE_LABELS,
+  ACTIVE_BOOKING_TAB_STATUSES,
+} from '@/lib/provider-labels';
 
 type TabKey = 'all' | 'pending' | 'active' | 'completed' | 'cancelled';
 
@@ -23,7 +31,6 @@ const TABS: {
   key: TabKey;
   label: string;
   status?: BookingStatus;
-  /** Bir neçə status (Aktiv = təsdiqlənmiş + icrada) */
   statuses?: BookingStatus[];
 }[] = [
   { key: 'all', label: 'Hamısı' },
@@ -31,22 +38,33 @@ const TABS: {
   {
     key: 'active',
     label: 'Aktiv',
-    statuses: [BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS],
+    statuses: ACTIVE_BOOKING_TAB_STATUSES,
   },
   { key: 'completed', label: 'Tamamlanan', status: BookingStatus.COMPLETED },
-  { key: 'cancelled', label: 'Ləğv edilmiş', status: BookingStatus.CANCELLED },
+  {
+    key: 'cancelled',
+    label: 'Ləğv / rədd',
+    statuses: [BookingStatus.CANCELLED, BookingStatus.REJECTED],
+  },
 ];
 
 export default function CustomerBookingsPage() {
   const token = useAuthToken();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get('highlight');
   const queryClient = useQueryClient();
   useAckBookingNotifications(!!token);
+  useBookingsRealtimeInvalidation(!!token);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [actionId, setActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [messageLoadingId, setMessageLoadingId] = useState<string | null>(null);
   const [reviewBooking, setReviewBooking] = useState<{
+    id: string;
+    serviceTitle: string;
+  } | null>(null);
+  const [cancelBooking, setCancelBooking] = useState<{
     id: string;
     serviceTitle: string;
   } | null>(null);
@@ -70,15 +88,30 @@ export default function CustomerBookingsPage() {
     refetchOnWindowFocus: true,
   });
 
+  useEffect(() => {
+    if (!highlightId || !data?.items.length) return;
+    const el = document.getElementById(`booking-${highlightId}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightId, data?.items]);
+
   const updateMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: BookingStatus }) => {
+    mutationFn: ({
+      id,
+      status,
+      cancelReason,
+    }: {
+      id: string;
+      status: BookingStatus;
+      cancelReason?: string;
+    }) => {
       if (!token) throw new Error('Autentifikasiya tələb olunur');
-      return api.updateBookingStatus(token, id, status);
+      return api.updateBookingStatus(token, id, status, { cancelReason });
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['bookings'] });
       void queryClient.invalidateQueries({ queryKey: BOOKING_ATTENTION_QUERY_KEY });
       setActionId(null);
+      setCancelBooking(null);
       setActionError(null);
     },
     onError: (error) => {
@@ -153,10 +186,19 @@ export default function CustomerBookingsPage() {
     },
   });
 
-  const handleCancel = (id: string) => {
+  const handleCancel = (booking: { id: string; serviceTitle: string }) => {
     setActionError(null);
-    setActionId(id);
-    updateMutation.mutate({ id, status: BookingStatus.CANCELLED });
+    setCancelBooking(booking);
+  };
+
+  const handleConfirmCancel = (reason: string) => {
+    if (!cancelBooking) return;
+    setActionId(cancelBooking.id);
+    updateMutation.mutate({
+      id: cancelBooking.id,
+      status: BookingStatus.CANCELLED,
+      cancelReason: reason,
+    });
   };
 
   const handleConfirmReschedule = (id: string) => {
@@ -229,127 +271,191 @@ export default function CustomerBookingsPage() {
       )}
 
       <div className="grid gap-4">
-        {data?.items.map((booking) => (
-          <Card key={booking.id}>
-            <CardContent className="p-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold">{booking.serviceTitle}</h3>
-                    <Badge variant={BOOKING_STATUS_VARIANTS[booking.status]}>
-                      {BOOKING_STATUS_LABELS[booking.status]}
-                    </Badge>
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Xidmət verən: {booking.providerName}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                    <span>Tarix: {formatDateTime(booking.scheduledAt)}</span>
-                    <span>Qiymət: {formatPrice(booking.totalPrice)}</span>
-                  </div>
-                  {booking.address && (
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Ünvan: <span className="text-foreground">{booking.address}</span>
-                    </p>
-                  )}
-                  {booking.proposedScheduledAt && booking.status === BookingStatus.PENDING && (
-                    <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 dark:border-amber-700/50 dark:bg-amber-950/30">
-                      <div className="flex items-start gap-2">
-                        <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                            Xidmət verən yeni tarix təklif edib
-                          </p>
-                          <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
-                            Təklif olunan tarix:{' '}
-                            <strong>{formatDateTime(booking.proposedScheduledAt)}</strong>
-                          </p>
-                          <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                            Mesajı oxumaq üçün «Mesaj yaz» düyməsindən istifadə edin.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {booking.notes && (
-                    <p className="mt-2 rounded-lg bg-muted px-3 py-2 text-sm">{booking.notes}</p>
-                  )}
-                  {booking.imageUrl && (
-                    <div className="mt-3">
-                      <p className="mb-1.5 text-xs font-medium text-muted-foreground">
-                        İşin şəkli
-                      </p>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={booking.imageUrl}
-                        alt="Görüləcək işin şəkli"
-                        className="max-h-48 max-w-full rounded-xl border border-border object-contain"
-                      />
-                    </div>
-                  )}
-                </div>
+        {data?.items.map((booking) => {
+          const isInstantPending =
+            booking.type === BookingType.INSTANT &&
+            booking.status === BookingStatus.PENDING;
+          const showCancelReason =
+            Boolean(booking.cancelReason) &&
+            (booking.status === BookingStatus.CANCELLED ||
+              booking.status === BookingStatus.REJECTED);
+          const isHighlighted = highlightId === booking.id;
 
-                <div className="flex flex-wrap gap-2">
-                  {booking.proposedScheduledAt && booking.status === BookingStatus.PENDING && (
-                    <>
-                      <Button
-                        size="sm"
-                        disabled={actionId === booking.id}
-                        onClick={() => handleConfirmReschedule(booking.id)}
-                      >
-                        {actionId === booking.id && confirmRescheduleMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'Yeni tarixi təsdiq et'
-                        )}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={actionId === booking.id}
-                        onClick={() => handleRejectReschedule(booking.id)}
-                      >
-                        {actionId === booking.id && rejectRescheduleMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'Təklifi rədd et'
-                        )}
-                      </Button>
-                    </>
-                  )}
-                  {(booking.status === BookingStatus.PENDING ||
-                    booking.status === BookingStatus.CONFIRMED) && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      disabled={actionId === booking.id}
-                      onClick={() => handleCancel(booking.id)}
-                    >
-                      {actionId === booking.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        'Ləğv et'
+          return (
+            <Card
+              key={booking.id}
+              id={`booking-${booking.id}`}
+              className={cn(
+                isHighlighted && 'ring-2 ring-brand ring-offset-2 ring-offset-background',
+              )}
+            >
+              <CardContent className="p-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-semibold">{booking.serviceTitle}</h3>
+                      <Badge variant={BOOKING_STATUS_VARIANTS[booking.status]}>
+                        {BOOKING_STATUS_LABELS[booking.status]}
+                      </Badge>
+                      {booking.type === BookingType.INSTANT && (
+                        <Badge variant="default">
+                          {BOOKING_TYPE_LABELS[BookingType.INSTANT]}
+                        </Badge>
                       )}
-                    </Button>
-                  )}
-                  {booking.status === BookingStatus.COMPLETED && !booking.hasReview && (
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Xidmət verən: {booking.providerName}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-4 text-sm text-muted-foreground">
+                      {booking.type === BookingType.INSTANT ? (
+                        <span>Təcili çağırış</span>
+                      ) : (
+                        <span>Tarix: {formatDateTime(booking.scheduledAt)}</span>
+                      )}
+                      <span>Qiymət: {formatPrice(booking.totalPrice)}</span>
+                    </div>
+                    {booking.address && (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Ünvan: <span className="text-foreground">{booking.address}</span>
+                      </p>
+                    )}
+                    {isInstantPending && (
+                      <InstantWaitingCard
+                        onCancel={() =>
+                          handleCancel({
+                            id: booking.id,
+                            serviceTitle: booking.serviceTitle,
+                          })
+                        }
+                        cancelDisabled={actionId === booking.id}
+                        cancelPending={
+                          actionId === booking.id && updateMutation.isPending
+                        }
+                      />
+                    )}
+                    {showCancelReason && (
+                      <div className="mt-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3">
+                        <p className="text-sm font-medium text-destructive">
+                          {booking.status === BookingStatus.REJECTED
+                            ? 'Sifariş rədd edildi'
+                            : 'Sifariş ləğv edildi'}
+                        </p>
+                        <p className="mt-1 text-sm text-destructive/90">
+                          Səbəb: {booking.cancelReason}
+                        </p>
+                      </div>
+                    )}
+                    {booking.proposedScheduledAt &&
+                      booking.status === BookingStatus.PENDING && (
+                        <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 dark:border-amber-700/50 dark:bg-amber-950/30">
+                          <div className="flex items-start gap-2">
+                            <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                                Xidmət verən yeni tarix təklif edib
+                              </p>
+                              <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
+                                Təklif olunan tarix:{' '}
+                                <strong>
+                                  {formatDateTime(booking.proposedScheduledAt)}
+                                </strong>
+                              </p>
+                              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                                Mesajı oxumaq üçün «Mesaj yaz» düyməsindən istifadə edin.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    {booking.notes && (
+                      <p className="mt-2 rounded-lg bg-muted px-3 py-2 text-sm">
+                        {booking.notes}
+                      </p>
+                    )}
+                    <BookingLiveTracking booking={booking} />
+                    {booking.imageUrl && (
+                      <div className="mt-3">
+                        <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                          İşin şəkli
+                        </p>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={booking.imageUrl}
+                          alt="Görüləcək işin şəkli"
+                          className="max-h-48 max-w-full rounded-xl border border-border object-contain"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {booking.proposedScheduledAt &&
+                      booking.status === BookingStatus.PENDING && (
+                        <>
+                          <Button
+                            size="sm"
+                            disabled={actionId === booking.id}
+                            onClick={() => handleConfirmReschedule(booking.id)}
+                          >
+                            {actionId === booking.id &&
+                            confirmRescheduleMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              'Yeni tarixi təsdiq et'
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={actionId === booking.id}
+                            onClick={() => handleRejectReschedule(booking.id)}
+                          >
+                            {actionId === booking.id &&
+                            rejectRescheduleMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              'Təklifi rədd et'
+                            )}
+                          </Button>
+                        </>
+                      )}
+                    {isCancellableBookingStatus(booking.status) && !isInstantPending && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={actionId === booking.id}
+                        onClick={() =>
+                          handleCancel({
+                            id: booking.id,
+                            serviceTitle: booking.serviceTitle,
+                          })
+                        }
+                      >
+                        {actionId === booking.id && updateMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Ləğv et'
+                        )}
+                      </Button>
+                    )}
+                    {booking.status === BookingStatus.COMPLETED && !booking.hasReview && (
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          setReviewBooking({
+                            id: booking.id,
+                            serviceTitle: booking.serviceTitle,
+                          })
+                        }
+                      >
+                        <Star className="h-4 w-4" />
+                        İşi təsdiqlə və rəy yaz
+                      </Button>
+                    )}
+                    {booking.status === BookingStatus.COMPLETED && booking.hasReview && (
+                      <Badge variant="success">Rəy verildi</Badge>
+                    )}
                     <Button
-                      size="sm"
-                      onClick={() =>
-                        setReviewBooking({
-                          id: booking.id,
-                          serviceTitle: booking.serviceTitle,
-                        })
-                      }
-                    >
-                      <Star className="h-4 w-4" />
-                      İşi təsdiqlə və rəy yaz
-                    </Button>
-                  )}
-                  {booking.status === BookingStatus.COMPLETED && booking.hasReview && (
-                    <Badge variant="success">Rəy verildi</Badge>
-                  )}
-                  <Button
                       size="sm"
                       variant="outline"
                       disabled={messageLoadingId === booking.id}
@@ -364,11 +470,12 @@ export default function CustomerBookingsPage() {
                         </>
                       )}
                     </Button>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {token && reviewBooking && (
@@ -381,6 +488,16 @@ export default function CustomerBookingsPage() {
           onSuccess={handleReviewSuccess}
         />
       )}
+
+      <CancelBookingDialog
+        open={Boolean(cancelBooking)}
+        serviceTitle={cancelBooking?.serviceTitle}
+        pending={updateMutation.isPending && actionId === cancelBooking?.id}
+        onClose={() => {
+          if (!updateMutation.isPending) setCancelBooking(null);
+        }}
+        onConfirm={handleConfirmCancel}
+      />
     </div>
   );
 }

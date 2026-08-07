@@ -9,6 +9,7 @@ import {
   ClipboardList,
   CalendarDays,
   MessageSquare,
+  Bell,
   Star,
   Settings,
   LogOut,
@@ -16,6 +17,7 @@ import {
   X,
   ArrowLeft,
   Search,
+  Flag,
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -27,7 +29,6 @@ import { useLogout } from '@/hooks/use-logout';
 import { useMessageNotifications } from '@/hooks/use-message-notifications';
 import { useBookingNotifications } from '@/hooks/use-booking-notifications';
 import { useReviewNotifications } from '@/hooks/use-review-notifications';
-import { NotificationsBell } from '@/components/notifications/notifications-bell';
 import { cn } from '@/lib/utils';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
 
@@ -47,6 +48,7 @@ const PROVIDER_NAV: NavItem[] = [
   { href: '/dashboard/provider/calendar', label: 'Təqvim', icon: CalendarDays },
   { href: '/dashboard/provider/bookings', label: 'Sifarişlər', icon: ClipboardList },
   { href: '/dashboard/provider/messages', label: 'Mesajlarım', icon: MessageSquare },
+  { href: '/dashboard/provider/notifications', label: 'Bildirişlər', icon: Bell },
   { href: '/dashboard/provider/ratings', label: 'Reytinq', icon: Star },
   { href: '/dashboard/provider/settings', label: 'Tənzimləmələr', icon: Settings },
 ];
@@ -55,7 +57,9 @@ const CUSTOMER_NAV: NavItem[] = [
   { href: '/dashboard/customer', label: 'İcmal', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/customer/bookings', label: 'Sifarişlərim', icon: ClipboardList },
   { href: '/dashboard/customer/messages', label: 'Mesajlarım', icon: MessageSquare },
+  { href: '/dashboard/customer/notifications', label: 'Bildirişlər', icon: Bell },
   { href: '/', label: 'Xidmət tap', icon: Search },
+  { href: '/dashboard/customer/report', label: 'Şikayət', icon: Flag },
   { href: '/dashboard/customer/settings', label: 'Tənzimləmələr', icon: Settings },
 ];
 
@@ -242,7 +246,6 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
           <span className="sm:inline">Geri qayıt</span>
         </Link>
         <div className="flex items-center gap-1">
-          <NotificationsBell />
           <ThemeToggle variant="switch" />
           <button
             type="button"
@@ -275,7 +278,7 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
         </>
       )}
 
-      <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-border bg-card lg:flex lg:h-[100dvh] lg:overflow-hidden">
+      <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-border bg-card lg:flex lg:overflow-hidden">
         <div className="flex h-16 items-center justify-between gap-2 border-b border-border px-4">
           <Link
             href="/"
@@ -285,7 +288,6 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
             <span className="truncate">Geri qayıt</span>
           </Link>
           <div className="flex shrink-0 items-center gap-1">
-            <NotificationsBell />
             <ThemeToggle variant="switch" />
           </div>
         </div>

@@ -4,7 +4,6 @@ import {
   ADMIN_NOTIFICATION_TYPES,
   BOOKING_NOTIFICATION_TYPES,
   REVIEW_NOTIFICATION_TYPES,
-  MESSAGE_NOTIFICATION_TYPES,
   NotificationType,
 } from '@xidmetal/shared';
 import type {
@@ -33,23 +32,24 @@ const bookingTypes = notificationTypeList(BOOKING_NOTIFICATION_TYPES, [
   NotificationType.BOOKING_CREATED,
   NotificationType.BOOKING_CONFIRMED,
   NotificationType.BOOKING_CANCELLED,
+  NotificationType.BOOKING_REJECTED,
   NotificationType.BOOKING_COMPLETED,
+  NotificationType.BOOKING_IN_PROGRESS,
+  NotificationType.BOOKING_EN_ROUTE,
+  NotificationType.BOOKING_ARRIVED,
   NotificationType.BOOKING_RESCHEDULE_PROPOSED,
+  NotificationType.BOOKING_RESCHEDULE_REJECTED,
 ]);
 const reviewTypes = notificationTypeList(REVIEW_NOTIFICATION_TYPES, [
   NotificationType.REVIEW_RECEIVED,
 ]);
-const messageTypes = notificationTypeList(MESSAGE_NOTIFICATION_TYPES, [
-  NotificationType.MESSAGE_RECEIVED,
-]);
 
-/** Zəng panelində göstərilən / deep-link edilə bilən bildirişlər */
-const inboxTypes: PrismaNotificationType[] = [
-  ...adminTypes,
-  ...bookingTypes,
-  ...reviewTypes,
-  ...messageTypes,
-];
+/**
+ * Zəng / Bildirişlər səhifəsi — yalnız admin/platforma elanları.
+ * Sifariş → booking badge; mesaj → söhbət; rəy → review badge.
+ * Qayda: `.cursor/rules/notifications.mdc`
+ */
+const inboxTypes: PrismaNotificationType[] = [...adminTypes];
 
 @Injectable()
 export class NotificationsService {
@@ -74,6 +74,7 @@ export class NotificationsService {
     return { markedCount: result.count };
   }
 
+  /** Yalnız admin/platforma bildirişləri (sifariş/mesaj/rəy daxil deyil) */
   async findAll(userId: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
     const where = { userId, type: { in: inboxTypes } };
@@ -97,7 +98,7 @@ export class NotificationsService {
     };
   }
 
-  /** Inbox (admin + sifariş + rəy) oxunmamış sayı — zəng ikonu */
+  /** Admin/platforma oxunmamış sayı — zəng ikonu */
   async getUnreadCount(userId: string): Promise<UnreadNotificationsSummary> {
     const count = await this.prisma.notification.count({
       where: { userId, isRead: false, type: { in: inboxTypes } },

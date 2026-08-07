@@ -1,35 +1,12 @@
-import { emailSchema } from '@xidmetal/shared';
-import { z } from 'zod';
+/** @deprecated Shared package-dən import edin — geriyə uyğunluq üçün saxlanılır */
+export {
+  contactFormSchema,
+  contactSubjectLabels,
+  contactSubjectValues,
+  type ContactFormInput,
+  type ContactFormInput as ContactFormValues,
+} from '@xidmetal/shared';
 
-export const contactSubjectValues = [
-  'general',
-  'provider',
-  'technical',
-  'partnership',
-  'other',
-] as const;
+import { contactSubjectValues as subjects } from '@xidmetal/shared';
 
-export type ContactSubject = (typeof contactSubjectValues)[number];
-
-export const contactSubjectLabels: Record<ContactSubject, string> = {
-  general: 'Ümumi sual',
-  provider: 'Xidmət verən dəstəyi',
-  technical: 'Texniki problem',
-  partnership: 'Əməkdaşlıq təklifi',
-  other: 'Digər',
-};
-
-export const contactFormSchema = z.object({
-  name: z.string().min(2, 'Ad minimum 2 simvol olmalıdır'),
-  email: emailSchema,
-  phone: z.string().optional(),
-  subject: z.enum(contactSubjectValues, {
-    errorMap: () => ({ message: 'Mövzu seçin' }),
-  }),
-  message: z
-    .string()
-    .min(10, 'Mesaj minimum 10 simvol olmalıdır')
-    .max(2000, 'Mesaj maksimum 2000 simvol ola bilər'),
-});
-
-export type ContactFormValues = z.infer<typeof contactFormSchema>;
+export type ContactSubject = (typeof subjects)[number];

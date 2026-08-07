@@ -25,6 +25,12 @@ export interface StorageDriver {
 
   /** Public URL bu driverə aiddirsə daxili açarı qaytarır */
   keyFromPublicUrl(url: string): string | null;
+
+  /**
+   * Private obyektlər üçün müvəqqəti oxuma URL (S3/R2 GetObject presign).
+   * Local driver tətbiq etmir — HMAC middleware istifadə olunur.
+   */
+  getSignedReadUrl?(key: string, ttlSeconds?: number): Promise<string>;
 }
 
 export const UPLOAD_FOLDERS = {

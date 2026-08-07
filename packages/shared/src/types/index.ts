@@ -1,9 +1,11 @@
 import {
   UserRole,
   BookingStatus,
+  BookingType,
   ServiceStatus,
   AvailabilityOverrideType,
   AvailabilitySlotStatus,
+  ProviderAvailability,
 } from '../enums';
 
 export interface ApiResponse<T = unknown> {
@@ -29,6 +31,12 @@ export interface ProviderProfile {
   isVerified: boolean;
   rating: number;
   reviewCount: number;
+  /** Domain əlçatanlıq — presence heartbeat-dən ayrı */
+  availability: ProviderAvailability;
+  lastLat?: number | null;
+  lastLng?: number | null;
+  lastHeading?: number | null;
+  locationUpdatedAt?: string | null;
 }
 
 export interface UserProfile {
@@ -37,6 +45,8 @@ export interface UserProfile {
   firstName: string;
   lastName: string;
   phone?: string;
+  /** ISO — təsdiqlənmiş telefon; SMS üçün */
+  phoneVerifiedAt?: string | null;
   avatarUrl?: string;
   role: UserRole;
   isVerified: boolean;
@@ -95,13 +105,26 @@ export interface BookingSummary {
   scheduledAt: string;
   proposedScheduledAt?: string;
   status: BookingStatus;
+  /** Default SCHEDULED; INSTANT → on-demand avto-dispatch */
+  type: BookingType;
   totalPrice: number;
   notes?: string;
   address?: string;
+  /** Xidmət ünvanı koordinatları (opsional) */
+  destLat?: number | null;
+  destLng?: number | null;
+  /** Mənşə / provider start (opsional) */
+  originLat?: number | null;
+  originLng?: number | null;
   imageUrl?: string;
   cancelReason?: string;
   cancelledBy?: string;
   cancelledAt?: string;
+  acceptedAt?: string;
+  enRouteAt?: string;
+  arrivedAt?: string;
+  startedAt?: string;
+  completedAt?: string;
   hasReview?: boolean;
   createdAt: string;
 }
@@ -168,6 +191,7 @@ export interface AdminDashboardStats {
   bookingsTotal: number;
   bookingsPending: number;
   reviewsPending: number;
+  reportsPending: number;
   categoriesActive: number;
 }
 
@@ -218,6 +242,25 @@ export interface AdminReviewSummary extends ReviewSummary {
 
 export interface AdminAnnouncementResult {
   sentCount: number;
+}
+
+export interface ReportSummary {
+  id: string;
+  targetType: string;
+  targetId?: string | null;
+  reason: string;
+  description: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface AdminReportSummary extends ReportSummary {
+  reporterId: string;
+  reporterName: string;
+  reporterEmail: string;
+  adminNote?: string | null;
+  resolvedAt?: string | null;
+  resolvedByName?: string | null;
 }
 
 export interface MessageSummary {
@@ -292,6 +335,86 @@ export interface BookingAttentionSummary {
   latestUnreadAt?: string | null;
 }
 
+/** Yaxın provider axtarışı cavabı */
+export interface NearbyProviderSummary {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl?: string;
+  rating: number;
+  reviewCount: number;
+  isVerified: boolean;
+  availability: ProviderAvailability;
+  lastLat: number;
+  lastLng: number;
+  locationUpdatedAt?: string | null;
+  /** Məsafə metr */
+  distanceM: number;
+}
+
+export interface GeocodeResult {
+  lat: number;
+  lng: number;
+  displayName: string;
+  /** mock | nominatim */
+  provider: string;
+}
+
+/** GDPR — istifadəçi məlumat ixracı */
+export interface UserDataExport {
+  exportedAt: string;
+  profile: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone: string | null;
+    phoneVerifiedAt: string | null;
+    role: string;
+    isVerified: boolean;
+    createdAt: string;
+    providerProfile: {
+      bio: string | null;
+      experience: number | null;
+      location: string | null;
+      isVerified: boolean;
+      rating: number;
+      reviewCount: number;
+      availability: string;
+    } | null;
+  };
+  services: Array<{
+    id: string;
+    title: string;
+    status: string;
+    price: number;
+    createdAt: string;
+  }>;
+  bookings: Array<{
+    id: string;
+    serviceTitle: string;
+    status: string;
+    type: string;
+    scheduledAt: string;
+    totalPrice: number;
+    role: 'customer' | 'provider';
+    createdAt: string;
+  }>;
+  notifications: Array<{
+    id: string;
+    type: string;
+    title: string;
+    createdAt: string;
+    isRead: boolean;
+  }>;
+  deviceTokens: Array<{
+    id: string;
+    platform: string;
+    tokenMasked: string;
+    createdAt: string;
+  }>;
+}
+
 export interface UnreadMessagesSummary {
   count: number;
   latestUnreadMessageId: string | null;
@@ -338,4 +461,59 @@ export interface DayAvailability {
   date: string;
   slots: AvailabilitySlot[];
   hasCalendar: boolean;
+}
+
+/** On-demand dispatch təklifi (Faza 4) */
+export interface DispatchOfferSummary {
+  id: string;
+  bookingId: string;
+  providerId: string;
+  status: string;
+  distanceM?: number | null;
+  score?: number | null;
+  expiresAt: string;
+  createdAt: string;
+  respondedAt?: string | null;
+  booking?: {
+    id: string;
+    serviceTitle: string;
+    address?: string | null;
+    destLat?: number | null;
+    destLng?: number | null;
+    scheduledAt: string;
+    notes?: string | null;
+    totalPrice: number;
+    customerName: string;
+  };
+}
+
+/** Ödəniş xülasəsi (Faza 5 — flag-gated) */
+export interface PaymentSummary {
+  id: string;
+  bookingId?: string | null;
+  amount: number;
+  commission: number;
+  currency: string;
+  status: string;
+  provider: string;
+  externalId?: string | null;
+  idempotencyKey?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Qeydiyyatlı cihaz tokeni */
+export interface DeviceTokenSummary {
+  id: string;
+  platform: string;
+  /** Token-in qısa maskası (təhlükəsizlik) */
+  tokenPreview: string;
+  createdAt: string;
+}
+
+/** Push payload (FCM data + notification) */
+export interface PushPayload {
+  title: string;
+  body: string;
+  data?: Record<string, string>;
 }

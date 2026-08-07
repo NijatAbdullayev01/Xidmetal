@@ -1,4 +1,5 @@
 import { SettingsForm } from '@/components/settings/settings-form';
+import { PushNotificationsCard } from '@/components/notifications/push-notifications-card';
 
 export default function CustomerSettingsPage() {
   return (
@@ -9,6 +10,7 @@ export default function CustomerSettingsPage() {
           Profil məlumatlarınızı, şəklinizi və şifrənizi idarə edin.
         </p>
       </div>
+      <PushNotificationsCard />
       <SettingsForm />
     </div>
   );

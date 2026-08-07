@@ -19,7 +19,7 @@ export default function CustomerDashboardLayout({ children }: { children: React.
 
   return (
     <RequireRole role={UserRole.CUSTOMER}>
-      <div className="flex h-[100dvh] flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <NotificationPermissionBanner />
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           <DashboardSidebar variant="customer" />

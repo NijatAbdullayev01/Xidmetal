@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, Loader2, MessageSquare } from 'lucide-react';
-import { BookingStatus } from '@xidmetal/shared';
+import { BookingStatus, isCancellableBookingStatus } from '@xidmetal/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,16 +17,28 @@ import { useAckBookingNotifications } from '@/hooks/use-ack-booking-notification
 import { BOOKING_ATTENTION_QUERY_KEY } from '@/hooks/use-booking-notifications';
 import { useAuthStore } from '@/store/auth.store';
 import { combineDateAndTime, formatDateTime, formatPrice } from '@/lib/utils';
-import { BOOKING_STATUS_LABELS, BOOKING_STATUS_VARIANTS } from '@/lib/provider-labels';
+import { BOOKING_STATUS_LABELS, BOOKING_STATUS_VARIANTS, ACTIVE_BOOKING_TAB_STATUSES } from '@/lib/provider-labels';
 import { cn } from '@/lib/utils';
+import { CancelBookingDialog } from '@/components/bookings/cancel-booking-dialog';
+import { ProviderLocationPublisher } from '@/components/tracking/provider-location-publisher';
+import { useBookingsRealtimeInvalidation } from '@/hooks/use-booking-tracking';
 
 type TabKey = 'all' | 'pending' | 'active' | 'completed';
 type ViewKey = 'incoming' | 'sent';
 
-const TABS: { key: TabKey; label: string; status?: BookingStatus }[] = [
+const TABS: {
+  key: TabKey;
+  label: string;
+  status?: BookingStatus;
+  statuses?: BookingStatus[];
+}[] = [
   { key: 'all', label: 'Hamısı' },
   { key: 'pending', label: 'Gözləyən', status: BookingStatus.PENDING },
-  { key: 'active', label: 'Aktiv', status: BookingStatus.IN_PROGRESS },
+  {
+    key: 'active',
+    label: 'Aktiv',
+    statuses: ACTIVE_BOOKING_TAB_STATUSES,
+  },
   { key: 'completed', label: 'Tamamlanan', status: BookingStatus.COMPLETED },
 ];
 
@@ -149,6 +161,7 @@ export default function ProviderBookingsPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   useAckBookingNotifications(!!token);
+  useBookingsRealtimeInvalidation(!!token);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [view, setView] = useState<ViewKey>(
     searchParams.get('view') === 'sent' ? 'sent' : 'incoming',
@@ -157,6 +170,10 @@ export default function ProviderBookingsPage() {
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [messageLoadingId, setMessageLoadingId] = useState<string | null>(null);
+  const [cancelBooking, setCancelBooking] = useState<{
+    id: string;
+    serviceTitle: string;
+  } | null>(null);
 
   const currentTab = TABS.find((t) => t.key === activeTab)!;
 
@@ -165,7 +182,11 @@ export default function ProviderBookingsPage() {
     queryFn: () =>
       api.bookings(token!, {
         limit: '50',
-        ...(currentTab.status && { status: currentTab.status }),
+        ...(currentTab.statuses
+          ? { statuses: currentTab.statuses.join(',') }
+          : currentTab.status
+            ? { status: currentTab.status }
+            : {}),
       }),
     enabled: !!token,
     refetchInterval: 5_000,
@@ -179,15 +200,24 @@ export default function ProviderBookingsPage() {
     ) ?? [];
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: BookingStatus }) => {
+    mutationFn: ({
+      id,
+      status,
+      cancelReason,
+    }: {
+      id: string;
+      status: BookingStatus;
+      cancelReason?: string;
+    }) => {
       if (!token) throw new Error('Autentifikasiya tələb olunur');
-      return api.updateBookingStatus(token, id, status);
+      return api.updateBookingStatus(token, id, status, { cancelReason });
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['bookings'] });
       void queryClient.invalidateQueries({ queryKey: BOOKING_ATTENTION_QUERY_KEY });
       setActionId(null);
       setRescheduleId(null);
+      setCancelBooking(null);
       setActionError(null);
     },
     onError: (error) => {
@@ -221,10 +251,30 @@ export default function ProviderBookingsPage() {
   });
 
   const handleAction = (id: string, status: BookingStatus) => {
+    if (status === BookingStatus.CANCELLED) {
+      const booking = visibleBookings.find((b) => b.id === id);
+      setActionError(null);
+      setRescheduleId(null);
+      setCancelBooking({
+        id,
+        serviceTitle: booking?.serviceTitle ?? '',
+      });
+      return;
+    }
     setActionError(null);
     setRescheduleId(null);
     setActionId(id);
     updateMutation.mutate({ id, status });
+  };
+
+  const handleConfirmCancel = (reason: string) => {
+    if (!cancelBooking) return;
+    setActionId(cancelBooking.id);
+    updateMutation.mutate({
+      id: cancelBooking.id,
+      status: BookingStatus.CANCELLED,
+      cancelReason: reason,
+    });
   };
 
   const handleMessage = (bookingId: string) => {
@@ -247,6 +297,8 @@ export default function ProviderBookingsPage() {
           {actionError}
         </div>
       )}
+
+      <ProviderLocationPublisher bookings={visibleBookings} />
 
       <div className="flex flex-wrap gap-2">
         <button
@@ -395,13 +447,61 @@ export default function ProviderBookingsPage() {
                     </>
                   )}
                   {view === 'incoming' && booking.status === BookingStatus.CONFIRMED && (
-                    <Button
-                      size="sm"
-                      disabled={actionId === booking.id}
-                      onClick={() => handleAction(booking.id, BookingStatus.IN_PROGRESS)}
-                    >
-                      İcraya başla
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        disabled={actionId === booking.id}
+                        onClick={() => handleAction(booking.id, BookingStatus.EN_ROUTE)}
+                      >
+                        Yola çıxdım
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={actionId === booking.id}
+                        onClick={() => handleAction(booking.id, BookingStatus.CANCELLED)}
+                      >
+                        Ləğv et
+                      </Button>
+                    </>
+                  )}
+                  {view === 'incoming' && booking.status === BookingStatus.EN_ROUTE && (
+                    <>
+                      <Button
+                        size="sm"
+                        disabled={actionId === booking.id}
+                        onClick={() => handleAction(booking.id, BookingStatus.ARRIVED)}
+                      >
+                        Ünvana çatdım
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={actionId === booking.id}
+                        onClick={() => handleAction(booking.id, BookingStatus.CANCELLED)}
+                      >
+                        Ləğv et
+                      </Button>
+                    </>
+                  )}
+                  {view === 'incoming' && booking.status === BookingStatus.ARRIVED && (
+                    <>
+                      <Button
+                        size="sm"
+                        disabled={actionId === booking.id}
+                        onClick={() => handleAction(booking.id, BookingStatus.IN_PROGRESS)}
+                      >
+                        İcraya başla
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={actionId === booking.id}
+                        onClick={() => handleAction(booking.id, BookingStatus.CANCELLED)}
+                      >
+                        Ləğv et
+                      </Button>
+                    </>
                   )}
                   {view === 'incoming' && booking.status === BookingStatus.IN_PROGRESS && (
                     <Button
@@ -410,6 +510,16 @@ export default function ProviderBookingsPage() {
                       onClick={() => handleAction(booking.id, BookingStatus.COMPLETED)}
                     >
                       Tamamla
+                    </Button>
+                  )}
+                  {view === 'sent' && isCancellableBookingStatus(booking.status) && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={actionId === booking.id}
+                      onClick={() => handleAction(booking.id, BookingStatus.CANCELLED)}
+                    >
+                      Ləğv et
                     </Button>
                   )}
                   <Button
@@ -448,6 +558,16 @@ export default function ProviderBookingsPage() {
           </Card>
         ))}
       </div>
+
+      <CancelBookingDialog
+        open={Boolean(cancelBooking)}
+        serviceTitle={cancelBooking?.serviceTitle}
+        pending={updateMutation.isPending && actionId === cancelBooking?.id}
+        onClose={() => {
+          if (!updateMutation.isPending) setCancelBooking(null);
+        }}
+        onConfirm={handleConfirmCancel}
+      />
     </div>
   );
 }

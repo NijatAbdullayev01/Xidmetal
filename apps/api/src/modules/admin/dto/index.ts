@@ -20,6 +20,7 @@ import {
   ServiceStatus,
   BookingStatus,
   ReviewStatus,
+  ReportStatus,
 } from '@xidmetal/shared';
 
 function optionalBoolean({ value }: { value: unknown }): boolean | undefined {
@@ -95,6 +96,25 @@ export class AdminReviewsQueryDto extends AdminPaginationQueryDto {
   @IsOptional()
   @IsEnum(ReviewStatus)
   status?: ReviewStatus;
+}
+
+export class AdminReportsQueryDto extends AdminPaginationQueryDto {
+  @ApiPropertyOptional({ enum: ReportStatus })
+  @IsOptional()
+  @IsEnum(ReportStatus)
+  status?: ReportStatus;
+}
+
+export class SetReportStatusDto {
+  @ApiProperty({ enum: [ReportStatus.RESOLVED, ReportStatus.DISMISSED] })
+  @IsEnum(ReportStatus)
+  status!: ReportStatus.RESOLVED | ReportStatus.DISMISSED;
+
+  @ApiPropertyOptional({ maxLength: 1000 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  adminNote?: string;
 }
 
 export class CreateCategoryDto {

@@ -17,6 +17,7 @@ import {
   getPriceUnitLabel,
 } from '@/lib/provider-labels';
 import { useState } from 'react';
+import { ProviderVerificationBanner } from '@/components/provider/provider-verification-banner';
 
 interface DeleteTarget {
   id: string;
@@ -106,6 +107,7 @@ export default function MyServicesPage() {
 
   return (
     <div className="space-y-6">
+      <ProviderVerificationBanner />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Xidmətlərim</h1>

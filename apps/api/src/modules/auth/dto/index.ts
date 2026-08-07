@@ -45,6 +45,11 @@ export class RegisterDto {
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
+
+  @ApiPropertyOptional({ description: 'Cloudflare Turnstile token' })
+  @IsOptional()
+  @IsString()
+  captchaToken?: string;
 }
 
 export class LoginDto {
@@ -62,6 +67,11 @@ export class LoginDto {
   })
   @IsIn(['marketplace', 'admin'])
   clientApp!: 'marketplace' | 'admin';
+
+  @ApiPropertyOptional({ description: 'Cloudflare Turnstile token' })
+  @IsOptional()
+  @IsString()
+  captchaToken?: string;
 }
 
 export class RefreshTokenDto {
@@ -84,6 +94,11 @@ export class ForgotPasswordDto {
   @ApiProperty({ example: 'user@example.com' })
   @IsEmail({}, { message: 'Düzgün e-poçt daxil edin' })
   email!: string;
+
+  @ApiPropertyOptional({ description: 'Cloudflare Turnstile token' })
+  @IsOptional()
+  @IsString()
+  captchaToken?: string;
 }
 
 export class ResetPasswordDto {

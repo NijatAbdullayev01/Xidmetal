@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Star,
   ShieldCheck,
+  Flag,
   FolderTree,
   ArrowRight,
 } from 'lucide-react';
@@ -59,6 +60,12 @@ export default function AdminOverviewPage() {
       value: stats?.reviewsPending ?? '—',
       icon: Star,
       href: '/reviews',
+    },
+    {
+      label: 'Gözləyən şikayət',
+      value: stats?.reportsPending ?? '—',
+      icon: Flag,
+      href: '/reports',
     },
     {
       label: 'Aktiv kateqoriya',

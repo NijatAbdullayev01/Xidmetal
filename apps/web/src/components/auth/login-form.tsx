@@ -12,12 +12,17 @@ import { Label } from '@/components/ui/label';
 import { api, ApiError } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { getAdminAppUrl } from '@/lib/auth';
+import {
+  TurnstileWidget,
+  isTurnstileConfigured,
+} from '@/components/auth/turnstile-widget';
 
 export function LoginForm() {
   const setAuth = useAuthStore((state) => state.setAuth);
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [adminHint, setAdminHint] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const {
     register,
@@ -35,8 +40,16 @@ export function LoginForm() {
     setServerError(null);
     setAdminHint(null);
 
+    if (isTurnstileConfigured() && !captchaToken) {
+      setServerError('Təhlükəsizlik yoxlamasını tamamlayın');
+      return;
+    }
+
     try {
-      const response = await api.auth.login(values);
+      const response = await api.auth.login({
+        ...values,
+        captchaToken: captchaToken ?? undefined,
+      });
       setAuth(response.user);
     } catch (error) {
       if (error instanceof ApiError) {
@@ -124,6 +137,8 @@ export function LoginForm() {
           )}
         </div>
       )}
+
+      <TurnstileWidget onToken={setCaptchaToken} />
 
       <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? (

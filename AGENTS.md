@@ -24,7 +24,7 @@ Bu layihə xidmət verənlərlə xidmət alanları birləşdirən marketplace pl
 ## Arxitektura
 
 - Backend: Controller → Service → Prisma (Clean Architecture)
-- Modullar domain-ə görə ayrılıb: auth, users, services, categories, availability, bookings, reviews, messages, notifications, health
+- Modullar domain-ə görə ayrılıb: auth, users, services, categories, availability, bookings, reviews, messages, notifications, health, contact, reports, geo, realtime, tracking, dispatch, payments (flag), devices, uploads
 - RBAC: CUSTOMER, PROVIDER, ADMIN rolları (admin UI: ayrı `apps/admin` app, port 3021)
 - **Məhsul qərarı:** bir hesab = bir rol; CUSTOMER→PROVIDER upgrade / dual-role yoxdur və əlavə edilməsin — xidmət verən üçün ayrı hesab (bax: `docs/ARCHITECTURE.md`)
 - JWT auth + refresh token rotation

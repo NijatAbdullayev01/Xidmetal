@@ -6,17 +6,21 @@ import type {
   RequestEmailVerificationInput,
   ConfirmEmailVerificationInput,
   UserProfile,
+  UserDataExport,
   ServiceSummary,
   BookingSummary,
   CategorySummary,
   ReviewSummary,
   ProviderReviewsPage,
+  ProviderDashboardStats,
   PaginatedResponse,
   CreateReviewInput,
   CreateServiceInput,
   UpdateServiceInput,
   UpdateProfileInput,
   ChangePasswordInput,
+  ContactFormInput,
+  CreateReportInput,
   RequestEmailChangeInput,
   ConfirmEmailChangeInput,
   ConversationSummary,
@@ -36,6 +40,16 @@ import type {
   DayAvailability,
   UpsertWorkingHoursInput,
   CreateAvailabilityOverrideInput,
+  ReportSummary,
+  NearbyProviderSummary,
+  GeocodeResult,
+  UpdateProviderLocationInput,
+  ProviderAvailability,
+  LocationPingSummary,
+  DispatchOfferSummary,
+  DeviceTokenSummary,
+  RegisterDeviceTokenInput,
+  UnregisterDeviceTokenInput,
 } from '@xidmetal/shared';
 import { BookingStatus, CLIENT_APP, CLIENT_APP_HEADER } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
@@ -121,6 +135,7 @@ export async function apiClient<T>(
     ...(token ? { cache: 'no-store' as const } : {}),
     headers: {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      [CLIENT_APP_HEADER]: CLIENT_APP.MARKETPLACE,
       ...headers,
     },
   });
@@ -229,6 +244,8 @@ export const api = {
 
   users: {
     me: (token: string) => apiClient<UserProfile>('/users/me', { token }),
+    dashboardStats: (token: string) =>
+      apiClient<ProviderDashboardStats>('/users/me/dashboard-stats', { token }),
     heartbeat: (token: string) =>
       apiClient<{ lastSeenAt: string }>('/users/me/heartbeat', {
         method: 'POST',
@@ -261,6 +278,21 @@ export const api = {
         token,
         body: JSON.stringify(data),
       }),
+    requestPhoneVerify: (token: string) =>
+      apiClient<{
+        message: string;
+        alreadyVerified?: boolean;
+        previewCode?: string;
+      }>('/users/me/phone/request-verify', {
+        method: 'POST',
+        token,
+      }),
+    confirmPhoneVerify: (token: string, data: { code: string }) =>
+      apiClient<UserProfile>('/users/me/phone/confirm-verify', {
+        method: 'POST',
+        token,
+        body: JSON.stringify(data),
+      }),
     deleteAccount: (
       token: string,
       data: { password: string; confirmText: string },
@@ -268,6 +300,20 @@ export const api = {
       apiClient<{ message: string }>('/users/me', {
         method: 'DELETE',
         token,
+        body: JSON.stringify(data),
+      }),
+    exportData: (token: string) =>
+      apiClient<UserDataExport>('/users/me/export', {
+        token,
+      }),
+  },
+
+  contact: {
+    submit: (
+      data: ContactFormInput & { website?: string; captchaToken?: string },
+    ) =>
+      apiClient<{ message: string }>('/contact', {
+        method: 'POST',
         body: JSON.stringify(data),
       }),
   },
@@ -360,12 +406,36 @@ export const api = {
     return apiClient<PaginatedResponse<BookingSummary>>(`/bookings${query}`, { token });
   },
 
-  createBooking: (token: string, data: CreateBookingInput) =>
+  createBooking: (
+    token: string,
+    data: CreateBookingInput,
+    options?: { idempotencyKey?: string },
+  ) =>
     apiClient<BookingSummary>('/bookings', {
       method: 'POST',
       token,
       body: JSON.stringify(data),
+      headers: options?.idempotencyKey
+        ? { 'Idempotency-Key': options.idempotencyKey }
+        : undefined,
     }),
+
+  dispatch: {
+    pendingOffers: (token: string) =>
+      apiClient<DispatchOfferSummary[]>('/dispatch/offers/pending', { token }),
+    acceptOffer: (token: string, offerId: string) =>
+      apiClient<DispatchOfferSummary>(`/dispatch/offers/${offerId}/accept`, {
+        method: 'POST',
+        token,
+        body: JSON.stringify({}),
+      }),
+    rejectOffer: (token: string, offerId: string, reason?: string) =>
+      apiClient<DispatchOfferSummary>(`/dispatch/offers/${offerId}/reject`, {
+        method: 'POST',
+        token,
+        body: JSON.stringify(reason ? { reason } : {}),
+      }),
+  },
 
   updateBookingStatus: (
     token: string,
@@ -400,6 +470,19 @@ export const api = {
       method: 'PATCH',
       token,
     }),
+
+  locationPings: (token: string, bookingId: string, params?: { limit?: string }) => {
+    const query = params ? `?${new URLSearchParams(params)}` : '';
+    return apiClient<LocationPingSummary[]>(
+      `/bookings/${bookingId}/location-pings${query}`,
+      { token },
+    );
+  },
+
+  realtime: {
+    socketToken: (token: string) =>
+      apiClient<{ token: string }>('/realtime/socket-token', { token }),
+  },
 
   createReview: (token: string, data: CreateReviewInput) =>
     apiClient<ReviewSummary>('/reviews', {
@@ -499,6 +582,86 @@ export const api = {
       apiClient<{ markedCount: number }>('/notifications/read-all', {
         method: 'POST',
         token,
+      }),
+  },
+
+  devices: {
+    listTokens: (token: string) =>
+      apiClient<DeviceTokenSummary[]>('/devices/tokens', { token }),
+    registerToken: (token: string, data: RegisterDeviceTokenInput) =>
+      apiClient<DeviceTokenSummary>('/devices/tokens', {
+        method: 'POST',
+        token,
+        body: JSON.stringify(data),
+      }),
+    unregisterToken: (token: string, data: UnregisterDeviceTokenInput) =>
+      apiClient<{ removed: boolean }>('/devices/tokens', {
+        method: 'DELETE',
+        token,
+        body: JSON.stringify(data),
+      }),
+  },
+
+  reports: {
+    create: (token: string, data: CreateReportInput) =>
+      apiClient<ReportSummary>('/reports', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({
+          ...data,
+          targetId: data.targetId?.trim() || undefined,
+        }),
+      }),
+  },
+
+  geo: {
+    geocode: (q: string) =>
+      apiClient<GeocodeResult[]>(`/geo/geocode?${new URLSearchParams({ q })}`),
+    reverse: (lat: number, lng: number) =>
+      apiClient<GeocodeResult | null>(
+        `/geo/reverse?${new URLSearchParams({ lat: String(lat), lng: String(lng) })}`,
+      ),
+    nearby: (params: {
+      lat: number;
+      lng: number;
+      radiusKm?: number;
+      categoryId?: string;
+      limit?: number;
+    }) => {
+      const query = new URLSearchParams({
+        lat: String(params.lat),
+        lng: String(params.lng),
+      });
+      if (params.radiusKm != null) query.set('radiusKm', String(params.radiusKm));
+      if (params.categoryId) query.set('categoryId', params.categoryId);
+      if (params.limit != null) query.set('limit', String(params.limit));
+      return apiClient<{ items: NearbyProviderSummary[]; engine: 'postgis' | 'haversine' }>(
+        `/geo/nearby?${query}`,
+      );
+    },
+    updateLocation: (token: string, data: UpdateProviderLocationInput) =>
+      apiClient<{
+        availability: ProviderAvailability;
+        lastLat: number;
+        lastLng: number;
+        lastHeading: number | null;
+        locationUpdatedAt: string;
+      }>('/geo/me/location', {
+        method: 'POST',
+        token,
+        body: JSON.stringify(data),
+      }),
+    updateAvailability: (token: string, availability: ProviderAvailability) =>
+      apiClient<{
+        availability: ProviderAvailability;
+        lastLat: number | null;
+        lastLng: number | null;
+        lastHeading: number | null;
+        locationUpdatedAt: string | null;
+      }>('/geo/me/availability', {
+        method: 'PATCH',
+        token,
+        body: JSON.stringify({ availability }),
       }),
   },
 };

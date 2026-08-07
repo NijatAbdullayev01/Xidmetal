@@ -15,7 +15,7 @@ import {
   type UploadFolder,
 } from './storage.types';
 import { collectMediaBaseUrls, isAllowedMediaUrl } from './allowed-media-url';
-import { signPrivateMediaUrl, stripMediaSignature } from './signed-media';
+import { isPrivateUploadKey, signPrivateMediaUrl, stripMediaSignature } from './signed-media';
 
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -98,12 +98,25 @@ export class StorageService implements OnModuleInit {
     return stripMediaSignature(url);
   }
 
-  /** Brauzerə qaytarılarkən private (bookings) URL-ləri imzala */
-  toReadableMediaUrl(url: string | null | undefined): string | undefined {
+  /** Brauzerə qaytarılarkən private (bookings) URL-ləri imzala / S3 presign */
+  async toReadableMediaUrl(url: string | null | undefined): Promise<string | undefined> {
     if (!url) return undefined;
     const canonical = stripMediaSignature(url);
-    const secret = this.config.get<string>('JWT_SECRET', '');
-    return signPrivateMediaUrl(canonical, secret);
+    const key = this.driver.keyFromPublicUrl(canonical);
+
+    if (key && isPrivateUploadKey(key) && this.driver.getSignedReadUrl) {
+      return this.driver.getSignedReadUrl(key);
+    }
+
+    return signPrivateMediaUrl(canonical, this.mediaSigningSecret());
+  }
+
+  /** Local HMAC — JWT rotasiyasından asılı olmamaq üçün ayrı secret üstünlük təşkil edir */
+  mediaSigningSecret(): string {
+    return (
+      this.config.get<string>('MEDIA_SIGNING_SECRET')?.trim() ||
+      this.config.get<string>('JWT_SECRET', '')
+    );
   }
 
   async uploadImage(
@@ -161,10 +174,10 @@ export class StorageService implements OnModuleInit {
       },
     });
 
-    const secret = this.config.get<string>('JWT_SECRET', '');
+    const readable = await this.toReadableMediaUrl(stored.url);
     return {
       ...stored,
-      url: signPrivateMediaUrl(stored.url, secret),
+      url: readable ?? stored.url,
     };
   }
 

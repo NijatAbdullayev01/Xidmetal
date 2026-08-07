@@ -1,68 +1,140 @@
 import { describe, expect, it } from 'vitest';
-import { BookingStatus } from '@xidmetal/shared';
+import {
+  BookingStatus,
+  isBookingTransitionAllowed,
+  isCancellableBookingStatus,
+  bookingLifecycleFieldsForStatus,
+  ACTIVE_BOOKING_STATUSES,
+} from '@xidmetal/shared';
 
-/**
- * bookings.service validateStatusTransition ilə eyni matrisa —
- * regression üçün saf unit test (Nest DI olmadan).
- */
-function isTransitionAllowed(
-  current: BookingStatus,
-  next: BookingStatus,
-  isProvider: boolean,
-  isCustomer: boolean,
-  isAdmin: boolean,
-): boolean {
-  if (current === next) return true;
-  if (isAdmin) return true;
-
-  const providerTransitions: Partial<Record<BookingStatus, BookingStatus[]>> = {
-    [BookingStatus.PENDING]: [BookingStatus.CONFIRMED, BookingStatus.REJECTED],
-    [BookingStatus.CONFIRMED]: [BookingStatus.IN_PROGRESS, BookingStatus.CANCELLED],
-    [BookingStatus.IN_PROGRESS]: [BookingStatus.COMPLETED],
-  };
-
-  const customerTransitions: Partial<Record<BookingStatus, BookingStatus[]>> = {
-    [BookingStatus.PENDING]: [BookingStatus.CANCELLED],
-    [BookingStatus.CONFIRMED]: [BookingStatus.CANCELLED],
-  };
-
-  const allowed = isProvider
-    ? providerTransitions[current] ?? []
-    : isCustomer
-      ? customerTransitions[current] ?? []
-      : [];
-
-  return allowed.includes(next);
-}
-
-describe('booking status transitions', () => {
+describe('booking status transitions (shared lifecycle)', () => {
   it('provider PENDING → CONFIRMED/REJECTED', () => {
     expect(
-      isTransitionAllowed(BookingStatus.PENDING, BookingStatus.CONFIRMED, true, false, false),
+      isBookingTransitionAllowed(BookingStatus.PENDING, BookingStatus.CONFIRMED, {
+        isProvider: true,
+        isCustomer: false,
+        isAdmin: false,
+      }),
     ).toBe(true);
     expect(
-      isTransitionAllowed(BookingStatus.PENDING, BookingStatus.REJECTED, true, false, false),
+      isBookingTransitionAllowed(BookingStatus.PENDING, BookingStatus.REJECTED, {
+        isProvider: true,
+        isCustomer: false,
+        isAdmin: false,
+      }),
     ).toBe(true);
     expect(
-      isTransitionAllowed(BookingStatus.PENDING, BookingStatus.COMPLETED, true, false, false),
+      isBookingTransitionAllowed(BookingStatus.PENDING, BookingStatus.COMPLETED, {
+        isProvider: true,
+        isCustomer: false,
+        isAdmin: false,
+      }),
     ).toBe(false);
   });
 
-  it('customer yalnız CANCELLED', () => {
+  it('provider CONFIRMED → EN_ROUTE (birbaşa IN_PROGRESS yox)', () => {
     expect(
-      isTransitionAllowed(BookingStatus.PENDING, BookingStatus.CANCELLED, false, true, false),
+      isBookingTransitionAllowed(BookingStatus.CONFIRMED, BookingStatus.EN_ROUTE, {
+        isProvider: true,
+        isCustomer: false,
+        isAdmin: false,
+      }),
     ).toBe(true);
     expect(
-      isTransitionAllowed(BookingStatus.CONFIRMED, BookingStatus.CANCELLED, false, true, false),
-    ).toBe(true);
-    expect(
-      isTransitionAllowed(BookingStatus.PENDING, BookingStatus.CONFIRMED, false, true, false),
+      isBookingTransitionAllowed(BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS, {
+        isProvider: true,
+        isCustomer: false,
+        isAdmin: false,
+      }),
     ).toBe(false);
+    expect(
+      isBookingTransitionAllowed(BookingStatus.CONFIRMED, BookingStatus.CANCELLED, {
+        isProvider: true,
+        isCustomer: false,
+        isAdmin: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('provider EN_ROUTE → ARRIVED → IN_PROGRESS → COMPLETED', () => {
+    expect(
+      isBookingTransitionAllowed(BookingStatus.EN_ROUTE, BookingStatus.ARRIVED, {
+        isProvider: true,
+        isCustomer: false,
+        isAdmin: false,
+      }),
+    ).toBe(true);
+    expect(
+      isBookingTransitionAllowed(BookingStatus.ARRIVED, BookingStatus.IN_PROGRESS, {
+        isProvider: true,
+        isCustomer: false,
+        isAdmin: false,
+      }),
+    ).toBe(true);
+    expect(
+      isBookingTransitionAllowed(BookingStatus.IN_PROGRESS, BookingStatus.COMPLETED, {
+        isProvider: true,
+        isCustomer: false,
+        isAdmin: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('customer EN_ROUTE/ARRIVED ləğv edə bilər; IN_PROGRESS yox', () => {
+    expect(
+      isBookingTransitionAllowed(BookingStatus.EN_ROUTE, BookingStatus.CANCELLED, {
+        isProvider: false,
+        isCustomer: true,
+        isAdmin: false,
+      }),
+    ).toBe(true);
+    expect(
+      isBookingTransitionAllowed(BookingStatus.ARRIVED, BookingStatus.CANCELLED, {
+        isProvider: false,
+        isCustomer: true,
+        isAdmin: false,
+      }),
+    ).toBe(true);
+    expect(
+      isBookingTransitionAllowed(BookingStatus.IN_PROGRESS, BookingStatus.CANCELLED, {
+        isProvider: false,
+        isCustomer: true,
+        isAdmin: false,
+      }),
+    ).toBe(false);
+    expect(isCancellableBookingStatus(BookingStatus.EN_ROUTE)).toBe(true);
+    expect(isCancellableBookingStatus(BookingStatus.IN_PROGRESS)).toBe(false);
   });
 
   it('admin hər keçidi edə bilər', () => {
     expect(
-      isTransitionAllowed(BookingStatus.PENDING, BookingStatus.COMPLETED, false, false, true),
+      isBookingTransitionAllowed(BookingStatus.PENDING, BookingStatus.COMPLETED, {
+        isProvider: false,
+        isCustomer: false,
+        isAdmin: true,
+      }),
     ).toBe(true);
+  });
+
+  it('ACTIVE_BOOKING_STATUSES EN_ROUTE/ARRIVED daxildir', () => {
+    expect(ACTIVE_BOOKING_STATUSES).toContain(BookingStatus.EN_ROUTE);
+    expect(ACTIVE_BOOKING_STATUSES).toContain(BookingStatus.ARRIVED);
+  });
+
+  it('lifecycle timestamp sahələri', () => {
+    const now = new Date('2026-08-07T12:00:00.000Z');
+    expect(
+      bookingLifecycleFieldsForStatus(BookingStatus.EN_ROUTE, {}, now),
+    ).toEqual({ enRouteAt: now });
+    expect(
+      bookingLifecycleFieldsForStatus(
+        BookingStatus.EN_ROUTE,
+        { enRouteAt: now },
+        now,
+      ),
+    ).toEqual({});
+    expect(
+      bookingLifecycleFieldsForStatus(BookingStatus.ARRIVED, {}, now),
+    ).toEqual({ arrivedAt: now });
   });
 });

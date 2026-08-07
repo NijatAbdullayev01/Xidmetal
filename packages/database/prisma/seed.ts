@@ -114,7 +114,21 @@ async function main() {
   console.log(`✅ ${categories.length} kateqoriya yaradıldı`);
 
   const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@xidmetal.az';
-  const adminPassword = process.env.ADMIN_PASSWORD ?? 'Admin123!';
+  const isProduction = process.env.NODE_ENV === 'production';
+  const adminPasswordEnv = process.env.ADMIN_PASSWORD?.trim();
+
+  if (isProduction && !adminPasswordEnv) {
+    throw new Error(
+      'Production mühitində ADMIN_PASSWORD məcburidir — default şifrə ilə seed qadağandır',
+    );
+  }
+
+  const adminPassword = adminPasswordEnv || 'Admin123!';
+  if (!isProduction && !adminPasswordEnv) {
+    console.warn(
+      '⚠️  ADMIN_PASSWORD təyin edilməyib — lokal default Admin123! istifadə olunur',
+    );
+  }
   const passwordHash = await bcrypt.hash(adminPassword, 12);
 
   await prisma.user.upsert({
@@ -124,7 +138,7 @@ async function main() {
       isActive: true,
       isVerified: true,
       // Şifrəni yalnız ADMIN_PASSWORD açıq təyin edildikdə yenilə
-      ...(process.env.ADMIN_PASSWORD ? { passwordHash } : {}),
+      ...(adminPasswordEnv ? { passwordHash } : {}),
     },
     create: {
       email: adminEmail,

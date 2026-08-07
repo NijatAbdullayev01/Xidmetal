@@ -1,49 +1,60 @@
 import { ConsoleLogger, type LogLevel, type LoggerService } from '@nestjs/common';
+import pino, { type Logger as PinoLogger } from 'pino';
 
 /**
- * Production-da JSON sətirlər; development-də Nest ConsoleLogger.
+ * Development: Nest ConsoleLogger.
+ * Production: pino JSON (structured logging).
  */
 export function createAppLogger(): LoggerService {
   if ((process.env.NODE_ENV ?? 'development') !== 'production') {
     return new ConsoleLogger('API');
   }
 
-  const logger: LoggerService = {
+  const pinoLogger: PinoLogger = pino({
+    level: process.env.LOG_LEVEL?.trim() || 'info',
+    base: { service: 'xidmetal-api' },
+    timestamp: pino.stdTimeFunctions.isoTime,
+  });
+
+  return {
     log(message: unknown, ...optionalParams: unknown[]) {
-      write('log', message, optionalParams);
+      writePino(pinoLogger, 'info', message, optionalParams);
     },
     error(message: unknown, ...optionalParams: unknown[]) {
-      write('error', message, optionalParams);
+      writePino(pinoLogger, 'error', message, optionalParams);
     },
     warn(message: unknown, ...optionalParams: unknown[]) {
-      write('warn', message, optionalParams);
+      writePino(pinoLogger, 'warn', message, optionalParams);
     },
     debug(message: unknown, ...optionalParams: unknown[]) {
-      write('debug', message, optionalParams);
+      writePino(pinoLogger, 'debug', message, optionalParams);
     },
     verbose(message: unknown, ...optionalParams: unknown[]) {
-      write('verbose', message, optionalParams);
+      writePino(pinoLogger, 'trace', message, optionalParams);
     },
   };
-
-  return logger;
 }
 
-function write(level: LogLevel | string, message: unknown, optionalParams: unknown[]) {
+function writePino(
+  logger: PinoLogger,
+  level: 'info' | 'error' | 'warn' | 'debug' | 'trace',
+  message: unknown,
+  optionalParams: unknown[],
+) {
   const context =
     typeof optionalParams[0] === 'string' ? optionalParams[0] : undefined;
-  const payload = {
-    level,
-    time: new Date().toISOString(),
-    ...(context ? { context } : {}),
-    msg: typeof message === 'string' ? message : safeJson(message),
-  };
-  const line = `${JSON.stringify(payload)}\n`;
-  if (level === 'error') {
-    process.stderr.write(line);
-  } else {
-    process.stdout.write(line);
+  const msg = typeof message === 'string' ? message : safeJson(message);
+  const payload = context ? { context, msg } : { msg };
+
+  if (level === 'error' && optionalParams.length > 1) {
+    const err = optionalParams.find((p) => p instanceof Error);
+    if (err) {
+      logger.error({ ...payload, err }, msg);
+      return;
+    }
   }
+
+  logger[level](payload, msg);
 }
 
 function safeJson(value: unknown): string {
@@ -53,3 +64,6 @@ function safeJson(value: unknown): string {
     return String(value);
   }
 }
+
+/** Nest LogLevel uyğunluğu üçün saxlanılır (test/helper) */
+export type AppLogLevel = LogLevel;

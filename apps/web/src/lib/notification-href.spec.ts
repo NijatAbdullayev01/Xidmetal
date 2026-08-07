@@ -21,6 +21,27 @@ describe('resolveNotificationHref', () => {
     ).toBe('/dashboard/provider/bookings');
   });
 
+  it('REJECTED bildirişini bookings-ə aparır', () => {
+    expect(
+      resolveNotificationHref(
+        { type: NotificationType.BOOKING_REJECTED, data: { bookingId: 'b2' } },
+        UserRole.CUSTOMER,
+      ),
+    ).toBe('/dashboard/customer/bookings');
+  });
+
+  it('RESCHEDULE_REJECTED bildirişini bookings-ə aparır', () => {
+    expect(
+      resolveNotificationHref(
+        {
+          type: NotificationType.BOOKING_RESCHEDULE_REJECTED,
+          data: { bookingId: 'b3' },
+        },
+        UserRole.PROVIDER,
+      ),
+    ).toBe('/dashboard/provider/bookings');
+  });
+
   it('rəy bildirişini ratings-ə aparır', () => {
     expect(
       resolveNotificationHref(

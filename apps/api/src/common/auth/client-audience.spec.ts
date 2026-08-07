@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { ForbiddenException } from '@nestjs/common';
+import { WsException } from '@nestjs/websockets';
 import { CLIENT_APP, UserRole } from '@xidmetal/shared';
 import { AuthService } from '../../modules/auth/auth.service';
+import {
+  assertSessionAudience,
+  normalizeTokenAudience,
+} from './client-audience';
+import {
+  ACCESS_COOKIE,
+  ACCESS_COOKIE_ADMIN,
+  ACCESS_COOKIE_MARKETPLACE,
+  accessCookieName,
+  parseCookie,
+  readAccessTokenFromCookieHeader,
+  refreshCookieName,
+} from './auth-cookies';
 
 function assertClientAudience(
   role: string,
@@ -34,5 +48,107 @@ describe('assertClientAudience', () => {
     expect(() =>
       assertClientAudience(UserRole.ADMIN, CLIENT_APP.ADMIN),
     ).not.toThrow();
+  });
+});
+
+describe('normalizeTokenAudience', () => {
+  it('string aud', () => {
+    expect(normalizeTokenAudience('marketplace')).toBe(CLIENT_APP.MARKETPLACE);
+    expect(normalizeTokenAudience('admin')).toBe(CLIENT_APP.ADMIN);
+  });
+
+  it('array aud', () => {
+    expect(normalizeTokenAudience(['marketplace'])).toBe(CLIENT_APP.MARKETPLACE);
+  });
+
+  it('naməlum → undefined', () => {
+    expect(normalizeTokenAudience('other')).toBeUndefined();
+    expect(normalizeTokenAudience(undefined)).toBeUndefined();
+  });
+});
+
+describe('assertSessionAudience', () => {
+  it('header ≠ aud → Forbidden (http)', () => {
+    expect(() =>
+      assertSessionAudience({
+        headerApp: CLIENT_APP.MARKETPLACE,
+        tokenAud: CLIENT_APP.ADMIN,
+        role: UserRole.ADMIN,
+        mode: 'http',
+      }),
+    ).toThrow(ForbiddenException);
+  });
+
+  it('header ≠ aud → WsException (ws)', () => {
+    expect(() =>
+      assertSessionAudience({
+        headerApp: CLIENT_APP.MARKETPLACE,
+        tokenAud: CLIENT_APP.ADMIN,
+        role: UserRole.ADMIN,
+        mode: 'ws',
+      }),
+    ).toThrow(WsException);
+  });
+
+  it('marketplace + ADMIN rol → rədd', () => {
+    expect(() =>
+      assertSessionAudience({
+        headerApp: CLIENT_APP.MARKETPLACE,
+        tokenAud: CLIENT_APP.MARKETPLACE,
+        role: UserRole.ADMIN,
+        mode: 'ws',
+      }),
+    ).toThrow(WsException);
+  });
+
+  it('marketplace + PROVIDER → OK', () => {
+    expect(() =>
+      assertSessionAudience({
+        headerApp: CLIENT_APP.MARKETPLACE,
+        tokenAud: CLIENT_APP.MARKETPLACE,
+        role: UserRole.PROVIDER,
+        mode: 'ws',
+      }),
+    ).not.toThrow();
+  });
+
+  it('uyğun aud yoxdursa header ilə rol yoxlanır', () => {
+    expect(() =>
+      assertSessionAudience({
+        headerApp: CLIENT_APP.MARKETPLACE,
+        tokenAud: undefined,
+        role: UserRole.PROVIDER,
+        mode: 'ws',
+      }),
+    ).not.toThrow();
+  });
+});
+
+describe('auth cookie namespacing', () => {
+  it('app-scoped adlar', () => {
+    expect(accessCookieName(CLIENT_APP.MARKETPLACE)).toBe(ACCESS_COOKIE_MARKETPLACE);
+    expect(accessCookieName(CLIENT_APP.ADMIN)).toBe(ACCESS_COOKIE_ADMIN);
+    expect(refreshCookieName(CLIENT_APP.ADMIN)).toBe('xidmetal_refresh_admin');
+  });
+
+  it('Cookie header-dən marketplace token oxuyur (legacy fallback)', () => {
+    const header = `${ACCESS_COOKIE}=legacy.jwt; other=1`;
+    expect(readAccessTokenFromCookieHeader(header, CLIENT_APP.MARKETPLACE)).toBe(
+      'legacy.jwt',
+    );
+  });
+
+  it('Cookie header-dən scoped marketplace üstünlük', () => {
+    const header = `${ACCESS_COOKIE}=legacy.jwt; ${ACCESS_COOKIE_MARKETPLACE}=mkt.jwt; ${ACCESS_COOKIE_ADMIN}=adm.jwt`;
+    expect(readAccessTokenFromCookieHeader(header, CLIENT_APP.MARKETPLACE)).toBe(
+      'mkt.jwt',
+    );
+    expect(readAccessTokenFromCookieHeader(header, CLIENT_APP.ADMIN)).toBe('adm.jwt');
+  });
+
+  it('parseCookie decode', () => {
+    expect(
+      parseCookie('a=1; xidmetal_access_marketplace=a%2Eb', ACCESS_COOKIE_MARKETPLACE),
+    ).toBe('a.b');
   });
 });

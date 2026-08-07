@@ -22,6 +22,7 @@ import { CLIENT_APP, UserRole, type ClientApp } from '@xidmetal/shared';
 import { parseDurationMs } from '../../common/auth/auth-cookies';
 import { assertValidEmailCode } from '../../common/auth/email-verification-codes';
 import { hashRefreshToken } from '../../common/auth/refresh-token';
+import { CaptchaService } from '../../common/captcha/captcha.service';
 
 const UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
 const EMAIL_CODE_EXPIRY_MS = 15 * 60 * 1000;
@@ -52,9 +53,11 @@ export class AuthService {
     private jwtService: JwtService,
     private config: ConfigService,
     private mailService: MailService,
+    private captcha: CaptchaService,
   ) {}
 
   async register(dto: RegisterDto) {
+    await this.captcha.assertValid(dto.captchaToken);
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findFirst({
       where: {
@@ -127,6 +130,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, clientApp: ClientApp) {
+    await this.captcha.assertValid(dto.captchaToken);
     const email = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
     const usable =
@@ -231,7 +235,11 @@ export class AuthService {
       stored.user.role,
       storedApp,
     );
-    return { user: this.sanitizeUser(stored.user), tokens };
+    return {
+      user: this.sanitizeUser(stored.user),
+      tokens,
+      clientApp: storedApp,
+    };
   }
 
   /** Cari sessiyanı (refresh token) serverdə ləğv edir */
@@ -247,7 +255,8 @@ export class AuthService {
     return { message: 'Bütün cihazlardan çıxış edildi' };
   }
 
-  async forgotPassword(email: string) {
+  async forgotPassword(email: string, captchaToken?: string) {
+    await this.captcha.assertValid(captchaToken);
     const normalized = email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({
       where: { email: normalized },

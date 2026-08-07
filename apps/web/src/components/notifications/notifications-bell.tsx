@@ -159,15 +159,32 @@ export function NotificationsBell() {
       >
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
           <p className="text-sm font-medium">Bildirişlər</p>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={unreadCount === 0 || markAllMutation.isPending}
-            onClick={() => markAllMutation.mutate()}
-          >
-            Hamısını oxu
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={unreadCount === 0 || markAllMutation.isPending}
+              onClick={() => markAllMutation.mutate()}
+            >
+              Hamısını oxu
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setOpen(false);
+                const base =
+                  user?.role === UserRole.PROVIDER
+                    ? '/dashboard/provider/notifications'
+                    : '/dashboard/customer/notifications';
+                router.push(base);
+              }}
+            >
+              Hamısı
+            </Button>
+          </div>
         </div>
 
         <div className="max-h-80 overflow-y-auto">

@@ -70,14 +70,16 @@ Cari vəziyyət üçün: [ARCHITECTURE.md](./ARCHITECTURE.md). Aşağıdakı cə
 
 | Modul | Məsuliyyət | Status (cari) |
 |-------|------------|----------------|
-| `reviews` | Rəy yaratma + rating aggregate | ✅ MVP (auto-APPROVED; moderation API yox) |
-| `notifications` | In-app oxu/siyahı | ✅ qismən (push/SMS/email kanalı yox; admin announce ✅; bəzi `NotificationType` emit olunmur) |
-| `messages` | Müştəri↔provider chat | ✅ REST + polling (WebSocket yox; typing in-memory) |
-| `realtime` (gateway) | Socket.IO gateway, otaqlar, presence | ❌ |
-| `tracking` | Provider lokasiya axını, marşrut, ETA | ❌ |
-| `dispatch` | On-demand provider tapma/təklif/timeout | ❌ |
-| `geo` | Geokodlaşdırma, yaxınlıq sorğuları (PostGIS) | ❌ |
-| `payments` | Payment intent, hold/capture, komissiya, payout, refund | ❌ |
+| `reviews` | Rəy yaratma + rating aggregate | ✅ MVP (`PENDING` + admin moderation) |
+| `notifications` | In-app oxu/siyahı + push/SMS kanalları | ✅ (FCM/SMS adapter; default noop) |
+| `messages` | Müştəri↔provider chat | ✅ REST + polling (WS typing hələ yox; TypingPresence DB) |
+| `realtime` (gateway) | Socket.IO gateway, otaqlar; provider presence | ✅ |
+| `tracking` | Provider lokasiya axını, marşrut, ETA, LocationPing | ✅ |
+| `dispatch` | On-demand provider tapma/təklif/timeout (BullMQ) | ✅ |
+| `geo` | Geokodlaşdırma, yaxınlıq sorğuları (PostGIS) | ✅ |
+| `payments` | Intent/hold/capture/refund scaffolding | ✅ flag OFF (`PAYMENTS_ENABLED`) |
+| `devices` | DeviceToken register/unregister | ✅ |
+| `metrics` (common) | Prometheus `/api/v1/metrics` + Grafana/k6 ops | ✅ Faza 6 |
 | Admin panel / CRUD | Kateqoriya yazma, verify, moderation | ✅ (`/api/v1/admin/*` + ayrı `apps/admin`) |
 
 Hər yeni modul mövcud konvensiyaya tabedir: `Controller → Service → Prisma`, DTO validation (class-validator), AZ dilində error mesajları. Bax: [.cursor/rules/backend.mdc].
@@ -126,33 +128,35 @@ Prisma PostGIS-i native dəstəkləmədiyi üçün `Unsupported("geography(Point
 
 ## 7. Ödəniş
 
-- Marketplace modeli: müştəri ödəyir → platforma komissiya tutur → provider-ə payout.
-- `PaymentIntent` yaradılır, iş başlayanda **hold**, tamamlananda **capture**.
-- Ləğv/refund siyasəti sifariş vəziyyətinə bağlıdır (bax lifecycle).
-- İdempotency açarları ilə ikiqat ödənişin qarşısı alınır.
+> **Cari məhsul qərarı:** Platforma ödənişsizdir. Modulu **scaffolding + `PAYMENTS_ENABLED=false`** ilə mövcuddur; aktivləşdirmə gələcək məhsul qərarındandır.
+
+- Hədəf model: müştəri ödəyir → platforma komissiya tutur → provider-ə payout.
+- `PaymentIntent` → **hold** → **capture**; Noop + Stripe stub adapter.
+- İdempotency: `Payment.idempotencyKey` + `IdempotencyRecord` + `Idempotency-Key` header.
+- Booking create/confirm/complete **PaymentIntent tələb etmir** (flag off).
 
 ---
 
 ## 8. Bildiriş kanalları
 
-| Kanal | İstifadə |
-|-------|----------|
-| In-app (WS) | Canlı status, "provider yoldadır/gəldi" |
-| Push (FCM) | App bağlı olduqda |
-| SMS | OTP, kritik status dəyişiklikləri |
-| Email | Qəbz, hesabat, marketinq |
+| Kanal | İstifadə | Status |
+|-------|----------|--------|
+| In-app | Status, inbox/badge | ✅ |
+| Push (FCM) | App/brauzer bağlı olduqda | ✅ adapter (noop default; credentials → FCM stub) |
+| SMS | Kritik status (`SMS_STATUS_ENABLED`) | ✅ adapter (noop/console/twilio stub) |
+| Email | Status mail | ✅ best-effort |
 
-Bütün bildirişlər `notifications` modulundan keçir; göndərmə BullMQ job-ları ilə asinxron edilir.
+In-app create-dən sonra push best-effort; SMS yalnız flag + `user.phone`. Phone OTP verify — `phoneVerifiedAt` + `/users/me/phone/*`; SMS yalnız təsdiqlənmiş nömrəyə.
 
 ---
 
 ## 9. Mobil / PWA
 
 Canlı izləmə praktikada provider tərəfdə arxa planda GPS tələb edir:
-- **MVP:** Provider Web tətbiqi **PWA** + `navigator.geolocation.watchPosition`.
-- **Sonra:** React Native (və ya Flutter) app — arxa plan lokasiya, native push.
+- **MVP (cari):** Provider Web tətbiqi **PWA** + `navigator.geolocation.watchPosition` + web push.
+- **Sonra (deferred):** React Native — arxa plan lokasiya, native push. `apps/mobile` hələ yoxdur; plan: [MOBILE.md](./MOBILE.md).
 
-Frontend `apps/web` cari qalır; mobil app gələcəkdə `apps/mobile` kimi əlavə oluna bilər.
+Frontend `apps/web` cari qalır; native app yalnız runnable + CI + shared wiring hazır olanda əlavə olunacaq.
 
 ---
 
@@ -160,7 +164,8 @@ Frontend `apps/web` cari qalır; mobil app gələcəkdə `apps/mobile` kimi əla
 
 - **Logging:** `pino` structured JSON, request-id korrelyasiyası.
 - **Errors:** Sentry (backend + frontend).
-- **Metrics:** Prometheus-uyğun `/metrics`.
+- **Metrics:** Prometheus exposition `GET /api/v1/metrics` (`prom-client`; default process + HTTP histogram + business counters). Auth: opsional `METRICS_TOKEN` Bearer; lokal default açıq. Dashboard: `ops/grafana/`; scrape: `ops/prometheus/prometheus.yml`; opsional compose profile `monitoring`.
+- **Load test:** k6 (`ops/load/`, `pnpm load:smoke`) — CI default-da yox; əl ilə / `workflow_dispatch`.
 - **CI/CD:** GitHub Actions — lint, typecheck, test, build, `prisma migrate deploy`.
 - **Migration:** Production-da `db:push` deyil, **`prisma migrate deploy`**.
 - **Deployment:** Konteynerlər (Docker) → Railway/Fly/Kubernetes; frontend Vercel.

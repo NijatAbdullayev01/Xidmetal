@@ -11,10 +11,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import {
+  TurnstileWidget,
+  isTurnstileConfigured,
+} from '@/components/auth/turnstile-widget';
 
 export function ForgotPasswordForm() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const {
     register,
@@ -30,8 +35,16 @@ export function ForgotPasswordForm() {
     setServerError(null);
     setSuccessMessage(null);
 
+    if (isTurnstileConfigured() && !captchaToken) {
+      setServerError('Təhlükəsizlik yoxlamasını tamamlayın');
+      return;
+    }
+
     try {
-      const response = await api.auth.forgotPassword(values);
+      const response = await api.auth.forgotPassword({
+        ...values,
+        captchaToken: captchaToken ?? undefined,
+      });
       setSuccessMessage(
         response.previewCode
           ? `${response.message} (DEV kod: ${response.previewCode})`
@@ -96,6 +109,8 @@ export function ForgotPasswordForm() {
           {serverError}
         </div>
       )}
+
+      <TurnstileWidget onToken={setCaptchaToken} />
 
       <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? (

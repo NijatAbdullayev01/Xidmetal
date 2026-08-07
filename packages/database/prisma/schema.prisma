@@ -22,6 +22,8 @@ model User {
   firstName     String    @map("first_name")
   lastName      String    @map("last_name")
   phone         String?   @unique
+  /** SMS/OTP — yalnız təsdiqlənmiş nömrəyə status SMS göndərilir */
+  phoneVerifiedAt DateTime? @map("phone_verified_at")
   avatarUrl     String?   @map("avatar_url")
   role          UserRole  @default(CUSTOMER)
   isVerified    Boolean   @default(false) @map("is_verified")
@@ -46,6 +48,10 @@ model User {
   conversationsAsProvider Conversation[] @relation("ProviderConversations")
   sentMessages            Message[]      @relation("SentMessages")
   uploadedObjects         UploadedObject[]
+  reportsFiled            Report[]       @relation("ReportsFiled")
+  reportsResolved         Report[]       @relation("ReportsResolved")
+  dispatchOffers          DispatchOffer[]
+  deviceTokens            DeviceToken[]
 
   @@index([deletedAt])
   @@map("users")
@@ -55,6 +61,8 @@ enum EmailVerificationPurpose {
   EMAIL_CHANGE
   SIGNUP_VERIFY
   PASSWORD_RESET
+  /** `email` sütununda E.164 telefon saxlanılır */
+  PHONE_VERIFY
 }
 
 model EmailVerificationCode {
@@ -75,6 +83,12 @@ model EmailVerificationCode {
   @@map("email_verification_codes")
 }
 
+enum ProviderAvailability {
+  OFFLINE
+  ONLINE
+  BUSY
+}
+
 model ProviderProfile {
   id          String   @id @default(uuid())
   userId      String   @unique @map("user_id")
@@ -84,11 +98,23 @@ model ProviderProfile {
   isVerified  Boolean  @default(false) @map("is_verified")
   rating      Float    @default(0)
   reviewCount Int      @default(0) @map("review_count")
+  /** Domain əlçatanlıq — User.lastSeenAt (presence heartbeat) ilə qarışdırılmamalıdır */
+  availability      ProviderAvailability @default(OFFLINE)
+  lastLat           Float?               @map("last_lat")
+  lastLng           Float?               @map("last_lng")
+  lastHeading       Float?               @map("last_heading")
+  locationUpdatedAt DateTime?            @map("location_updated_at")
+  /**
+   * PostGIS geography — yalnız raw SQL ilə yazılır/oxunur (ST_DWithin).
+   * lastLat/lastLng ilə geo service sinxron saxlayır.
+   */
+  lastLocation Unsupported("geography(Point,4326)")? @map("last_location")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([availability])
   @@map("provider_profiles")
 }
 
@@ -247,10 +273,17 @@ model ServiceAvailabilityOverride {
 enum BookingStatus {
   PENDING
   CONFIRMED
+  EN_ROUTE
+  ARRIVED
   IN_PROGRESS
   COMPLETED
   CANCELLED
   REJECTED
+}
+
+enum BookingType {
+  SCHEDULED
+  INSTANT
 }
 
 model Booking {
@@ -261,30 +294,171 @@ model Booking {
   scheduledAt         DateTime      @map("scheduled_at")
   proposedScheduledAt DateTime?     @map("proposed_scheduled_at")
   status              BookingStatus @default(PENDING)
+  type                BookingType   @default(SCHEDULED)
   totalPrice  Decimal       @map("total_price") @db.Decimal(10, 2)
   notes       String?
   address     String?
+  /** Xidmətin göstəriləcəyi ünvan koordinatları (opsional; ünvan string qalır) */
+  destLat     Float?        @map("dest_lat")
+  destLng     Float?        @map("dest_lng")
+  /** Provider başlanğıc / mənşə koordinatları (opsional; tracking Phase 3) */
+  originLat   Float?        @map("origin_lat")
+  originLng   Float?        @map("origin_lng")
   imageUrl    String?       @map("image_url") @db.Text
   /** Ləğv səbəbi (CANCELLED olduqda) */
   cancelReason String?      @map("cancel_reason") @db.VarChar(500)
   /** CUSTOMER | PROVIDER | ADMIN */
   cancelledBy  String?      @map("cancelled_by") @db.VarChar(20)
   cancelledAt  DateTime?    @map("cancelled_at")
+  /** PENDING → CONFIRMED */
+  acceptedAt   DateTime?    @map("accepted_at")
+  /** CONFIRMED → EN_ROUTE */
+  enRouteAt    DateTime?    @map("en_route_at")
+  /** EN_ROUTE → ARRIVED */
+  arrivedAt    DateTime?    @map("arrived_at")
+  /** ARRIVED → IN_PROGRESS */
+  startedAt    DateTime?    @map("started_at")
+  /** IN_PROGRESS → COMPLETED */
+  completedAt  DateTime?    @map("completed_at")
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
   service  Service  @relation(fields: [serviceId], references: [id])
   customer User     @relation("CustomerBookings", fields: [customerId], references: [id])
   provider User     @relation("ProviderBookings", fields: [providerId], references: [id])
-  review       Review?
-  conversation Conversation?
+  review        Review?
+  conversation  Conversation?
+  locationPings LocationPing[]
+  dispatchOffers DispatchOffer[]
+  payment        Payment?
 
   @@index([customerId])
   @@index([providerId])
   @@index([status])
   @@index([serviceId, scheduledAt])
   @@index([scheduledAt])
+  @@index([type])
   @@map("bookings")
+}
+
+// ─── Ödəniş (Faza 5 — feature flag; default off) ─────────────────────────────
+
+enum PaymentStatus {
+  REQUIRES_PAYMENT
+  AUTHORIZED
+  CAPTURED
+  REFUNDED
+  FAILED
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  /** Booking əlaqəsi — canlı axında məcburi (service bookingId tələb edir); DB-də nullable scaffolding */
+  bookingId      String?       @unique @map("booking_id")
+  amount         Decimal       @db.Decimal(10, 2)
+  commission     Decimal       @default(0) @db.Decimal(10, 2)
+  currency       String        @default("AZN")
+  status         PaymentStatus @default(REQUIRES_PAYMENT)
+  /** "noop" | "stripe" | "local_psp" */
+  provider       String
+  externalId     String?       @map("external_id")
+  idempotencyKey String?       @unique @map("idempotency_key")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@map("payments")
+}
+
+// ─── Push cihaz token-ləri (Faza 5) ──────────────────────────────────────────
+
+enum DevicePlatform {
+  WEB
+  ANDROID
+  IOS
+}
+
+model DeviceToken {
+  id        String         @id @default(uuid())
+  userId    String         @map("user_id")
+  token     String         @unique
+  platform  DevicePlatform
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+/**
+ * Ümumi idempotency saxlama — write endpoint-lər üçün.
+ * TTL: expiresAt — IdempotencyService saatlıq purgeExpired ilə təmizləyir.
+ */
+model IdempotencyRecord {
+  id           String   @id @default(uuid())
+  key          String
+  userId       String   @map("user_id")
+  route        String
+  statusCode   Int      @map("status_code")
+  responseBody Json?    @map("response_body")
+  responseHash String?  @map("response_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  expiresAt    DateTime @map("expires_at")
+
+  @@unique([key, userId, route])
+  @@index([expiresAt])
+  @@map("idempotency_records")
+}
+
+// ─── On-demand dispatch (Faza 4) ─────────────────────────────────────────────
+
+enum DispatchOfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+model DispatchOffer {
+  id          String              @id @default(uuid())
+  bookingId   String              @map("booking_id")
+  providerId  String              @map("provider_id")
+  status      DispatchOfferStatus @default(PENDING)
+  distanceM   Float?              @map("distance_m")
+  score       Float?
+  expiresAt   DateTime            @map("expires_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  respondedAt DateTime?           @map("responded_at")
+
+  booking  Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  provider User    @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([providerId, status])
+  @@index([status, expiresAt])
+  @@map("dispatch_offers")
+}
+
+// ─── Canlı izləmə (Faza 3) ───────────────────────────────────────────────────
+
+/** Audit / marşrut yenidən oynatma — hər WS push yazılmır (sampling) */
+model LocationPing {
+  id         String   @id @default(uuid())
+  bookingId  String   @map("booking_id")
+  lat        Float
+  lng        Float
+  heading    Float?
+  speed      Float?
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, recordedAt])
+  @@map("location_pings")
 }
 
 // ─── Mesajlaşma ──────────────────────────────────────────────────────────────
@@ -360,13 +534,64 @@ enum NotificationType {
   BOOKING_CREATED
   BOOKING_CONFIRMED
   BOOKING_CANCELLED
+  BOOKING_REJECTED
   BOOKING_COMPLETED
   BOOKING_IN_PROGRESS
+  BOOKING_EN_ROUTE
+  BOOKING_ARRIVED
   BOOKING_RESCHEDULE_PROPOSED
+  BOOKING_RESCHEDULE_REJECTED
   REVIEW_RECEIVED
   MESSAGE_RECEIVED
   /// Platforma / admin tərəfindən göndərilən bildirişlər (zəng ikonu)
   ADMIN_ANNOUNCEMENT
+}
+
+// ─── Şikayətlər ──────────────────────────────────────────────────────────────
+
+enum ReportTargetType {
+  USER
+  SERVICE
+  BOOKING
+  MESSAGE
+  OTHER
+}
+
+enum ReportReason {
+  SPAM
+  FRAUD
+  ABUSE
+  INAPPROPRIATE
+  NO_SHOW
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+model Report {
+  id           String           @id @default(uuid())
+  reporterId   String           @map("reporter_id")
+  targetType   ReportTargetType @map("target_type")
+  targetId     String?          @map("target_id")
+  reason       ReportReason
+  description  String
+  status       ReportStatus     @default(PENDING)
+  adminNote    String?          @map("admin_note")
+  resolvedAt   DateTime?        @map("resolved_at")
+  resolvedById String?          @map("resolved_by_id")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  reporter   User  @relation("ReportsFiled", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolvedBy User? @relation("ReportsResolved", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([reporterId])
+  @@map("reports")
 }
 
 model Notification {

@@ -1,13 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { ArrowRight, LayoutGrid, SearchX } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowRight, ChevronLeft, ChevronRight, LayoutGrid, SearchX } from 'lucide-react';
 import type { CategorySummary, ServiceSummary } from '@xidmetal/shared';
 import { BecomeProviderLink } from '@/components/auth/become-provider-link';
 import { buttonStyles } from '@/components/ui/button';
 import { ServiceCard } from '@/components/services/service-card';
+import { NearbyProvidersSection } from '@/components/services/nearby-providers-section';
 import { ServiceSearch } from '@/components/search/service-search';
 import { getCategoryIcon } from '@/lib/category-icons';
 import { normalizeSearchText, scoreMatch } from '@/lib/search';
@@ -16,54 +17,61 @@ import { cn } from '@/lib/utils';
 interface ServicesContentProps {
   categories: CategorySummary[];
   services: ServiceSummary[];
+  total: number;
+  page: number;
+  totalPages: number;
+  query: string;
+  categoryId: string | null;
+}
+
+function buildServicesHref(input: {
+  q?: string;
+  categoryId?: string | null;
+  page?: number;
+}): string {
+  const params = new URLSearchParams();
+  if (input.q) params.set('q', input.q);
+  if (input.categoryId) params.set('categoryId', input.categoryId);
+  if (input.page && input.page > 1) params.set('page', String(input.page));
+  const query = params.toString();
+  return query ? `/services?${query}` : '/services';
 }
 
 export function ServicesContent({
   categories,
   services,
+  total,
+  page,
+  totalPages,
+  query,
+  categoryId,
 }: ServicesContentProps) {
-  const searchParams = useSearchParams();
-  const initialQuery = searchParams.get('q')?.trim() ?? '';
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const hasQuery = initialQuery.length > 0;
+  const router = useRouter();
+  const hasQuery = query.length > 0;
+  const activeCategory = categoryId;
 
   const categorySlugById = useMemo(
     () => new Map(categories.map((category) => [category.id, category.slug])),
     [categories],
   );
 
-  const rankedServices = useMemo(() => {
-    if (!hasQuery) return services;
-
-    return [...services]
-      .map((service) => ({
-        service,
-        score: scoreMatch(
-          initialQuery,
-          service.title,
-          service.description,
-          service.categoryName,
-          service.providerName,
-          service.location,
-        ),
-      }))
-      .sort((a, b) => b.score - a.score || a.service.title.localeCompare(b.service.title, 'az'))
-      .map((item) => item.service);
-  }, [services, hasQuery, initialQuery]);
-
-  const filteredServices = useMemo(() => {
-    if (!activeCategory) return rankedServices;
-    return rankedServices.filter((service) => service.categoryId === activeCategory);
-  }, [rankedServices, activeCategory]);
-
   const activeCategoryName = categories.find((c) => c.id === activeCategory)?.name;
+
+  const setCategory = (nextCategoryId: string | null) => {
+    router.push(
+      buildServicesHref({
+        q: query || undefined,
+        categoryId: nextCategoryId,
+        page: 1,
+      }),
+    );
+  };
 
   const categoryCardClass =
     'group relative flex w-[42vw] max-w-[10.25rem] shrink-0 snap-start touch-manipulation flex-col overflow-hidden rounded-2xl border border-border/70 bg-card p-3.5 shadow-sm transition-all duration-300 active:scale-[0.98] hover:border-brand/50 hover:shadow-md min-h-[128px] sm:min-h-[168px] sm:w-[11.5rem] sm:max-w-none sm:p-5 sm:active:scale-100 md:w-[12.5rem] lg:w-[calc((min(80rem,100vw-4rem)-5*1rem)/6)]';
 
   return (
     <>
-      {/* Axtarış */}
       <section className="border-b border-border/60 bg-gradient-to-b from-brand/10 to-background pt-8 pb-6 sm:pt-12 sm:pb-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl">
@@ -72,7 +80,7 @@ export function ServicesContent({
             </h1>
             {hasQuery ? (
               <p className="mt-2 text-center text-sm text-muted-foreground sm:text-base">
-                «{initialQuery}» üzrə nəticələr
+                «{query}» üzrə nəticələr
               </p>
             ) : (
               <p className="mt-2 text-center text-sm text-muted-foreground sm:text-base">
@@ -82,7 +90,7 @@ export function ServicesContent({
             <div className="mt-6">
               <ServiceSearch
                 categories={categories}
-                initialQuery={initialQuery}
+                initialQuery={query}
                 syncUrlOnSubmit
               />
             </div>
@@ -90,7 +98,8 @@ export function ServicesContent({
         </div>
       </section>
 
-      {/* Kateqoriyalar — axtarış nəticələrində gizlədilir */}
+      {!hasQuery && <NearbyProvidersSection />}
+
       {!hasQuery ? (
         <section className="pt-8 pb-4 sm:pt-10 sm:pb-6">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -101,7 +110,7 @@ export function ServicesContent({
                 <div className="flex w-max gap-3 px-4 py-1 sm:gap-4 sm:px-6 sm:py-3 lg:px-8">
                   <button
                     type="button"
-                    onClick={() => setActiveCategory(null)}
+                    onClick={() => setCategory(null)}
                     className={cn(
                       categoryCardClass,
                       !activeCategory && 'border-brand/60 ring-2 ring-brand/25',
@@ -149,7 +158,7 @@ export function ServicesContent({
                       <button
                         key={category.id}
                         type="button"
-                        onClick={() => setActiveCategory(isActive ? null : category.id)}
+                        onClick={() => setCategory(isActive ? null : category.id)}
                         className={cn(
                           categoryCardClass,
                           isActive && 'border-brand/60 ring-2 ring-brand/25',
@@ -197,7 +206,6 @@ export function ServicesContent({
         </section>
       ) : null}
 
-      {/* Xidmətlər */}
       <section className="py-10 sm:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -206,11 +214,11 @@ export function ServicesContent({
                 {activeCategoryName ?? (hasQuery ? 'Tapılan xidmətlər' : 'Bütün xidmətlər')}
               </h2>
               <p className="mt-1 text-muted-foreground">
-                {filteredServices.length} xidmət tapıldı
+                {total} xidmət tapıldı
                 {hasQuery ? (
                   <span>
                     {' '}
-                    · sorğu: <span className="font-medium text-foreground">{initialQuery}</span>
+                    · sorğu: <span className="font-medium text-foreground">{query}</span>
                   </span>
                 ) : null}
               </p>
@@ -220,7 +228,7 @@ export function ServicesContent({
                 {activeCategory ? (
                   <button
                     type="button"
-                    onClick={() => setActiveCategory(null)}
+                    onClick={() => setCategory(null)}
                     className="text-sm font-medium text-brand-dark transition-colors hover:text-brand-foreground"
                   >
                     Kateqoriya filtrini sıfırla
@@ -228,7 +236,7 @@ export function ServicesContent({
                 ) : null}
                 {hasQuery ? (
                   <Link
-                    href="/services"
+                    href={buildServicesHref({ categoryId: activeCategory })}
                     className="text-sm font-medium text-brand-dark transition-colors hover:text-brand-foreground"
                   >
                     Axtarışı təmizlə
@@ -238,39 +246,32 @@ export function ServicesContent({
             )}
           </div>
 
-          {filteredServices.length === 0 ? (
+          {services.length === 0 ? (
             <div className="mt-12 flex flex-col items-center rounded-2xl border border-dashed border-border bg-muted/30 px-6 py-16 text-center">
               <SearchX className="h-10 w-10 text-muted-foreground/50" aria-hidden />
               <h3 className="mt-4 text-lg font-semibold">Xidmət tapılmadı</h3>
               <p className="mt-2 max-w-md text-sm text-muted-foreground">
                 {hasQuery
-                  ? `«${initialQuery}» üçün uyğun aktiv xidmət yoxdur. Başqa sözlər yoxlayın və ya kateqoriyalara baxın.`
+                  ? `«${query}» üçün uyğun aktiv xidmət yoxdur. Başqa sözlər yoxlayın və ya kateqoriyalara baxın.`
                   : 'Seçilmiş kateqoriyada hələ aktiv xidmət yoxdur. Bütün kateqoriyalara baxın.'}
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-3">
-                {hasQuery ? (
+                {hasQuery || activeCategory ? (
                   <Link href="/services" className={buttonStyles('default', 'md')}>
                     Bütün xidmətlərə bax
                   </Link>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategory(null)}
-                    className={buttonStyles('outline', 'md')}
-                  >
-                    Bütün xidmətlərə bax
-                  </button>
-                )}
+                ) : null}
               </div>
               {hasQuery && categories.length > 0 ? (
                 <p className="mt-8 text-xs text-muted-foreground">
                   Bəlkə bunları axtarırsınız:{' '}
                   {categories
-                    .filter((category) =>
-                      scoreMatch(initialQuery, category.name, category.description) >= 40
-                      || normalizeSearchText(category.name).includes(
-                        normalizeSearchText(initialQuery).slice(0, 4),
-                      ),
+                    .filter(
+                      (category) =>
+                        scoreMatch(query, category.name, category.description) >= 40 ||
+                        normalizeSearchText(category.name).includes(
+                          normalizeSearchText(query).slice(0, 4),
+                        ),
                     )
                     .slice(0, 3)
                     .map((category) => (
@@ -286,20 +287,64 @@ export function ServicesContent({
               ) : null}
             </div>
           ) : (
-            <div className="mt-10 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-              {filteredServices.map((service) => (
-                <ServiceCard
-                  key={service.id}
-                  service={service}
-                  categorySlug={categorySlugById.get(service.categoryId)}
-                />
-              ))}
-            </div>
+            <>
+              <div className="mt-10 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                {services.map((service) => (
+                  <ServiceCard
+                    key={service.id}
+                    service={service}
+                    categorySlug={categorySlugById.get(service.categoryId)}
+                  />
+                ))}
+              </div>
+
+              {totalPages > 1 ? (
+                <nav
+                  className="mt-10 flex flex-col items-center justify-between gap-4 sm:flex-row"
+                  aria-label="Səhifələmə"
+                >
+                  <p className="text-sm text-muted-foreground">
+                    Səhifə {page} / {totalPages}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={buildServicesHref({
+                        q: query || undefined,
+                        categoryId: activeCategory,
+                        page: page - 1,
+                      })}
+                      aria-disabled={page <= 1}
+                      className={cn(
+                        buttonStyles('outline', 'md'),
+                        page <= 1 && 'pointer-events-none opacity-40',
+                      )}
+                    >
+                      <ChevronLeft className="h-4 w-4" aria-hidden />
+                      Əvvəlki
+                    </Link>
+                    <Link
+                      href={buildServicesHref({
+                        q: query || undefined,
+                        categoryId: activeCategory,
+                        page: page + 1,
+                      })}
+                      aria-disabled={page >= totalPages}
+                      className={cn(
+                        buttonStyles('outline', 'md'),
+                        page >= totalPages && 'pointer-events-none opacity-40',
+                      )}
+                    >
+                      Növbəti
+                      <ChevronRight className="h-4 w-4" aria-hidden />
+                    </Link>
+                  </div>
+                </nav>
+              ) : null}
+            </>
           )}
         </div>
       </section>
 
-      {/* CTA */}
       <section className="border-t border-border py-14 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand via-brand to-brand-light px-5 py-10 text-center sm:px-16 sm:py-14">

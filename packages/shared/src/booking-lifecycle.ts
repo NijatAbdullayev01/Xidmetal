@@ -1,0 +1,95 @@
+import { BookingStatus } from './enums';
+
+/**
+ * Provider icazəli keçidlər (hədəf lifecycle).
+ * CONFIRMED → IN_PROGRESS birbaşa keçid yoxdur — EN_ROUTE → ARRIVED vasitəsilə.
+ */
+export const PROVIDER_BOOKING_TRANSITIONS: Partial<
+  Record<BookingStatus, readonly BookingStatus[]>
+> = {
+  [BookingStatus.PENDING]: [BookingStatus.CONFIRMED, BookingStatus.REJECTED],
+  [BookingStatus.CONFIRMED]: [BookingStatus.EN_ROUTE, BookingStatus.CANCELLED],
+  [BookingStatus.EN_ROUTE]: [BookingStatus.ARRIVED, BookingStatus.CANCELLED],
+  [BookingStatus.ARRIVED]: [BookingStatus.IN_PROGRESS, BookingStatus.CANCELLED],
+  [BookingStatus.IN_PROGRESS]: [BookingStatus.COMPLETED],
+};
+
+/** Müştəri yalnız ləğv (iş başladıqdan sonra ləğv yox) */
+export const CUSTOMER_BOOKING_TRANSITIONS: Partial<
+  Record<BookingStatus, readonly BookingStatus[]>
+> = {
+  [BookingStatus.PENDING]: [BookingStatus.CANCELLED],
+  [BookingStatus.CONFIRMED]: [BookingStatus.CANCELLED],
+  [BookingStatus.EN_ROUTE]: [BookingStatus.CANCELLED],
+  [BookingStatus.ARRIVED]: [BookingStatus.CANCELLED],
+};
+
+/**
+ * Slot / hesab silmə üçün «aktiv» sifarişlər —
+ * hələ tutulan vaxt pəncərəsi olan statuslar.
+ */
+export const ACTIVE_BOOKING_STATUSES: readonly BookingStatus[] = [
+  BookingStatus.PENDING,
+  BookingStatus.CONFIRMED,
+  BookingStatus.EN_ROUTE,
+  BookingStatus.ARRIVED,
+  BookingStatus.IN_PROGRESS,
+] as const;
+
+export function isBookingTransitionAllowed(
+  current: BookingStatus,
+  next: BookingStatus,
+  roles: { isProvider: boolean; isCustomer: boolean; isAdmin: boolean },
+): boolean {
+  if (current === next) return true;
+  if (roles.isAdmin) return true;
+
+  const allowed = roles.isProvider
+    ? (PROVIDER_BOOKING_TRANSITIONS[current] ?? [])
+    : roles.isCustomer
+      ? (CUSTOMER_BOOKING_TRANSITIONS[current] ?? [])
+      : [];
+
+  return allowed.includes(next);
+}
+
+export function isCancellableBookingStatus(status: BookingStatus): boolean {
+  return (
+    status === BookingStatus.PENDING ||
+    status === BookingStatus.CONFIRMED ||
+    status === BookingStatus.EN_ROUTE ||
+    status === BookingStatus.ARRIVED
+  );
+}
+
+export interface BookingLifecycleTimestamps {
+  acceptedAt?: Date | null;
+  enRouteAt?: Date | null;
+  arrivedAt?: Date | null;
+  startedAt?: Date | null;
+  completedAt?: Date | null;
+}
+
+/** Statusa keçiddə doldurulmalı audit sahəsi (yalnız boşdursa). */
+export function bookingLifecycleFieldsForStatus(
+  status: BookingStatus,
+  existing: BookingLifecycleTimestamps,
+  now: Date,
+): Partial<
+  Record<'acceptedAt' | 'enRouteAt' | 'arrivedAt' | 'startedAt' | 'completedAt', Date>
+> {
+  switch (status) {
+    case BookingStatus.CONFIRMED:
+      return existing.acceptedAt ? {} : { acceptedAt: now };
+    case BookingStatus.EN_ROUTE:
+      return existing.enRouteAt ? {} : { enRouteAt: now };
+    case BookingStatus.ARRIVED:
+      return existing.arrivedAt ? {} : { arrivedAt: now };
+    case BookingStatus.IN_PROGRESS:
+      return existing.startedAt ? {} : { startedAt: now };
+    case BookingStatus.COMPLETED:
+      return existing.completedAt ? {} : { completedAt: now };
+    default:
+      return {};
+  }
+}

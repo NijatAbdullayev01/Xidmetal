@@ -33,10 +33,10 @@ export class UpdateProfileDto {
   })
   phone?: string;
 
-  @ApiPropertyOptional({ description: 'Profil şəkli URL və ya data URL' })
+  @ApiPropertyOptional({ description: 'Profil şəkli URL (storage allowlist)' })
   @IsOptional()
   @IsString()
-  @MaxLength(2_000_000, { message: 'Şəkil çox böyükdür' })
+  @MaxLength(2_000, { message: 'Şəkil URL çox uzundur' })
   avatarUrl?: string | null;
 
   @ApiPropertyOptional({ example: 5, description: 'İş təcrübəsi (il ilə)' })
@@ -45,6 +45,18 @@ export class UpdateProfileDto {
   @Min(0, { message: 'Təcrübə mənfi ola bilməz' })
   @Max(50, { message: 'Təcrübə maksimum 50 il ola bilər' })
   experience?: number;
+
+  @ApiPropertyOptional({ example: '10 ildir təmir işləri ilə məşğulam', description: 'Qısa bio' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000, { message: 'Bio maksimum 1000 simvol ola bilər' })
+  bio?: string;
+
+  @ApiPropertyOptional({ example: 'Bakı', description: 'Əsas fəaliyyət ünvanı' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200, { message: 'Ünvan çox uzundur' })
+  location?: string;
 }
 
 export class ChangePasswordDto {
@@ -71,6 +83,14 @@ export class ConfirmEmailChangeDto {
   @IsEmail({}, { message: 'Düzgün e-poçt daxil edin' })
   newEmail!: string;
 
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @Length(6, 6, { message: 'Təsdiq kodu 6 rəqəm olmalıdır' })
+  @Matches(/^\d{6}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
+  code!: string;
+}
+
+export class ConfirmPhoneVerifyDto {
   @ApiProperty({ example: '123456' })
   @IsString()
   @Length(6, 6, { message: 'Təsdiq kodu 6 rəqəm olmalıdır' })

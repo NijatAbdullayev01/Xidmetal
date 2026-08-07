@@ -1,7 +1,18 @@
 import { randomUUID } from 'crypto';
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { StorageDriver, StoredObject } from './storage.types';
 
+/**
+ * S3 / R2 driver.
+ * Private obyektlər (bookings/) üçün oxuma yalnız GetObject presigned URL ilə —
+ * public CDN HMAC ilə qorunmur; bucket-da public read olmamalıdır.
+ */
 export class S3StorageDriver implements StorageDriver {
   private readonly client: S3Client;
 
@@ -32,6 +43,7 @@ export class S3StorageDriver implements StorageDriver {
   }): Promise<StoredObject> {
     const key = `${params.folder}/${randomUUID()}.${params.extension}`;
 
+    // ACL təyin etmirik — bucket policy / Block Public Access private qalmalıdır
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
@@ -46,6 +58,14 @@ export class S3StorageDriver implements StorageDriver {
       key,
       url: `${base}/${key}`,
     };
+  }
+
+  async getSignedReadUrl(key: string, ttlSeconds = 60 * 60): Promise<string> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
+    return getSignedUrl(this.client, command, { expiresIn: ttlSeconds });
   }
 
   async delete(key: string): Promise<void> {

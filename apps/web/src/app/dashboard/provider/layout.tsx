@@ -23,7 +23,7 @@ export default function ProviderDashboardLayout({ children }: { children: React.
 
   return (
     <RequireRole role={UserRole.PROVIDER}>
-      <div className="flex h-[100dvh] flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <NotificationPermissionBanner />
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           <DashboardSidebar variant="provider" />

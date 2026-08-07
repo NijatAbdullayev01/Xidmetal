@@ -24,7 +24,9 @@ export class NotificationsController {
   constructor(private notificationsService: NotificationsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Bildirişlər siyahısı' })
+  @ApiOperation({
+    summary: 'Admin/platforma bildirişləri (sifariş və mesaj daxil deyil)',
+  })
   findAll(
     @CurrentUser('id') userId: string,
     @Query() query: NotificationQueryDto,

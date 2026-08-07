@@ -1,4 +1,6 @@
 import { SettingsForm } from '@/components/settings/settings-form';
+import { ProviderAvailabilityCard } from '@/components/provider/provider-availability-card';
+import { PushNotificationsCard } from '@/components/notifications/push-notifications-card';
 
 export default function ProviderSettingsPage() {
   return (
@@ -9,6 +11,8 @@ export default function ProviderSettingsPage() {
           Profil məlumatlarınızı, şəklinizi və şifrənizi idarə edin.
         </p>
       </div>
+      <ProviderAvailabilityCard />
+      <PushNotificationsCard />
       <SettingsForm />
     </div>
   );

@@ -11,9 +11,38 @@ concurrency:
 
 jobs:
   check:
-    name: Lint, Typecheck, Test & Build
+    name: Lint, Typecheck, Test, Migrate & Build
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
+    services:
+      postgres:
+        # PostGIS migration (geography / ST_DWithin) — alpine postgres extension yoxdur
+        image: postgis/postgis:16-3.5
+        env:
+          POSTGRES_USER: xidmetal
+          POSTGRES_PASSWORD: xidmetal_ci
+          POSTGRES_DB: xidmetal
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U xidmetal -d xidmetal"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://xidmetal:xidmetal_ci@localhost:5432/xidmetal?schema=public
+      REDIS_URL: redis://localhost:6379
 
     steps:
       - name: Checkout
@@ -36,6 +65,12 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
+      - name: Prisma migrate deploy
+        run: pnpm db:migrate:deploy
+
+      - name: Prisma migrate status
+        run: pnpm db:migrate:status
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -53,3 +88,49 @@ jobs:
           NEXT_PUBLIC_ADMIN_URL: http://localhost:3021
           NEXT_PUBLIC_API_URL: ""
           JWT_SECRET: ci-only-not-for-production-use-32chars
+
+  e2e-web:
+    name: Playwright UI (auth + smoke + critical-flows)
+    runs-on: ubuntu-latest
+    needs: check
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Build web
+        run: pnpm --filter @xidmetal/web build
+        env:
+          NEXT_PUBLIC_APP_URL: http://localhost:3020
+          NEXT_PUBLIC_ADMIN_URL: http://localhost:3021
+          NEXT_PUBLIC_API_URL: ""
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @xidmetal/web exec playwright install --with-deps chromium
+
+      - name: Run CI auth E2E
+        run: pnpm --filter @xidmetal/web test:e2e
+        env:
+          CI: true
+          E2E_BASE_URL: http://localhost:3020
+          NEXT_PUBLIC_APP_URL: http://localhost:3020
+          NEXT_PUBLIC_ADMIN_URL: http://localhost:3021
+          NEXT_PUBLIC_API_URL: ""

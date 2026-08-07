@@ -16,6 +16,10 @@ import { cn } from '@/lib/utils';
 import { AZ_PHONE_PREFIX, azPhoneLocalPart, toAzPhoneValue } from '@/lib/phone';
 import { api, ApiError } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
+import {
+  TurnstileWidget,
+  isTurnstileConfigured,
+} from '@/components/auth/turnstile-widget';
 
 interface RegisterFormProps {
   defaultRole?: PublicUserRole;
@@ -27,6 +31,7 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const {
     register,
@@ -49,17 +54,22 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
   const onSubmit = async (values: RegisterFormValues) => {
     setServerError(null);
 
+    if (isTurnstileConfigured() && !captchaToken) {
+      setServerError('Təhlükəsizlik yoxlamasını tamamlayın');
+      return;
+    }
+
     try {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { confirmPassword: _confirmPassword, phone, ...rest } = values;
       const payload = {
         ...rest,
         phone: phone?.trim() || undefined,
+        captchaToken: captchaToken ?? undefined,
       };
       const response = await api.auth.register(payload);
 
       setAuth(response.user);
-      // Tənzimləmələr / profil sorğusu dərhal qeydiyyat məlumatlarını görsün
       queryClient.setQueryData(['users', 'me'], response.user);
     } catch (error) {
       if (error instanceof ApiError) {
@@ -275,6 +285,8 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
           {serverError}
         </div>
       )}
+
+      <TurnstileWidget onToken={setCaptchaToken} />
 
       <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? (

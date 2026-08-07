@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    # PostGIS lazımdır (Faza 2 ST_DWithin). Köhnə postgres:16-alpine volume-u
+    # PostGIS image ilə uyğun olmaya bilər — təmiz start: docker compose down -v && up -d
+    image: postgis/postgis:16-3.5
     container_name: xidmetal-postgres
     restart: unless-stopped
     environment:

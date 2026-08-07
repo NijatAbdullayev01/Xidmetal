@@ -195,11 +195,12 @@ try {
 }
 ```
 
-## Test (gələcək)
+## Test
 
-- **Unit:** Vitest (shared, services)
-- **Integration:** Supertest (API endpoints)
-- **E2E:** Playwright (critical user flows)
+- **Unit:** Vitest (`apps/api` helper/modul spec-ləri; `pnpm test`)
+- **E2E:** Playwright — `apps/web/e2e` (`ci-auth`, `smoke`, `critical-flows`; CI-də hər üçü)
+- **Load:** k6 (`pnpm load:smoke`) — əl ilə / `workflow_dispatch`
+- **Integration (Supertest):** hələ genişləndirilməyib
 
 ## Import sırası
 

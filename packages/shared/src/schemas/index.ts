@@ -6,15 +6,71 @@ import {
   ReviewStatus,
   ServiceStatus,
   BookingStatus,
+  BookingType,
+  ProviderAvailability,
+  ReportReason,
+  ReportTargetType,
+  ReportStatus,
+  DevicePlatform,
 } from '../enums';
 import { PRICE_UNIT_VALUES } from '../price-units';
 import { SERVICE_VENUE_VALUES } from '../service-venues';
 import { CARGO_ROUTE_SCOPE_VALUES } from '../vehicle-cargo';
+import { isValidCoordinates } from '../geo';
+import { PAYMENTS } from '../constants';
 
 const vehicleDimensionSchema = z
   .number({ invalid_type_error: 'Maşın ölçüsü rəqəm olmalıdır' })
   .positive('Maşın ölçüsü 0-dan böyük olmalıdır')
   .max(30, 'Maşın ölçüsü maksimum 30 m ola bilər');
+
+export const latitudeSchema = z
+  .number({ invalid_type_error: 'Enlik rəqəm olmalıdır' })
+  .min(-90, 'Enlik -90…90 aralığında olmalıdır')
+  .max(90, 'Enlik -90…90 aralığında olmalıdır');
+
+export const longitudeSchema = z
+  .number({ invalid_type_error: 'Uzunluq rəqəm olmalıdır' })
+  .min(-180, 'Uzunluq -180…180 aralığında olmalıdır')
+  .max(180, 'Uzunluq -180…180 aralığında olmalıdır');
+
+export const headingSchema = z
+  .number({ invalid_type_error: 'İstiqamət rəqəm olmalıdır' })
+  .min(0, 'İstiqamət 0…360 aralığında olmalıdır')
+  .max(360, 'İstiqamət 0…360 aralığında olmalıdır');
+
+/** Cüt lat/lng — biri göndərilibsə digəri də məcburidir */
+function withOptionalCoordPairs<T extends z.ZodRawShape>(
+  schema: z.ZodObject<T>,
+  pairs: Array<{ latKey: keyof T & string; lngKey: keyof T & string; label: string }>,
+) {
+  return schema.superRefine((data, ctx) => {
+    const record = data as Record<string, unknown>;
+    for (const { latKey, lngKey, label } of pairs) {
+      const lat = record[latKey];
+      const lng = record[lngKey];
+      const hasLat = lat !== undefined && lat !== null;
+      const hasLng = lng !== undefined && lng !== null;
+      if (hasLat !== hasLng) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} üçün həm enlik, həm uzunluq lazımdır`,
+          path: [hasLat ? lngKey : latKey],
+        });
+        continue;
+      }
+      if (hasLat && hasLng && typeof lat === 'number' && typeof lng === 'number') {
+        if (!isValidCoordinates(lat, lng)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `${label} koordinatları etibarsızdır`,
+            path: [latKey],
+          });
+        }
+      }
+    }
+  });
+}
 
 const timeHhMmSchema = z
   .string()
@@ -47,11 +103,13 @@ export const registerSchema = z.object({
   lastName: z.string().min(2, 'Soyad minimum 2 simvol olmalıdır'),
   phone: phoneSchema.optional(),
   role: z.nativeEnum(UserRole).default(UserRole.CUSTOMER),
+  captchaToken: z.string().optional(),
 });
 
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, 'Şifrə tələb olunur'),
+  captchaToken: z.string().optional(),
 });
 
 const verificationCodeSchema = z
@@ -61,6 +119,7 @@ const verificationCodeSchema = z
 
 export const forgotPasswordSchema = z.object({
   email: emailSchema,
+  captchaToken: z.string().optional(),
 });
 
 export const resetPasswordSchema = z
@@ -121,12 +180,80 @@ export const createServiceSchema = z.object({
   images: serviceImagesSchema,
 });
 
-export const createBookingSchema = z.object({
-  serviceId: z.string().uuid(),
-  scheduledAt: z.string().datetime(),
-  notes: z.string().trim().min(1, 'Qeyd yazın').max(1000),
-  address: z.string().trim().min(1, 'Ünvan daxil edin').max(500).optional(),
-  imageUrl: imageUrlSchema.optional(),
+export const createBookingSchema = withOptionalCoordPairs(
+  z.object({
+    serviceId: z.string().uuid(),
+    /** SCHEDULED üçün məcburi; INSTANT-da opsional (server ofset təyin edir) */
+    scheduledAt: z.string().datetime().optional(),
+    notes: z.string().trim().min(1, 'Qeyd yazın').max(1000),
+    address: z.string().trim().min(1, 'Ünvan daxil edin').max(500).optional(),
+    imageUrl: imageUrlSchema.optional(),
+    /** Default SCHEDULED. INSTANT → avto-dispatch (Faza 4). */
+    type: z.nativeEnum(BookingType).optional(),
+    destLat: latitudeSchema.optional(),
+    destLng: longitudeSchema.optional(),
+    originLat: latitudeSchema.optional(),
+    originLng: longitudeSchema.optional(),
+  }),
+  [
+    { latKey: 'destLat', lngKey: 'destLng', label: 'Təyinat' },
+    { latKey: 'originLat', lngKey: 'originLng', label: 'Mənşə' },
+  ],
+).superRefine((data, ctx) => {
+  const type = data.type ?? BookingType.SCHEDULED;
+  if (type === BookingType.SCHEDULED) {
+    if (!data.scheduledAt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Sifariş tarixi tələb olunur',
+        path: ['scheduledAt'],
+      });
+    }
+  }
+  if (type === BookingType.INSTANT) {
+    const hasDest =
+      data.destLat !== undefined &&
+      data.destLat !== null &&
+      data.destLng !== undefined &&
+      data.destLng !== null;
+    if (!hasDest) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Ani sifariş üçün təyinat koordinatları məcburidir',
+        path: ['destLat'],
+      });
+    }
+  }
+});
+
+export const updateProviderLocationSchema = z.object({
+  lat: latitudeSchema,
+  lng: longitudeSchema,
+  heading: headingSchema.optional(),
+  availability: z.nativeEnum(ProviderAvailability).optional(),
+});
+
+export const updateProviderAvailabilitySchema = z.object({
+  availability: z.nativeEnum(ProviderAvailability, {
+    errorMap: () => ({ message: 'Əlçatanlıq statusu seçin' }),
+  }),
+});
+
+export const nearbyProvidersQuerySchema = z.object({
+  lat: latitudeSchema,
+  lng: longitudeSchema,
+  radiusKm: z.coerce.number().min(0.1, 'Radius minimum 0.1 km').max(100, 'Radius maksimum 100 km').default(10),
+  categoryId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export const geocodeQuerySchema = z.object({
+  q: z.string().trim().min(2, 'Axtarış ən azı 2 simvol olmalıdır').max(200),
+});
+
+export const reverseGeocodeQuerySchema = z.object({
+  lat: latitudeSchema,
+  lng: longitudeSchema,
 });
 
 export const rescheduleBookingSchema = z.object({
@@ -169,6 +296,43 @@ export const updateProfileSchema = z.object({
     .min(0, 'Təcrübə mənfi ola bilməz')
     .max(50, 'Təcrübə maksimum 50 il ola bilər')
     .optional(),
+  bio: z
+    .union([
+      z.string().max(1000, 'Bio maksimum 1000 simvol ola bilər'),
+      z.literal(''),
+    ])
+    .optional(),
+  location: z.union([z.string().min(1, 'Ünvan seçin'), z.literal('')]).optional(),
+});
+
+export const contactSubjectValues = [
+  'general',
+  'provider',
+  'technical',
+  'partnership',
+  'other',
+] as const;
+
+export const contactSubjectLabels: Record<(typeof contactSubjectValues)[number], string> = {
+  general: 'Ümumi sual',
+  provider: 'Xidmət verən dəstəyi',
+  technical: 'Texniki problem',
+  partnership: 'Əməkdaşlıq təklifi',
+  other: 'Digər',
+};
+
+export const contactFormSchema = z.object({
+  name: z.string().min(2, 'Ad minimum 2 simvol olmalıdır').max(100),
+  email: emailSchema,
+  phone: z.string().max(30).optional(),
+  subject: z.enum(contactSubjectValues, {
+    errorMap: () => ({ message: 'Mövzu seçin' }),
+  }),
+  message: z
+    .string()
+    .min(10, 'Mesaj minimum 10 simvol olmalıdır')
+    .max(2000, 'Mesaj maksimum 2000 simvol ola bilər'),
+  captchaToken: z.string().optional(),
 });
 
 export const changePasswordSchema = z
@@ -325,6 +489,83 @@ export const adminReviewsQuerySchema = paginationSchema.extend({
   status: z.nativeEnum(ReviewStatus).optional(),
 });
 
+export const reportReasonLabels = {
+  [ReportReason.SPAM]: 'Spam',
+  [ReportReason.FRAUD]: 'Fırıldaqçılıq',
+  [ReportReason.ABUSE]: 'Təhqir / təzyiq',
+  [ReportReason.INAPPROPRIATE]: 'Uyğunsuz məzmun',
+  [ReportReason.NO_SHOW]: 'Gəlməmə / yerinə yetirməmə',
+  [ReportReason.OTHER]: 'Digər',
+} as const;
+
+export const createReportSchema = z.object({
+  targetType: z.nativeEnum(ReportTargetType, {
+    errorMap: () => ({ message: 'Hədəf növü seçin' }),
+  }),
+  targetId: z
+    .union([z.string().uuid('Düzgün ID daxil edin'), z.literal('')])
+    .optional(),
+  reason: z.nativeEnum(ReportReason, {
+    errorMap: () => ({ message: 'Səbəb seçin' }),
+  }),
+  description: z
+    .string()
+    .min(10, 'Təsvir minimum 10 simvol olmalıdır')
+    .max(2000, 'Təsvir maksimum 2000 simvol ola bilər'),
+});
+
+export const adminSetReportStatusSchema = z.object({
+  status: z.enum([ReportStatus.RESOLVED, ReportStatus.DISMISSED]),
+  adminNote: z.string().max(1000).optional(),
+});
+
+export const adminReportsQuerySchema = paginationSchema.extend({
+  status: z.nativeEnum(ReportStatus).optional(),
+});
+
+export const registerDeviceTokenSchema = z.object({
+  token: z
+    .string()
+    .min(32, 'Cihaz tokeni çox qısadır')
+    .max(4096, 'Cihaz tokeni çox uzundur'),
+  platform: z.nativeEnum(DevicePlatform, {
+    errorMap: () => ({ message: 'Platforma seçin (WEB, ANDROID, IOS)' }),
+  }),
+});
+
+export const unregisterDeviceTokenSchema = z.object({
+  token: z
+    .string()
+    .min(32, 'Cihaz tokeni çox qısadır')
+    .max(4096, 'Cihaz tokeni çox uzundur'),
+});
+
+export const createPaymentIntentSchema = z.object({
+  bookingId: z.string().uuid('Sifariş ID düzgün deyil').optional(),
+  amount: z
+    .number({ invalid_type_error: 'Məbləğ rəqəm olmalıdır' })
+    .positive('Məbləğ 0-dan böyük olmalıdır')
+    .max(1_000_000, 'Məbləğ çox böyükdür'),
+  currency: z
+    .string()
+    .length(3, 'Valyuta 3 hərfli kod olmalıdır')
+    .default(PAYMENTS.DEFAULT_CURRENCY)
+    .optional(),
+  idempotencyKey: z
+    .string()
+    .min(8, 'İdempotency açarı minimum 8 simvol olmalıdır')
+    .max(PAYMENTS.IDEMPOTENCY_KEY_MAX_LEN, 'İdempotency açarı çox uzundur')
+    .optional(),
+});
+
+export const paymentActionSchema = z.object({
+  idempotencyKey: z
+    .string()
+    .min(8, 'İdempotency açarı minimum 8 simvol olmalıdır')
+    .max(PAYMENTS.IDEMPOTENCY_KEY_MAX_LEN, 'İdempotency açarı çox uzundur')
+    .optional(),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
@@ -339,6 +580,7 @@ export type CreateReviewInput = z.infer<typeof createReviewSchema>;
 export type UpdateServiceInput = z.infer<typeof updateServiceSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type ContactFormInput = z.infer<typeof contactFormSchema>;
 export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
 export type RequestEmailChangeInput = z.infer<typeof requestEmailChangeSchema>;
 export type ConfirmEmailChangeInput = z.infer<typeof confirmEmailChangeSchema>;
@@ -355,3 +597,14 @@ export type AdminSetProviderVerifiedInput = z.infer<typeof adminSetProviderVerif
 export type AdminSetServiceStatusInput = z.infer<typeof adminSetServiceStatusSchema>;
 export type AdminSetReviewStatusInput = z.infer<typeof adminSetReviewStatusSchema>;
 export type AdminAnnouncementInput = z.infer<typeof adminAnnouncementSchema>;
+export type CreateReportInput = z.infer<typeof createReportSchema>;
+export type AdminSetReportStatusInput = z.infer<typeof adminSetReportStatusSchema>;
+export type UpdateProviderLocationInput = z.infer<typeof updateProviderLocationSchema>;
+export type UpdateProviderAvailabilityInput = z.infer<typeof updateProviderAvailabilitySchema>;
+export type NearbyProvidersQueryInput = z.infer<typeof nearbyProvidersQuerySchema>;
+export type GeocodeQueryInput = z.infer<typeof geocodeQuerySchema>;
+export type ReverseGeocodeQueryInput = z.infer<typeof reverseGeocodeQuerySchema>;
+export type RegisterDeviceTokenInput = z.infer<typeof registerDeviceTokenSchema>;
+export type UnregisterDeviceTokenInput = z.infer<typeof unregisterDeviceTokenSchema>;
+export type CreatePaymentIntentInput = z.infer<typeof createPaymentIntentSchema>;
+export type PaymentActionInput = z.infer<typeof paymentActionSchema>;

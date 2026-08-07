@@ -84,7 +84,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.register(dto);
-    setAuthCookies(res, this.config, result.tokens);
+    setAuthCookies(res, this.config, result.tokens, CLIENT_APP.MARKETPLACE);
     return toAuthResponse(result);
   }
 
@@ -101,12 +101,12 @@ export class AuthController {
     const clientApp = resolveClientApp(req, dto.clientApp);
     try {
       const result = await this.authService.login(dto, clientApp);
-      setAuthCookies(res, this.config, result.tokens);
+      setAuthCookies(res, this.config, result.tokens, clientApp);
       return toAuthResponse(result);
     } catch (error) {
       // Audience uyğunsuzluğu: köhnə/yanlış session cookie-ni sil
       if (error instanceof ForbiddenException) {
-        clearAuthCookies(res, this.config);
+        clearAuthCookies(res, this.config, clientApp);
       }
       throw error;
     }
@@ -122,10 +122,6 @@ export class AuthController {
     @Body() dto: RefreshTokenDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = readRefreshTokenFromRequest(req, dto.refreshToken);
-    if (!refreshToken) {
-      throw new BadRequestException('Refresh token tələb olunur');
-    }
     const clientAppHint = (() => {
       try {
         return resolveClientApp(req, undefined);
@@ -133,13 +129,21 @@ export class AuthController {
         return undefined;
       }
     })();
+    const refreshToken = readRefreshTokenFromRequest(
+      req,
+      dto.refreshToken,
+      clientAppHint,
+    );
+    if (!refreshToken) {
+      throw new BadRequestException('Refresh token tələb olunur');
+    }
     try {
       const result = await this.authService.refresh(refreshToken, clientAppHint);
-      setAuthCookies(res, this.config, result.tokens);
+      setAuthCookies(res, this.config, result.tokens, result.clientApp);
       return toAuthResponse(result);
     } catch (error) {
       if (error instanceof ForbiddenException) {
-        clearAuthCookies(res, this.config);
+        clearAuthCookies(res, this.config, clientAppHint);
       }
       throw error;
     }
@@ -154,11 +158,22 @@ export class AuthController {
     @Body() dto: LogoutDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = readRefreshTokenFromRequest(req, dto.refreshToken);
+    const clientAppHint = (() => {
+      try {
+        return resolveClientApp(req, undefined);
+      } catch {
+        return undefined;
+      }
+    })();
+    const refreshToken = readRefreshTokenFromRequest(
+      req,
+      dto.refreshToken,
+      clientAppHint,
+    );
     if (refreshToken) {
       await this.authService.logout(refreshToken);
     }
-    clearAuthCookies(res, this.config);
+    clearAuthCookies(res, this.config, clientAppHint);
     return { message: 'Çıxış edildi' };
   }
 
@@ -181,7 +196,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Şifrə bərpası kodu göndər' })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(dto.email);
+    return this.authService.forgotPassword(dto.email, dto.captchaToken);
   }
 
   @Public()

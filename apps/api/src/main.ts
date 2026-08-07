@@ -1,3 +1,4 @@
+import './instrument';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -13,6 +14,7 @@ import { assertJwtSecretForRuntime } from './common/auth/jwt-secret';
 import { createAppLogger } from './common/logging/app.logger';
 import { requestIdMiddleware } from './common/middleware/request-id.middleware';
 import { createPrivateUploadsGuard } from './common/middleware/private-uploads.middleware';
+import { RedisIoAdapter } from './modules/realtime/redis-io.adapter';
 
 /** Upload URL-ləri JSON-da qısa olduğu üçün böyük body lazım deyil */
 const JSON_BODY_LIMIT = '1mb';
@@ -30,7 +32,50 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const nodeEnv = configService.get<string>('NODE_ENV', 'development');
   const jwtSecret = configService.get<string>('JWT_SECRET', '');
+  const mediaSigningSecret =
+    configService.get<string>('MEDIA_SIGNING_SECRET')?.trim() || jwtSecret;
   assertJwtSecretForRuntime(jwtSecret, nodeEnv);
+
+  if (nodeEnv === 'production' && !configService.get<string>('SMTP_HOST')?.trim()) {
+    logger.warn(
+      'SMTP_HOST təyin olunmayıb — verify/reset/contact e-poçtları uğursuz olacaq',
+      'Bootstrap',
+    );
+  }
+
+  if (nodeEnv === 'production' && !configService.get<string>('SENTRY_DSN')?.trim()) {
+    logger.warn('SENTRY_DSN təyin olunmayıb — xəta izləmə deaktivdir', 'Bootstrap');
+  }
+
+  if (
+    nodeEnv === 'production' &&
+    !configService.get<string>('TURNSTILE_SECRET_KEY')?.trim()
+  ) {
+    logger.warn(
+      'TURNSTILE_SECRET_KEY təyin olunmayıb — auth/contact captcha skip olunur (spam riski)',
+      'Bootstrap',
+    );
+  }
+
+  if (
+    nodeEnv === 'production' &&
+    !configService.get<string>('METRICS_TOKEN')?.trim()
+  ) {
+    logger.warn(
+      'METRICS_TOKEN təyin olunmayıb — /metrics açıqdır; production-da token tövsiyə olunur',
+      'Bootstrap',
+    );
+  }
+
+  if (
+    nodeEnv === 'production' &&
+    !configService.get<string>('REDIS_URL')?.trim()
+  ) {
+    logger.warn(
+      'REDIS_URL təyin olunmayıb — ready probe fail edəcək; WS/dispatch/throttle multi-instance üçün Redis lazımdır',
+      'Bootstrap',
+    );
+  }
 
   const trustProxy = configService.get<string>('TRUST_PROXY', '');
   if (trustProxy === 'true' || trustProxy === '1') {
@@ -54,7 +99,7 @@ async function bootstrap() {
 
   const localUploadDir = configService.get<string>('STORAGE_LOCAL_DIR', './uploads');
   // Booking şəkilləri HMAC imza tələb edir; services/avatars açıqdır
-  app.use('/uploads', createPrivateUploadsGuard(jwtSecret));
+  app.use('/uploads', createPrivateUploadsGuard(mediaSigningSecret));
   app.useStaticAssets(join(process.cwd(), localUploadDir), {
     prefix: '/uploads/',
   });
@@ -91,15 +136,21 @@ async function bootstrap() {
       .setDescription('Xidmət platforması REST API')
       .setVersion('1.0')
       .addBearerAuth()
-      .addCookieAuth('xidmetal_access')
+      .addCookieAuth('xidmetal_access_marketplace')
+      .addCookieAuth('xidmetal_access_admin')
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('docs', app, document);
   }
 
+  const redisIoAdapter = new RedisIoAdapter(app, configService);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
+
   await app.listen(port);
   logger.log(`API dinləyir: http://localhost:${port}${API.prefix}`, 'Bootstrap');
+  logger.log(`Socket.IO: http://localhost:${port}`, 'Bootstrap');
   if (swaggerEnabled) {
     logger.log(`Swagger: http://localhost:${port}/docs`, 'Bootstrap');
   }

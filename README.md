@@ -4,7 +4,7 @@
 
 Xidmətal, provider (xidmət verən) və customer (xidmət alan) rollarını birləşdirən marketplace tipli platformadır. İstifadəçilər xidmət axtara, planlaşdırılmış sifariş verə, mesajlaşa, rəy yaza və provider kimi xidmət təklif edə bilərlər.
 
-**Cari vəziyyət:** scheduled (randevu) MVP — auth, kateqoriya/xidmət, təqvim, sifariş, chat, in-app bildiriş, rəy. On-demand çağırış, canlı izləmə və ödəniş hələ yol xəritəsindədir (`docs/ROADMAP.md`).
+**Cari vəziyyət:** scheduled + on-demand marketplace MVP — auth, kateqoriya/xidmət, təqvim, sifariş lifecycle (`EN_ROUTE`/`ARRIVED`), INSTANT dispatch, canlı izləmə (Socket.IO + Mapbox), chat, in-app/push/SMS kanalları, rəy, admin panel. Ödəniş modul scaffolding var, default **OFF** (`PAYMENTS_ENABLED=false`). Native mobil deferred — bax: `docs/ROADMAP.md`, `docs/MOBILE.md`.
 
 ## Texnologiya yığını
 
@@ -65,15 +65,16 @@ pnpm dev
 | Swagger Docs | http://localhost:4000/docs |
 | Prisma Studio | `pnpm db:studio` |
 | PostgreSQL (Docker) | `localhost:5434` |
-| Redis (Docker) | `localhost:6380` (API hələ istifadə etmir) |
+| Redis (Docker) | `localhost:6380` (throttler storage) |
 
 ## Layihə strukturu
 
 ```
 xidmetal/
 ├── apps/
-│   ├── web/          # Next.js frontend
-│   └── api/          # NestJS backend
+│   ├── web/          # Next.js marketplace (port 3020)
+│   ├── admin/        # Next.js admin panel (port 3021)
+│   └── api/          # NestJS backend (port 4000)
 ├── packages/
 │   ├── shared/       # Paylaşılan types, schemas, constants
 │   ├── database/     # Prisma schema & client

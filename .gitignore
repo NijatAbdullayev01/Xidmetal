@@ -9,6 +9,10 @@ out/
 build/
 .turbo/
 
+# Accidental tsc emit into package sources (output belongs in dist/)
+packages/shared/src/**/*.js
+packages/shared/src/**/*.js.map
+
 # Environment
 .env
 .env.local
@@ -31,6 +35,11 @@ pnpm-debug.log*
 
 # Testing
 coverage/
+test-results/
+playwright-report/
+blob-report/
+ops/load/results/
+*.k6.json
 
 # Prisma
 packages/database/prisma/migrations/**/migration_lock.toml

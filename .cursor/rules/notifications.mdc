@@ -1,0 +1,34 @@
+---
+description: Bildiriş kanalları — inbox yalnız admin; sifariş/mesaj/rəy ayrı
+globs: apps/**/notifications/**,packages/shared/src/enums/**,apps/web/src/components/notifications/**,apps/web/src/hooks/use-notifications*
+alwaysApply: false
+---
+
+# Bildiriş Kanalları Qaydası
+
+## Məhsul qərarı
+
+`/dashboard/*/notifications` (**NotificationsInbox**) və zəng paneli (**NotificationsBell**) **yalnız** admin/platforma tərəfindən göndərilən bildirişlər üçündür (`ADMIN_NOTIFICATION_TYPES`, hazırda `ADMIN_ANNOUNCEMENT`).
+
+**Buraya düşməz:** sifariş, mesaj və rəy bildirişləri.
+
+## Kanal ayrılığı
+
+| Kanal | Tiplər | UI / API |
+|-------|--------|----------|
+| Admin inbox + zəng | `ADMIN_NOTIFICATION_TYPES` | `GET /notifications`, unread-count, mark read / read-all |
+| Sifariş | `BOOKING_NOTIFICATION_TYPES` | Sifarişlər nav badge; `booking-unread-count` / `booking-read-all` |
+| Mesaj | `MESSAGE_NOTIFICATION_TYPES` | Mesajlar; söhbət oxunanda `markMessageNotificationsRead` |
+| Rəy | `REVIEW_NOTIFICATION_TYPES` | Provider reytinq badge; `review-unread-count` / `review-read-all` |
+
+## Kod
+
+- `NotificationsService.findAll` / `getUnreadCount` / `markRead` / `markAllRead` → yalnız `adminTypes` (`inboxTypes`).
+- Shared allowlist: `ADMIN_NOTIFICATION_TYPES` — sifariş/mesaj/rəy əlavə etmə.
+- Inbox UI mətni: admin/platforma elanları; sifariş/mesajın buraya düşmədiyini izah et.
+
+## Qadağan
+
+- Sifariş və ya mesaj bildirişini inbox siyahısına / zəng panelinə qarışdırmaq.
+- `BOOKING_*` / `MESSAGE_*` / `REVIEW_*` tiplərini `ADMIN_NOTIFICATION_TYPES` və ya `inboxTypes`-ə əlavə etmək.
+- Booking/message diqqətini yalnız zəng unread sayına bağlamaq (ayrı badge/kanal saxla).

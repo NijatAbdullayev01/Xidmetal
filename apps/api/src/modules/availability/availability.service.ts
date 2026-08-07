@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { BookingStatus, type Prisma } from '@prisma/client';
+import { ACTIVE_BOOKING_STATUSES as SHARED_ACTIVE_BOOKING_STATUSES } from '@xidmetal/shared';
 import { PrismaService } from '../../common/database/prisma.service';
 import {
   AvailabilityOverrideType,
@@ -24,10 +25,8 @@ import { bookingWindowEndMs, rangesOverlap } from '../../common/booking/booking-
 const BAKU_OFFSET = '+04:00';
 const DEFAULT_DURATION_MINUTES = 60;
 const ACTIVE_BOOKING_STATUSES: BookingStatus[] = [
-  BookingStatus.PENDING,
-  BookingStatus.CONFIRMED,
-  BookingStatus.IN_PROGRESS,
-];
+  ...SHARED_ACTIVE_BOOKING_STATUSES,
+] as BookingStatus[];
 
 interface TimeRange {
   startMin: number;

@@ -1,0 +1,18 @@
+-- Faza 1: booking lifecycle — EN_ROUTE / ARRIVED, BookingType, timestamps
+ALTER TYPE "BookingStatus" ADD VALUE IF NOT EXISTS 'EN_ROUTE';
+ALTER TYPE "BookingStatus" ADD VALUE IF NOT EXISTS 'ARRIVED';
+
+DO $$ BEGIN
+  CREATE TYPE "BookingType" AS ENUM ('SCHEDULED', 'INSTANT');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "type" "BookingType" NOT NULL DEFAULT 'SCHEDULED';
+ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "en_route_at" TIMESTAMP(3);
+ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "arrived_at" TIMESTAMP(3);
+
+CREATE INDEX IF NOT EXISTS "bookings_type_idx" ON "bookings"("type");
+
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'BOOKING_EN_ROUTE';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'BOOKING_ARRIVED';

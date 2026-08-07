@@ -18,6 +18,8 @@
     "db:migrate:status": "pnpm --filter @xidmetal/database migrate:status",
     "db:push": "pnpm --filter @xidmetal/database push",
     "db:studio": "pnpm --filter @xidmetal/database studio",
+    "load:smoke": "bash ops/load/run.sh smoke",
+    "load:stress": "bash ops/load/run.sh stress",
     "clean": "turbo clean && rm -rf node_modules"
   },
   "devDependencies": {

@@ -34,3 +34,47 @@ export const PAGINATION = {
   defaultLimit: 20,
   maxLimit: 100,
 } as const;
+
+/** On-demand dispatch (Faza 4) — env ilə override edilə bilər */
+export const DISPATCH = {
+  /** Yaxınlıq radiusu (metr) — default 15 km */
+  RADIUS_M: 15_000,
+  /** Təklif timeout (saniyə) */
+  OFFER_TIMEOUT_SEC: 30,
+  /** INSTANT üçün scheduledAt ofseti (dəqiqə) — slot lock yox, display window */
+  INSTANT_SCHEDULED_OFFSET_MIN: 15,
+  /** BullMQ queue adı */
+  QUEUE_NAME: 'dispatch-offers',
+  /** Redis job prefix */
+  QUEUE_PREFIX: 'xidmetal:dispatch',
+  /** Bir booking-ə eyni anda max aktiv PENDING offer */
+  MAX_ACTIVE_OFFERS: 1,
+  /** Namizəd limiti */
+  MAX_CANDIDATES: 20,
+} as const;
+
+/** Ödəniş (Faza 5) — default OFF; live charge yoxdur */
+export const PAYMENTS = {
+  /** Default valyuta */
+  DEFAULT_CURRENCY: 'AZN',
+  /** Komissiya faizi (scaffolding; məhsul qərarı: hazırda 0) */
+  DEFAULT_COMMISSION_RATE: 0,
+  /** Idempotency açar max uzunluq */
+  IDEMPOTENCY_KEY_MAX_LEN: 128,
+} as const;
+
+/** Push / SMS kanalları (Faza 5) */
+export const NOTIFICATION_CHANNELS = {
+  /** SMS yalnız bu tiplər üçün (SMS_STATUS_ENABLED=true) */
+  SMS_STATUS_TYPES: [
+    'BOOKING_CREATED',
+    'BOOKING_CONFIRMED',
+    'BOOKING_REJECTED',
+    'BOOKING_CANCELLED',
+    'BOOKING_EN_ROUTE',
+    'BOOKING_ARRIVED',
+    'BOOKING_COMPLETED',
+  ] as const,
+  /** IdempotencyRecord default TTL (saat) */
+  IDEMPOTENCY_TTL_HOURS: 24,
+} as const;

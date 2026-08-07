@@ -1,8 +1,9 @@
 import { Module, Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import Redis from 'ioredis';
+import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { ServicesModule } from './modules/services/services.module';
@@ -14,15 +15,27 @@ import { MessagesModule } from './modules/messages/messages.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { HealthModule } from './modules/health/health.module';
+import { ContactModule } from './modules/contact/contact.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { GeoModule } from './modules/geo/geo.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
+import { TrackingModule } from './modules/tracking/tracking.module';
+import { DispatchModule } from './modules/dispatch/dispatch.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { DevicesModule } from './modules/devices/devices.module';
 import { DatabaseModule } from './common/database/database.module';
 import { MailModule } from './common/mail/mail.module';
 import { StorageModule } from './common/storage/storage.module';
+import { NotificationChannelsModule } from './common/notifications/notification-channels.module';
+import { MetricsModule } from './common/metrics/metrics.module';
+import { CaptchaModule } from './common/captcha/captcha.module';
 import { JwtAuthGuard } from './common/guards';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { RedisThrottlerStorage } from './common/throttler/redis-throttler.storage';
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../../.env', '.env'] }),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
@@ -61,8 +74,19 @@ import { RedisThrottlerStorage } from './common/throttler/redis-throttler.storag
     }),
     DatabaseModule,
     MailModule,
+    CaptchaModule,
     StorageModule,
+    NotificationChannelsModule,
+    MetricsModule,
     HealthModule,
+    ContactModule,
+    ReportsModule,
+    GeoModule,
+    RealtimeModule,
+    TrackingModule,
+    DispatchModule,
+    PaymentsModule,
+    DevicesModule,
     AuthModule,
     UsersModule,
     CategoriesModule,
@@ -76,6 +100,7 @@ import { RedisThrottlerStorage } from './common/throttler/redis-throttler.storag
     UploadsModule,
   ],
   providers: [
+    { provide: APP_FILTER, useClass: SentryGlobalFilter },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],

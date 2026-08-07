@@ -3,31 +3,35 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Briefcase, ClipboardList, Star, PlusCircle, ArrowRight, MessageSquare } from 'lucide-react';
-import { BookingStatus, ServiceStatus } from '@xidmetal/shared';
+import type { ProviderDashboardStats } from '@xidmetal/shared';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { buttonStyles } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { formatPrice } from '@/lib/utils';
+import { DispatchOffersCard } from '@/components/dispatch/dispatch-offers-card';
+import { ProviderVerificationBanner } from '@/components/provider/provider-verification-banner';
 
 export default function ProviderOverviewPage() {
   const token = useAuthToken();
 
-  const { data: profile } = useQuery({
-    queryKey: ['users', 'me'],
-    queryFn: () => api.users.me(token!),
+  const { data: dashboardStats } = useQuery({
+    queryKey: ['users', 'dashboard-stats'],
+    queryFn: () => api.users.dashboardStats(token!),
     enabled: !!token,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: services } = useQuery({
     queryKey: ['services', 'mine'],
-    queryFn: () => api.myServices(token!, { limit: '100' }),
+    queryFn: () => api.myServices(token!, { limit: '10' }),
     enabled: !!token,
   });
 
   const { data: bookings } = useQuery({
-    queryKey: ['bookings', 'all'],
-    queryFn: () => api.bookings(token!, { limit: '100' }),
+    queryKey: ['bookings', 'recent'],
+    queryFn: () => api.bookings(token!, { limit: '10' }),
     enabled: !!token,
     refetchInterval: 5_000,
     refetchIntervalInBackground: true,
@@ -43,24 +47,28 @@ export default function ProviderOverviewPage() {
     refetchOnWindowFocus: true,
   });
 
-  const activeServices = services?.items.filter((s) => s.status === ServiceStatus.ACTIVE).length ?? 0;
-  const pendingBookings =
-    bookings?.items.filter((b) => b.status === BookingStatus.PENDING).length ?? 0;
-  const rating = profile?.providerProfile?.rating ?? 0;
-  const reviewCount = profile?.providerProfile?.reviewCount ?? 0;
+  const statsSummary: ProviderDashboardStats = dashboardStats ?? {
+    activeServices: 0,
+    totalServices: 0,
+    pendingBookings: 0,
+    completedBookings: 0,
+    rating: 0,
+    reviewCount: 0,
+  };
+
   const unreadMessages =
     conversations?.items.reduce((sum, c) => sum + c.unreadCount, 0) ?? 0;
 
   const stats = [
     {
       label: 'Aktiv xidmətlər',
-      value: activeServices,
+      value: statsSummary.activeServices,
       icon: Briefcase,
       href: '/dashboard/provider/services',
     },
     {
       label: 'Gözləyən sifarişlər',
-      value: pendingBookings,
+      value: statsSummary.pendingBookings,
       icon: ClipboardList,
       href: '/dashboard/provider/bookings',
     },
@@ -72,7 +80,8 @@ export default function ProviderOverviewPage() {
     },
     {
       label: 'Reytinq',
-      value: reviewCount > 0 ? `${rating.toFixed(1)} ★` : '—',
+      value:
+        statsSummary.reviewCount > 0 ? `${statsSummary.rating.toFixed(1)} ★` : '—',
       icon: Star,
       href: '/dashboard/provider/ratings',
     },
@@ -80,6 +89,7 @@ export default function ProviderOverviewPage() {
 
   return (
     <div className="space-y-8">
+      <ProviderVerificationBanner />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
@@ -116,12 +126,16 @@ export default function ProviderOverviewPage() {
         })}
       </div>
 
+      <DispatchOffersCard />
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>Son sifarişlər</CardTitle>
-              <CardDescription>Ən son daxil olan sifarişlər</CardDescription>
+              <CardDescription>
+                Ən son daxil olan sifarişlər · {statsSummary.completedBookings} tamamlanmış
+              </CardDescription>
             </div>
             <Link
               href="/dashboard/provider/bookings"
@@ -201,7 +215,9 @@ export default function ProviderOverviewPage() {
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Xidmətlərim</CardTitle>
-            <CardDescription>Yaratdığınız xidmətlər</CardDescription>
+            <CardDescription>
+              Yaratdığınız xidmətlər · cəmi {statsSummary.totalServices}
+            </CardDescription>
           </div>
           <Link
             href="/dashboard/provider/services"

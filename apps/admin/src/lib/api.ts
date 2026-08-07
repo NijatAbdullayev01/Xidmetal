@@ -11,6 +11,7 @@ import type {
   AdminUserSummary,
   AdminCategorySummary,
   AdminReviewSummary,
+  AdminReportSummary,
   AdminAnnouncementResult,
   CreateCategoryInput,
   UpdateCategoryInput,
@@ -18,6 +19,7 @@ import type {
   AdminSetProviderVerifiedInput,
   AdminSetServiceStatusInput,
   AdminSetReviewStatusInput,
+  AdminSetReportStatusInput,
   AdminAnnouncementInput,
 } from '@xidmetal/shared';
 import { BookingStatus, CLIENT_APP, CLIENT_APP_HEADER } from '@xidmetal/shared';
@@ -90,6 +92,7 @@ export async function apiClient<T>(
     ...(token ? { cache: 'no-store' as const } : {}),
     headers: {
       'Content-Type': 'application/json',
+      [CLIENT_APP_HEADER]: CLIENT_APP.ADMIN,
       ...headers,
     },
   });
@@ -218,6 +221,18 @@ export const api = {
         token,
         body: JSON.stringify(data),
       }),
+    reports: (token: string, params?: Record<string, string>) => {
+      const query = params ? `?${new URLSearchParams(params)}` : '';
+      return apiClient<PaginatedResponse<AdminReportSummary>>(`/admin/reports${query}`, {
+        token,
+      });
+    },
+    setReportStatus: (token: string, id: string, data: AdminSetReportStatusInput) =>
+      apiClient<AdminReportSummary>(`/admin/reports/${id}/status`, {
+        method: 'PATCH',
+        token,
+        body: JSON.stringify(data),
+      }),
     announce: (token: string, data: AdminAnnouncementInput) =>
       apiClient<AdminAnnouncementResult>('/admin/announcements', {
         method: 'POST',
@@ -226,10 +241,18 @@ export const api = {
       }),
   },
 
-  updateBookingStatus: (token: string, id: string, status: BookingStatus) =>
+  updateBookingStatus: (
+    token: string,
+    id: string,
+    status: BookingStatus,
+    options?: { cancelReason?: string },
+  ) =>
     apiClient<BookingSummary>(`/bookings/${id}/status`, {
       method: 'PATCH',
       token,
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({
+        status,
+        ...(options?.cancelReason ? { cancelReason: options.cancelReason } : {}),
+      }),
     }),
 };

@@ -4,6 +4,7 @@ import { ThemeProvider } from '@/components/providers/theme-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { AttentionProvider } from '@/components/providers/attention-provider';
 import { NavigationProgress } from '@/components/layout/navigation-progress';
+import { PwaRegister } from '@/components/pwa/pwa-register';
 import { APP } from '@xidmetal/shared';
 import './globals.css';
 
@@ -14,6 +15,7 @@ export const metadata: Metadata = {
   },
   description: APP.description,
   keywords: ['xidmət', 'xidmət verən', 'sifariş', 'azərbaycan', 'xidmət platforması'],
+  manifest: '/manifest.webmanifest',
   openGraph: {
     title: APP.name,
     description: APP.description,
@@ -32,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Suspense fallback={null}>
                 <NavigationProgress />
               </Suspense>
+              <PwaRegister />
               {children}
             </AttentionProvider>
           </QueryProvider>

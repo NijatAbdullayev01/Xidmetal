@@ -64,8 +64,9 @@ const customerSteps: {
     description:
       'Uyğun xidməti tapdıqdan sonra tarix, vaxt və qısa qeyd əlavə edərək sifariş göndərin. Hesab yaratmaq bir neçə saniyə çəkir.',
     details: [
-      'İstədiyiniz tarix və vaxtı seçin',
+      'İstədiyiniz tarix və vaxtı seçin və ya «İndi çağır»',
       'Əlavə tələblərinizi qeyd edin',
+      'Ödəniş platformada aparılmır — haqqı tərəflər özləri razılaşdırır',
       'Sifariş xidmət verənə göndərilir',
     ],
   },

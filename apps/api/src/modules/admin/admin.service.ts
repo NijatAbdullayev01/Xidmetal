@@ -3,11 +3,13 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  Optional,
 } from '@nestjs/common';
 import {
   BookingStatus,
   NotificationType,
   Prisma,
+  ReportStatus,
   ReviewStatus,
   ServiceStatus,
   UserRole,
@@ -16,6 +18,7 @@ import type {
   AdminAnnouncementResult,
   AdminCategorySummary,
   AdminDashboardStats,
+  AdminReportSummary,
   AdminReviewSummary,
   AdminUserSummary,
   BookingSummary,
@@ -23,14 +26,17 @@ import type {
   ServiceSummary,
 } from '@xidmetal/shared';
 import { PrismaService } from '../../common/database/prisma.service';
+import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
 import {
   AdminBookingsQueryDto,
+  AdminReportsQueryDto,
   AdminReviewsQueryDto,
   AdminServicesQueryDto,
   AdminUsersQueryDto,
   CreateAnnouncementDto,
   CreateCategoryDto,
   SetProviderVerifiedDto,
+  SetReportStatusDto,
   SetReviewStatusDto,
   SetServiceStatusDto,
   SetUserActiveDto,
@@ -66,7 +72,10 @@ function slugify(input: string): string {
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Optional() private channels?: NotificationChannelsService,
+  ) {}
 
   async getStats(): Promise<AdminDashboardStats> {
     const [
@@ -80,6 +89,7 @@ export class AdminService {
       bookingsTotal,
       bookingsPending,
       reviewsPending,
+      reportsPending,
       categoriesActive,
     ] = await Promise.all([
       this.prisma.user.count({ where: { role: { not: UserRole.ADMIN } } }),
@@ -94,6 +104,7 @@ export class AdminService {
       this.prisma.booking.count(),
       this.prisma.booking.count({ where: { status: BookingStatus.PENDING } }),
       this.prisma.review.count({ where: { status: ReviewStatus.PENDING } }),
+      this.prisma.report.count({ where: { status: ReportStatus.PENDING } }),
       this.prisma.category.count({ where: { isActive: true } }),
     ]);
 
@@ -108,6 +119,7 @@ export class AdminService {
       bookingsTotal,
       bookingsPending,
       reviewsPending,
+      reportsPending,
       categoriesActive,
     };
   }
@@ -486,10 +498,19 @@ export class AdminService {
         scheduledAt: b.scheduledAt.toISOString(),
         proposedScheduledAt: b.proposedScheduledAt?.toISOString(),
         status: b.status as BookingSummary['status'],
+        type: b.type as BookingSummary['type'],
         totalPrice: Number(b.totalPrice),
         notes: b.notes ?? undefined,
         address: b.address ?? undefined,
         imageUrl: b.imageUrl ?? undefined,
+        cancelReason: b.cancelReason ?? undefined,
+        cancelledBy: b.cancelledBy ?? undefined,
+        cancelledAt: b.cancelledAt?.toISOString(),
+        acceptedAt: b.acceptedAt?.toISOString(),
+        enRouteAt: b.enRouteAt?.toISOString(),
+        arrivedAt: b.arrivedAt?.toISOString(),
+        startedAt: b.startedAt?.toISOString(),
+        completedAt: b.completedAt?.toISOString(),
         hasReview: Boolean(b.review),
         createdAt: b.createdAt.toISOString(),
       })),
@@ -657,6 +678,107 @@ export class AdminService {
     };
   }
 
+  async listReports(
+    query: AdminReportsQueryDto,
+  ): Promise<PaginatedResponse<AdminReportSummary>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ReportWhereInput = {
+      ...(query.status ? { status: query.status } : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.report.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          reporter: {
+            select: { id: true, firstName: true, lastName: true, email: true },
+          },
+          resolvedBy: { select: { firstName: true, lastName: true } },
+        },
+      }),
+      this.prisma.report.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        reporterId: r.reporter.id,
+        reporterName: `${r.reporter.firstName} ${r.reporter.lastName}`,
+        reporterEmail: r.reporter.email,
+        targetType: r.targetType,
+        targetId: r.targetId,
+        reason: r.reason,
+        description: r.description,
+        status: r.status,
+        adminNote: r.adminNote,
+        resolvedAt: r.resolvedAt?.toISOString() ?? null,
+        resolvedByName: r.resolvedBy
+          ? `${r.resolvedBy.firstName} ${r.resolvedBy.lastName}`
+          : null,
+        createdAt: r.createdAt.toISOString(),
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 0,
+    };
+  }
+
+  async setReportStatus(
+    id: string,
+    adminId: string,
+    dto: SetReportStatusDto,
+  ): Promise<AdminReportSummary> {
+    if (dto.status !== ReportStatus.RESOLVED && dto.status !== ReportStatus.DISMISSED) {
+      throw new BadRequestException('Yalnız RESOLVED və ya DISMISSED statusu təyin edilə bilər');
+    }
+
+    const existing = await this.prisma.report.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Şikayət tapılmadı');
+    }
+
+    const updated = await this.prisma.report.update({
+      where: { id },
+      data: {
+        status: dto.status,
+        adminNote: dto.adminNote?.trim() || null,
+        resolvedAt: new Date(),
+        resolvedById: adminId,
+      },
+      include: {
+        reporter: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+        resolvedBy: { select: { firstName: true, lastName: true } },
+      },
+    });
+
+    return {
+      id: updated.id,
+      reporterId: updated.reporter.id,
+      reporterName: `${updated.reporter.firstName} ${updated.reporter.lastName}`,
+      reporterEmail: updated.reporter.email,
+      targetType: updated.targetType,
+      targetId: updated.targetId,
+      reason: updated.reason,
+      description: updated.description,
+      status: updated.status,
+      adminNote: updated.adminNote,
+      resolvedAt: updated.resolvedAt?.toISOString() ?? null,
+      resolvedByName: updated.resolvedBy
+        ? `${updated.resolvedBy.firstName} ${updated.resolvedBy.lastName}`
+        : null,
+      createdAt: updated.createdAt.toISOString(),
+    };
+  }
+
   async createAnnouncement(dto: CreateAnnouncementDto): Promise<AdminAnnouncementResult> {
     const roles = dto.roles?.length
       ? dto.roles
@@ -694,6 +816,20 @@ export class AdminService {
         } as Prisma.InputJsonValue,
       })),
     });
+
+    // createMany id qaytarmır — WS invalidate üçün best-effort emit
+    for (const u of users) {
+      this.channels?.deliverAfterInApp({
+        userId: u.id,
+        title,
+        body,
+        type: NotificationType.ADMIN_ANNOUNCEMENT,
+        data: {
+          source: 'admin',
+          ...(safeHref ? { href: safeHref } : {}),
+        },
+      });
+    }
 
     return { sentCount: users.length };
   }

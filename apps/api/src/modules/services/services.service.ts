@@ -17,8 +17,9 @@ import {
   requiresCargoRouteScope,
   allowsPerSqmPriceUnit,
   MAX_SERVICE_IMAGES,
+  ACTIVE_BOOKING_STATUSES,
 } from '@xidmetal/shared';
-import { BookingStatus, ReviewStatus, ServiceStatus } from '@prisma/client';
+import { ReviewStatus, ServiceStatus } from '@prisma/client';
 
 const SERVICE_IMAGES_INCLUDE = { orderBy: { sortOrder: 'asc' as const } };
 
@@ -359,7 +360,7 @@ export class ServicesService {
         where: {
           serviceId: id,
           status: {
-            in: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS],
+            in: [...ACTIVE_BOOKING_STATUSES],
           },
         },
       });
@@ -458,7 +459,7 @@ export class ServicesService {
       where: {
         serviceId: id,
         status: {
-          in: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS],
+          in: [...ACTIVE_BOOKING_STATUSES],
         },
       },
     });
@@ -494,7 +495,7 @@ export class ServicesService {
       where: {
         serviceId: { in: serviceIds },
         status: {
-          in: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS],
+          in: [...ACTIVE_BOOKING_STATUSES],
         },
       },
       _count: { _all: true },

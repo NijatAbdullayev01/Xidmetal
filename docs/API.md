@@ -12,6 +12,7 @@ Protected endpoint-lər `Authorization: Bearer <access_token>` **və ya** httpOn
 
 Brauzer (marketplace/admin): login/register/refresh **yalnız cookie** qoyur — JSON cavabda `tokens` **yoxdur** (XSS səthi bağlanıb).
 `clientApp`: `marketplace` | `admin` (body və ya `x-xidmetal-client` header) — yanlış app-də session yaradılmır və cookie silinir.
+Cookie adları app-scoped-dir (`xidmetal_access_marketplace` / `xidmetal_access_admin`) — eyni API host-da sessiyalar bir-birini üstünə yazmır.
 Swagger / xarici klientlər Bearer header dəstəklənir. Access default: `15m`.
 
 🔒 = JWT tələb olunur (cookie və ya Bearer). Rəllər `@Roles` və ya service-layer yoxlaması ilə tətbiq olunur.
@@ -25,6 +26,7 @@ Swagger / xarici klientlər Bearer header dəstəklənir. Access default: `15m`.
 Yeni istifadəçi. `role`: `CUSTOMER` | `PROVIDER` (`ADMIN` qeydiyyatı qadağandır).
 **Məhsul qərarı:** rol qeydiyyatda seçilir və dəyişmir; `CUSTOMER` → `PROVIDER` upgrade endpoint-i yoxdur (ayrı hesab lazımdır).
 Qeydiyyatdan sonra e-poçt təsdiq kodu göndərilir (`isVerified: false` qalır — soft verify; girişə mane olmur).
+Opsional `captchaToken` — `TURNSTILE_SECRET_KEY` setdirsə məcburidir.
 
 **Body:**
 ```json
@@ -34,7 +36,8 @@ Qeydiyyatdan sonra e-poçt təsdiq kodu göndərilir (`isVerified: false` qalır
   "firstName": "Əli",
   "lastName": "Məmmədov",
   "phone": "+994501234567",
-  "role": "CUSTOMER"
+  "role": "CUSTOMER",
+  "captchaToken": "…"
 }
 ```
 
@@ -42,7 +45,7 @@ Qeydiyyatdan sonra e-poçt təsdiq kodu göndərilir (`isVerified: false` qalır
 
 ### POST /auth/login
 
-**Body:** `{ "email", "password", "clientApp?: "marketplace"|"admin" }`
+**Body:** `{ "email", "password", "clientApp": "marketplace"|"admin", "captchaToken?" }`
 
 **Response:** `{ user }` + cookies. `clientApp=marketplace` + ADMIN → `403` (cookie clear). `clientApp=admin` + qeyri-ADMIN → `403`.
 
@@ -92,9 +95,13 @@ Kod ilə `isVerified: true`.
 
 Cari profil (`providerProfile` daxil ola bilər).
 
+### GET /users/me/dashboard-stats 🔒 PROVIDER
+
+Kabinet statistikası: `activeServices`, `totalServices`, `pendingBookings`, `completedBookings`, `rating`, `reviewCount`.
+
 ### PATCH /users/me 🔒
 
-Profil yeniləmə (ad, telefon, avatar və s.).
+Profil yeniləmə (ad, telefon, avatar; provider: `bio`, `location`, `experience`).
 
 ### PATCH /users/me/password 🔒
 
@@ -102,7 +109,7 @@ Profil yeniləmə (ad, telefon, avatar və s.).
 
 ### POST /users/me/heartbeat 🔒
 
-Onlayn presence (`lastSeenAt`); throttled.
+Onlayn presence (`lastSeenAt`); throttled. `ProviderAvailability` domain field-indən ayrıdır (bax: `/geo/me/availability`).
 
 ### POST /users/me/email/request-change 🔒
 
@@ -111,6 +118,22 @@ Yeni e-poçt üçün kod (SMTP varsa mail; yoxdursa dev log).
 ### POST /users/me/email/confirm-change 🔒
 
 Kod ilə e-poçt təsdiqi.
+
+### POST /users/me/phone/request-verify 🔒
+
+Telefon OTP (SMS; `SMS_PROVIDER=noop` olduqda `previewCode`).
+
+### POST /users/me/phone/confirm-verify 🔒
+
+Kod ilə `phoneVerifiedAt` təsdiqi.
+
+### GET /users/me/export 🔒
+
+Şəxsi məlumatların JSON ixracı (profil, sifarişlər, bildirişlər, maskalanmış device token-lər).
+
+### DELETE /users/me 🔒
+
+Hesab soft-delete (şifrə + `SIL` təsdiqi).
 
 ---
 
@@ -178,17 +201,13 @@ Həftəlik iş saatlarını yenilə.
 
 ### GET /bookings 🔒
 
-Sifarişlər siyahısı (rol üzrə filtr).
+Sifarişlər siyahısı (rol üzrə filtr). Query: `page`, `limit`, `status`.
 
 ### GET /bookings/:id 🔒
 
 Sifariş detalları — yalnız iştirakçı və ya ADMIN.
 
-### POST /bookings 🔒 (+ email verified)
-
-Rola görə siyahı. Query: `page`, `limit`, `status`.
-
-### POST /bookings 🔒
+### POST /bookings 🔒 CUSTOMER (+ email verified)
 
 **Body (nümunə):**
 ```json
@@ -201,18 +220,37 @@ Rola görə siyahı. Query: `page`, `limit`, `status`.
 }
 ```
 
-Slot `availability` ilə yoxlanır (transaction + `pg_advisory_xact_lock`); gələcək tarix məcburidir. E-poçt təsdiqi + təsdiqlənmiş provider tələb olunur.
+Header: `Idempotency-Key` (opsional, tövsiyə — double-submit / INSTANT təkrarını eyni sifarişə bağlayır).
+
+Slot `availability` ilə yoxlanır (transaction + `pg_advisory_xact_lock`) — **yalnız SCHEDULED**. E-poçt təsdiqi + təsdiqlənmiş provider tələb olunur. Opsional `type`: `SCHEDULED` (default) | `INSTANT`.
+
+**INSTANT:** `destLat`/`destLng` məcburi; `scheduledAt` opsional (server ~15 dəq ofset); slot lock yoxdur; create sonrası `dispatch` yaxın ONLINE provider-lərə sequential offer göndərir.
+
+Opsional geo (SCHEDULED): `destLat`/`destLng`, `originLat`/`originLng` (cüt göndərilməlidir; ünvan string qalır).
+
+### Dispatch (Faza 4) 🔒 PROVIDER / ADMIN
+
+| Method | Path | İzah |
+|--------|------|------|
+| GET | `/dispatch/offers/pending` | Provider: aktiv PENDING təkliflər |
+| POST | `/dispatch/offers/:id/accept` | Qəbul → booking CONFIRMED (race-safe) |
+| POST | `/dispatch/offers/:id/reject` | Rədd → növbəti namizəd |
+| GET | `/dispatch/offers?bookingId=` | Admin: sifariş üzrə bütün təkliflər |
+
+Env: `DISPATCH_RADIUS_M` (default 15000), `DISPATCH_OFFER_TIMEOUT_SEC` (default 30), `REDIS_URL` (BullMQ; yoxdursa dev setTimeout).
 
 ### PATCH /bookings/:id/status 🔒
 
-**Body:** `{ "status": "CONFIRMED" }`
+**Body:** `{ "status": "EN_ROUTE" }` (ləğv üçün `cancelReason` məcburi)
 
-**Statuslar:** `PENDING`, `CONFIRMED`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`, `REJECTED`
+**Statuslar:** `PENDING`, `CONFIRMED`, `EN_ROUTE`, `ARRIVED`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`, `REJECTED`
 
-İcazəli keçidlər (qısaca):
-- Provider: `PENDING→CONFIRMED|REJECTED`, `CONFIRMED→IN_PROGRESS|CANCELLED`, `IN_PROGRESS→COMPLETED`
-- Customer: `PENDING|CONFIRMED→CANCELLED`
+İcazəli keçidlər (qısaca; mənbə: shared `booking-lifecycle`):
+- Provider: `PENDING→CONFIRMED|REJECTED`, `CONFIRMED→EN_ROUTE|CANCELLED`, `EN_ROUTE→ARRIVED|CANCELLED`, `ARRIVED→IN_PROGRESS|CANCELLED`, `IN_PROGRESS→COMPLETED`
+- Customer: `PENDING|CONFIRMED|EN_ROUTE|ARRIVED→CANCELLED`
 - Admin: bypass
+
+Lifecycle timestamp-lər: `acceptedAt`, `enRouteAt`, `arrivedAt`, `startedAt`, `completedAt`, `cancelledAt`.
 
 ### PATCH /bookings/:id/reschedule 🔒 PROVIDER
 
@@ -266,7 +304,66 @@ Soft-delete (yalnız öz siyahısından).
 
 Typing indicator (DB `typing_presences`; multi-instance; ~4s TTL). E-poçt təsdiqi məcburidir.
 
-> Real-time WebSocket yoxdur — frontend polling istifadə edir.
+> Mesajlar üçün WS hələ yox — frontend polling; sifariş tracking üçün Socket.IO (aşağıya bax).
+
+---
+
+## Geo (Faza 2)
+
+Geocoder: `GEOCODER_PROVIDER=mock` (default) və ya `nominatim` (`GEOCODER_BASE_URL`, `GEOCODER_USER_AGENT`). Hardcoded API key yoxdur.
+
+### GET /geo/geocode
+
+**Query:** `q` (min 2 simvol). Ünvan → koordinat siyahısı.
+
+### GET /geo/reverse
+
+**Query:** `lat`, `lng`. Koordinat → ünvan.
+
+### GET /geo/nearby
+
+**Query:** `lat`, `lng`, `radiusKm` (default 10, max 100), `categoryId?`, `limit?` (max 50).
+
+Yalnız `ONLINE` + aktiv xidməti olan providerlər. Cavab: `{ items, engine: "postgis" | "haversine" }`.
+Web UI: `/services` səhifəsində «Yaxınımdakı xidmət verənlər» (`NearbyProvidersSection`).
+
+### POST /geo/me/location 🔒 PROVIDER
+
+**Body:** `{ "lat", "lng", "heading?", "availability?" }` — mövqe + opsional əlçatanlıq; PostGIS `last_location` sinxron.
+
+### PATCH /geo/me/availability 🔒 PROVIDER
+
+**Body:** `{ "availability": "ONLINE" | "OFFLINE" | "BUSY" }`.
+
+---
+
+## Realtime & Tracking (Faza 3)
+
+Socket.IO eyni API prosesində (`http://localhost:4000/socket.io`). CORS: `CORS_ORIGIN` / app URL-lər. Redis adapter: `REDIS_URL` (yoxdursa in-memory).
+
+### GET /realtime/socket-token 🔒
+
+httpOnly cookie (və ya Bearer) access JWT-ni WS `auth.token` üçün qaytarır.
+
+**Response:** `{ "token": "<jwt>" }`
+
+### GET /bookings/:id/location-pings 🔒
+
+İştirakçı (customer/provider) və ya admin. Sampling tarixçəsi (`LocationPing`).
+
+**Query:** `limit` (default 100, max 500).
+
+### Socket.IO event-lər
+
+| İstiqamət | Event | Qeyd |
+|-----------|-------|------|
+| C→S | `booking:subscribe` / `booking:unsubscribe` | `{ bookingId }` — server room auth |
+| C→S | `location:push` | Provider; status `EN_ROUTE`/`ARRIVED`/`IN_PROGRESS`; ~3s throttle |
+| S→C | `location:update` | `booking:{id}` otağı + ETA |
+| S→C | `booking:status` | Status dəyişəndə |
+| S→C | `notification:new` | Opsional `user:{id}` |
+
+Env: `NEXT_PUBLIC_WS_URL`, `NEXT_PUBLIC_MAPBOX_TOKEN`, `MAPBOX_ACCESS_TOKEN` (Directions; boş = haversine ETA).
 
 ---
 
@@ -274,23 +371,67 @@ Typing indicator (DB `typing_presences`; multi-instance; ~4s TTL). E-poçt təsd
 
 ### GET /notifications 🔒
 
+Yalnız admin/platforma elanları (`ADMIN_ANNOUNCEMENT`). Sifariş və mesaj bildirişləri bu siyahıda yoxdur.
+
 ### GET /notifications/unread-count 🔒
 
-Admin/platforma tipləri (zəng ikonu).
+Admin/platforma tipləri (zəng ikonu + Bildirişlər səhifəsi).
 
 ### GET /notifications/booking-unread-count 🔒
 
-Sifariş hadisələri.
+Sifariş hadisələri (nav badge — inbox-dan ayrı).
 
 ### PATCH /notifications/:id/read 🔒
 
 ### POST /notifications/read-all 🔒
 
+Yalnız admin inbox bildirişlərini oxundu edir.
+
 ### POST /notifications/booking-read-all 🔒
 
 > Booking/reschedule axınları DB-yə yazır. Admin platforma bildirişi: `POST /admin/announcements`.
-> Emit olunanlar: `BOOKING_CREATED`, `BOOKING_CONFIRMED`, `BOOKING_CANCELLED` (ləğv + rədd), `BOOKING_COMPLETED`, `BOOKING_RESCHEDULE_PROPOSED`, `REVIEW_RECEIVED`, `MESSAGE_RECEIVED` (söhbət üzrə dedupe), `ADMIN_ANNOUNCEMENT`.
+> **Kanal qaydası:** zəng / `/notifications` = yalnız `ADMIN_*`; sifariş = booking badge; mesaj = söhbət; rəy = review badge.
+> Emit olunanlar: `BOOKING_CREATED`, `BOOKING_CONFIRMED`, `BOOKING_REJECTED`, `BOOKING_CANCELLED`, `BOOKING_IN_PROGRESS`, `BOOKING_COMPLETED`, `BOOKING_RESCHEDULE_PROPOSED`, `BOOKING_RESCHEDULE_REJECTED` (tarix təklifi rədd — sifariş PENDING qalır), `REVIEW_RECEIVED`, `MESSAGE_RECEIVED` (söhbət üzrə dedupe), `ADMIN_ANNOUNCEMENT`. Admin `CONFIRMED`/`REJECTED` keçidləri də müştəriyə in-app bildiriş göndərir.
 > Review unread: `GET/POST …/review-unread-count` / `review-read-all`.
+> In-app create-dən sonra best-effort **push** (DeviceToken + FCM/noop). Kritik statuslar üçün **SMS** yalnız `SMS_STATUS_ENABLED=true` və `user.phone` olduqda.
+
+---
+
+## Devices (Faza 5)
+
+### GET /devices/tokens 🔒
+
+Qeydiyyatlı cihaz tokenləri (maskalanmış preview).
+
+### POST /devices/tokens 🔒
+
+Body: `{ token, platform: WEB|ANDROID|IOS }`. Upsert (eyni token → user/platform yenilənir).
+
+### DELETE /devices/tokens 🔒
+
+Body: `{ token }`.
+
+---
+
+## Payments (Faza 5 — flag-gated)
+
+> **`PAYMENTS_ENABLED=true` olmadıqda** bütün `/payments/*` → **501** `"Ödəniş hələ aktiv deyil"`. Booking axını ödəniş tələb etmir. `NEXT_PUBLIC_PAYMENTS_ENABLED` default `false` — checkout UI yoxdur.
+
+### POST /payments/intents 🔒 CUSTOMER
+
+Intent yarat. **`bookingId` məcburi**; məbləğ serverdə `booking.totalPrice`-dan götürülür (`amount` göndərilsə uyğun olmalıdır). Header: `Idempotency-Key` (opsional). Body: `{ bookingId, amount?, currency?, idempotencyKey? }`.
+
+### GET /payments/:id 🔒 CUSTOMER | PROVIDER | ADMIN
+
+Yalnız sifariş iştirakçısı / admin. `bookingId=null` orphan ödəniş əlçatan deyil.
+
+### POST /payments/:id/authorize 🔒 CUSTOMER
+
+### POST /payments/:id/capture 🔒 CUSTOMER
+
+### POST /payments/:id/refund 🔒 ADMIN
+
+Provider: `PAYMENT_PROVIDER=noop|stripe` (stripe = skeleton, real charge / webhook hələ yox).
 
 ---
 
@@ -342,9 +483,37 @@ Query: `status` (`PENDING`|`APPROVED`|`REJECTED`).
 
 Body: `{ "status": "APPROVED"|"REJECTED" }` — reytinq aggregate yenilənir.
 
+### GET /admin/reports
+
+Query: `status` (`PENDING`|`RESOLVED`|`DISMISSED`).
+
+### PATCH /admin/reports/:id/status
+
+Body: `{ "status": "RESOLVED"|"DISMISSED", "adminNote?" }` — şikayəti bağlayır.
+
 ### POST /admin/announcements
 
 Body: `{ "title", "body", "roles?": ["CUSTOMER"|"PROVIDER"] }` — boş `roles` = bütün aktiv istifadəçilər.
+
+---
+
+## Reports (şikayət)
+
+### POST /reports 🔒
+
+İstifadəçi şikayəti. E-poçt təsdiqi məcburi. Throttle: 5/dəq.
+
+**Body:**
+```json
+{
+  "targetType": "BOOKING"|"SERVICE"|"USER"|"MESSAGE"|"OTHER",
+  "targetId": "uuid (OTHER üçün opsional)",
+  "reason": "SPAM"|"FRAUD"|"ABUSE"|"INAPPROPRIATE"|"NO_SHOW"|"OTHER",
+  "description": "Ən azı 10 simvol"
+}
+```
+
+**Response:** `201` — `ReportSummary`. Admin inbox-a best-effort e-poçt.
 
 ---
 
@@ -369,6 +538,38 @@ Limit: 10 req/dəq, 30/saat/user; e-poçt təsdiqi məcburi; orphan TTL 24 saat.
   "service": "xidmetal-api"
 }
 ```
+
+### GET /health/ready
+
+DB + Redis readiness. `REDIS_URL` varsa Redis ping; production-da `REDIS_URL` yoxdursa **503** (`redis: "missing"`). Dev-də Redis olmadan `redis: "not_configured"` ilə ok ola bilər.
+
+---
+
+## Metrics
+
+### GET /metrics 🌐
+
+Prometheus exposition format (`text/plain; version=0.0.4` / OpenMetrics). Prefix: global `/api/v1` → tam yol **`GET /api/v1/metrics`**.
+
+- **Auth:** Development-də `METRICS_TOKEN` boşdursa açıq. **Production-da token məcburidir** (`Authorization: Bearer <token>`). Prometheus scrape üçün `ops/prometheus/prometheus.yml` nümunəsinə baxın.
+- **Throttle:** skip (`@SkipThrottle`) — scrape rate-limit-ə düşməsin.
+- **Cardinality:** HTTP route label-ləri parametrləri normalize edir (`/bookings/:id`, UUID yox).
+- Nümunə seriyalar: `xidmetal_http_request_duration_seconds`, `xidmetal_bookings_created_total{type}`, `xidmetal_dispatch_offers_total{result}`, `xidmetal_ws_connections`, `xidmetal_payments_intents_total`, default process (`xidmetal_process_*`).
+
+```bash
+curl -s http://localhost:4000/api/v1/metrics | head
+# Production:
+# curl -s -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:4000/api/v1/metrics
+```
+
+---
+
+## Contact
+
+### POST /contact 🌐
+
+Public əlaqə formu. Body: `name`, `email`, `phone?`, `subject`, `message`, `captchaToken?`, `website?` (honeypot).
+Throttle: 5/dəq. `TURNSTILE_SECRET_KEY` setdirsə captcha məcburidir. Mesaj `CONTACT_INBOX_EMAIL` (və ya `SMTP_FROM`) ünvanına göndərilir.
 
 ---
 

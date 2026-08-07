@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ClipboardList, MessageSquare, Search, ArrowRight } from 'lucide-react';
-import { BookingStatus } from '@xidmetal/shared';
+import { BookingStatus, ACTIVE_BOOKING_STATUSES } from '@xidmetal/shared';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { buttonStyles } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,13 +35,9 @@ export default function CustomerOverviewPage() {
     refetchOnWindowFocus: true,
   });
 
+  const activeSet = new Set<string>(ACTIVE_BOOKING_STATUSES);
   const activeBookings =
-    bookings?.items.filter(
-      (b) =>
-        b.status === BookingStatus.PENDING ||
-        b.status === BookingStatus.CONFIRMED ||
-        b.status === BookingStatus.IN_PROGRESS,
-    ).length ?? 0;
+    bookings?.items.filter((b) => activeSet.has(b.status)).length ?? 0;
 
   const completedBookings =
     bookings?.items.filter((b) => b.status === BookingStatus.COMPLETED).length ?? 0;

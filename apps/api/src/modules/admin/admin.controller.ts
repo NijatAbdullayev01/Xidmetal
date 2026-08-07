@@ -13,12 +13,14 @@ import { UserRole } from '@xidmetal/shared';
 import { AdminService } from './admin.service';
 import {
   AdminBookingsQueryDto,
+  AdminReportsQueryDto,
   AdminReviewsQueryDto,
   AdminServicesQueryDto,
   AdminUsersQueryDto,
   CreateAnnouncementDto,
   CreateCategoryDto,
   SetProviderVerifiedDto,
+  SetReportStatusDto,
   SetReviewStatusDto,
   SetServiceStatusDto,
   SetUserActiveDto,
@@ -116,6 +118,22 @@ export class AdminController {
   @ApiOperation({ summary: 'Rəyi təsdiqlə / rədd et' })
   setReviewStatus(@Param('id') id: string, @Body() dto: SetReviewStatusDto) {
     return this.adminService.setReviewStatus(id, dto);
+  }
+
+  @Get('reports')
+  @ApiOperation({ summary: 'Şikayətlər siyahısı' })
+  listReports(@Query() query: AdminReportsQueryDto) {
+    return this.adminService.listReports(query);
+  }
+
+  @Patch('reports/:id/status')
+  @ApiOperation({ summary: 'Şikayəti həll et / rədd et' })
+  setReportStatus(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: SetReportStatusDto,
+  ) {
+    return this.adminService.setReportStatus(id, adminId, dto);
   }
 
   @Post('announcements')
