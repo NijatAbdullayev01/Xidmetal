@@ -55,7 +55,7 @@ export default function AdminUsersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">İstifadəçilər</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Müştərilər</h1>
         <p className="mt-1 text-muted-foreground">
           Müştəri hesablarını axtarın, filtrələyin və aktivlik statusunu idarə edin.
         </p>

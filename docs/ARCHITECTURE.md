@@ -169,7 +169,7 @@ Keçidlər shared `booking-lifecycle` + `bookings.service` rol matrisi ilə yoxl
 - **Health:** `/health` liveness, `/health/ready` DB readiness
 - **Metrics:** `/api/v1/metrics` Prometheus exposition (lokal açıq; prod-da opsional `METRICS_TOKEN`)
 
-**Qeyd:** server-side logout/revoke, şifrə unutma və e-poçt verify mövcuddur. Login soft qalır (unverified user daxil ola bilir); **yazma** əməliyyatları (sifariş, mesaj, rəy, upload, xidmət yarat/yenilə/sil, təqvim yazıları, şikayət) `@RequireEmailVerified` ilə qorunur. Provider `isVerified` olmadan xidməti `ACTIVE` edə bilməz. Şəkillər `POST /uploads` ilə saxlanır (local və ya S3/R2); DB-də yalnız URL. Soft-delete: `User.deletedAt`; provider hard-delete `Restrict` (xidmətləri gizli silmir).
+**Qeyd:** server-side logout/revoke, şifrə unutma və e-poçt verify mövcuddur. Login soft qalır (unverified user daxil ola bilir); **yazma** əməliyyatları (sifariş, mesaj, rəy, upload, xidmət yarat/yenilə/sil, təqvim yazıları, şikayət) `@RequireEmailVerified` ilə qorunur. Provider `providerProfile.isVerified` olmadan xidməti yoxlamaya göndərə, onlayn ola və ictimai siyahıda görünə bilməz. Xidmət paylaşımı: `DRAFT`/`NEEDS_REVISION` → `PENDING_REVIEW` → admin təsdiqi → `ACTIVE` (və ya düzəliş qeydi ilə `NEEDS_REVISION`). Admin təsdiqi ləğvində aktiv xidmətlər `PAUSED` olur. Şəkillər `POST /uploads` ilə saxlanır (local və ya S3/R2); DB-də yalnız URL. Soft-delete: `User.deletedAt`; provider hard-delete `Restrict` (xidmətləri gizli silmir).
 
 ## Scalability planı
 

@@ -60,6 +60,8 @@ export enum DevicePlatform {
 
 export enum ServiceStatus {
   DRAFT = 'DRAFT',
+  PENDING_REVIEW = 'PENDING_REVIEW',
+  NEEDS_REVISION = 'NEEDS_REVISION',
   ACTIVE = 'ACTIVE',
   PAUSED = 'PAUSED',
   ARCHIVED = 'ARCHIVED',

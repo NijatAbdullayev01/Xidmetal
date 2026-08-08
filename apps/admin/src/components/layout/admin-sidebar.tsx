@@ -35,7 +35,7 @@ interface NavItem {
 
 const ADMIN_NAV: NavItem[] = [
   { href: '/', label: 'İcmal', icon: LayoutDashboard, exact: true },
-  { href: '/users', label: 'İstifadəçilər', icon: Users },
+  { href: '/users', label: 'Müştərilər', icon: Users },
   { href: '/providers', label: 'Xidmət verənlər', icon: ShieldCheck },
   { href: '/categories', label: 'Kateqoriyalar', icon: FolderTree },
   { href: '/services', label: 'Xidmətlər', icon: Briefcase },

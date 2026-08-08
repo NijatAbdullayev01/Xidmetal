@@ -1,18 +1,37 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { buttonStyles } from '@/components/ui/button';
+import { api } from '@/lib/api';
+import { useAuthToken } from '@/hooks/use-auth-token';
 import { cn } from '@/lib/utils';
 
 /**
- * Provider təsdiqlənməyibsə dashboard/services-də göstərilir.
+ * Xidmət verən admin təsdiqi gözləyirsə dashboard-da göstərilir.
+ * `/users/me` ilə sinxron — auth store login zamanı köhnə ola bilər.
  */
 export function ProviderVerificationBanner({ className }: { className?: string }) {
-  const user = useAuthStore((s) => s.user);
-  const profile = user?.providerProfile;
+  const token = useAuthToken();
+  const updateUser = useAuthStore((s) => s.updateUser);
+  const authProfile = useAuthStore((s) => s.user?.providerProfile);
 
+  const { data: me } = useQuery({
+    queryKey: ['users', 'me'],
+    queryFn: () => api.users.me(token!),
+    enabled: !!token,
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (!me?.providerProfile) return;
+    updateUser({ providerProfile: me.providerProfile });
+  }, [me, updateUser]);
+
+  const profile = me?.providerProfile ?? authProfile;
   if (!profile || profile.isVerified) return null;
 
   return (
@@ -34,8 +53,9 @@ export function ProviderVerificationBanner({ className }: { className?: string }
               Hesabınız hələ təsdiqlənməyib
             </p>
             <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
-              Xidmətlərinizi «Aktiv» etmək üçün admin təsdiqi lazımdır. Profilinizi
-              tamamlayın və bələdçini oxuyun — komandamız qısa zamanda yoxlayacaq.
+              Admin təsdiqinə qədər xidmətlərinizi aktivləşdirə, onlayn ola və sifariş
+              qəbul edə bilməzsiniz. Profilinizi tamamlayın — komandamız qısa zamanda
+              yoxlayacaq.
             </p>
           </div>
         </div>

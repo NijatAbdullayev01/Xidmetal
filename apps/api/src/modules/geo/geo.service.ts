@@ -13,6 +13,10 @@ import {
   type NearbyProviderSummary,
 } from '@xidmetal/shared';
 import { PrismaService } from '../../common/database/prisma.service';
+import {
+  assertProviderVerified,
+  isProviderDutyAvailability,
+} from '../../common/provider/assert-provider-verified';
 import { GEOCODER_ADAPTER, type GeocoderAdapter } from './geocoder';
 import type {
   NearbyProvidersQueryDto,
@@ -68,6 +72,10 @@ export class GeoService {
     const now = new Date();
     const availability = dto.availability ?? profile.availability;
 
+    if (isProviderDutyAvailability(availability)) {
+      await assertProviderVerified(this.prisma, userId);
+    }
+
     await this.prisma.providerProfile.update({
       where: { id: profile.id },
       data: {
@@ -91,6 +99,10 @@ export class GeoService {
   }
 
   async updateMyAvailability(userId: string, dto: UpdateProviderAvailabilityDto) {
+    if (isProviderDutyAvailability(dto.availability)) {
+      await assertProviderVerified(this.prisma, userId);
+    }
+
     const profile = await this.ensureProviderProfile(userId);
     const updated = await this.prisma.providerProfile.update({
       where: { id: profile.id },
@@ -183,6 +195,7 @@ export class GeoService {
           WHERE u.role = 'PROVIDER'::"UserRole"
             AND u.is_active = true
             AND u.deleted_at IS NULL
+            AND pp.is_verified = true
             AND pp.availability = 'ONLINE'::"ProviderAvailability"
             AND pp.last_location IS NOT NULL
             AND ST_DWithin(
@@ -221,6 +234,7 @@ export class GeoService {
           WHERE u.role = 'PROVIDER'::"UserRole"
             AND u.is_active = true
             AND u.deleted_at IS NULL
+            AND pp.is_verified = true
             AND pp.availability = 'ONLINE'::"ProviderAvailability"
             AND pp.last_location IS NOT NULL
             AND ST_DWithin(
@@ -251,6 +265,7 @@ export class GeoService {
 
     const profiles = await this.prisma.providerProfile.findMany({
       where: {
+        isVerified: true,
         availability: ProviderAvailability.ONLINE,
         lastLat: { not: null },
         lastLng: { not: null },

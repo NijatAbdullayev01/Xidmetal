@@ -27,13 +27,15 @@ test.describe('Kritik axınlar (UI)', () => {
     await expect(page.getByText(/şifrə|bərpa/i).first()).toBeVisible();
   });
 
-  test('xidmət detallarına keçid mümkündür', async ({ page }) => {
+  test('xidmət kartı preview pop-up açır', async ({ page }) => {
     await page.goto('/services');
-    const firstLink = page.locator('a[href^="/services/"]').first();
-    const count = await firstLink.count();
+    const firstCard = page
+      .getByRole('button', { name: /şəkillər və təsvir/i })
+      .first();
+    const count = await firstCard.count();
     test.skip(count === 0, 'Kataloqda xidmət yoxdur');
-    await firstLink.click();
-    await expect(page).toHaveURL(/\/services\/.+/);
-    await expect(page.getByRole('heading').first()).toBeVisible();
+    await firstCard.click();
+    await expect(page).toHaveURL(/\/services\/?$/);
+    await expect(page.getByRole('dialog')).toBeVisible();
   });
 });

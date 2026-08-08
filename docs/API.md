@@ -169,7 +169,7 @@ Xidmət detalları (şəkillər, venue, yük ölçüləri / `cargoRouteScope` v�
 
 ### POST /services 🔒 PROVIDER
 
-Yeni xidmət. Qiymət, kateqoriya, təsvir, şəkillər (**http(s) URL** — `POST /uploads`), `serviceVenue`, (yükdaşıma) `vehicleLength` / `vehicleWidth` / `vehicleHeight`, `cargoRouteScope`. E-poçt təsdiqi məcburidir. `ACTIVE` status üçün provider admin-təsdiqli olmalıdır.
+Yeni xidmət. Qiymət, kateqoriya, təsvir, şəkillər (**http(s) URL** — `POST /uploads`), `serviceVenue`, (yükdaşıma) `vehicleLength` / `vehicleWidth` / `vehicleHeight`, `cargoRouteScope`. E-poçt təsdiqi məcburidir. `ACTIVE` birbaşa təyin olunmur — `POST /services/:id/submit-review` ilə `PENDING_REVIEW`; admin təsdiqindən sonra görünür.
 
 ### PATCH /services/:id 🔒 PROVIDER/ADMIN
 
@@ -455,7 +455,7 @@ Body: `{ "isActive": boolean }` — deaktivdə refresh token-lər silinir.
 
 ### PATCH /admin/providers/:userId/verify
 
-Body: `{ "isVerified": boolean }`.
+Body: `{ "isVerified": boolean }`. Təsdiq ləğvində aktiv xidmətlər `PAUSED`, əlçatanlıq `OFFLINE` olur və xidmət verənə bildiriş göndərilir.
 
 ### GET /admin/categories
 
@@ -471,7 +471,19 @@ Query: `page`, `limit`, `status`, `categoryId`, `search`.
 
 ### PATCH /admin/services/:id/status
 
-Body: `{ "status": "DRAFT"|"ACTIVE"|"PAUSED"|"ARCHIVED" }`.
+Body: `{ "status": "ACTIVE" | "PAUSED" | "ARCHIVED" | … }`. `ACTIVE` → `approveService` ilə eyni (profil təsdiqi tələb olunur).
+
+### PATCH /admin/services/:id/approve
+
+Yoxlamada olan xidməti təsdiqləyir (`ACTIVE`), xidmət verənə bildiriş göndərir.
+
+### PATCH /admin/services/:id/request-revision
+
+Body: `{ "note": string }` (min 5). Status → `NEEDS_REVISION`; qeyd xidmət verənə görünür.
+
+### POST /services/:id/submit-review
+
+Xidmət verən: `DRAFT` / `NEEDS_REVISION` → `PENDING_REVIEW`. Hesab təsdiqi məcburidir.
 
 ### GET /admin/bookings
 

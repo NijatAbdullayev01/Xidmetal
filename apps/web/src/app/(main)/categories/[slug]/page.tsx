@@ -33,7 +33,8 @@ const loadCategoryData = cache(async (slug: string): Promise<{
     if (error instanceof ApiError && error.status === 404) {
       return null;
     }
-    return null;
+    // Şəbəkə / SSR xətalarını "tapılmadı" kimi gizlətmə — Next error boundary göstərsin
+    throw error;
   }
 });
 

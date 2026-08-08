@@ -18,6 +18,7 @@ import type {
   AdminSetUserActiveInput,
   AdminSetProviderVerifiedInput,
   AdminSetServiceStatusInput,
+  AdminRequestServiceRevisionInput,
   AdminSetReviewStatusInput,
   AdminSetReportStatusInput,
   AdminAnnouncementInput,
@@ -25,7 +26,23 @@ import type {
 import { BookingStatus, CLIENT_APP, CLIENT_APP_HEADER } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+/**
+ * Brauzer: boş base → eyni origin (next.config rewrite → API).
+ * SSR: Node absolute URL tələb edir → API_URL / INTERNAL_API_URL.
+ */
+function resolveApiBaseUrl(): string {
+  const fromPublic = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (fromPublic) return fromPublic.replace(/\/$/, '');
+
+  if (typeof window !== 'undefined') return '';
+
+  const internal =
+    process.env.API_URL?.trim() ||
+    process.env.INTERNAL_API_URL?.trim() ||
+    'http://localhost:4000';
+  return internal.replace(/\/$/, '');
+}
+
 const API_PREFIX = '/api/v1';
 
 export class ApiError extends Error {
@@ -51,7 +68,7 @@ async function refreshAccessToken(): Promise<string | null> {
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
-        const response = await fetch(`${API_URL}${API_PREFIX}/auth/refresh`, {
+        const response = await fetch(`${resolveApiBaseUrl()}${API_PREFIX}/auth/refresh`, {
           method: 'POST',
           credentials: 'include',
           headers: {
@@ -86,7 +103,7 @@ export async function apiClient<T>(
 ): Promise<T> {
   const { token, headers, ...rest } = options;
 
-  const response = await fetch(`${API_URL}${API_PREFIX}${endpoint}`, {
+  const response = await fetch(`${resolveApiBaseUrl()}${API_PREFIX}${endpoint}`, {
     ...rest,
     credentials: 'include',
     ...(token ? { cache: 'no-store' as const } : {}),
@@ -201,6 +218,21 @@ export const api = {
     },
     setServiceStatus: (token: string, id: string, data: AdminSetServiceStatusInput) =>
       apiClient<ServiceSummary>(`/admin/services/${id}/status`, {
+        method: 'PATCH',
+        token,
+        body: JSON.stringify(data),
+      }),
+    approveService: (token: string, id: string) =>
+      apiClient<ServiceSummary>(`/admin/services/${id}/approve`, {
+        method: 'PATCH',
+        token,
+      }),
+    requestServiceRevision: (
+      token: string,
+      id: string,
+      data: AdminRequestServiceRevisionInput,
+    ) =>
+      apiClient<ServiceSummary>(`/admin/services/${id}/request-revision`, {
         method: 'PATCH',
         token,
         body: JSON.stringify(data),

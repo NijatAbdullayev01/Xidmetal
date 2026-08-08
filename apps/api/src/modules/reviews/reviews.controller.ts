@@ -37,7 +37,7 @@ export class ReviewsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.PROVIDER)
   @Get('received')
-  @ApiOperation({ summary: 'Provider-ə gələn rəylər (PENDING daxil)' })
+  @ApiOperation({ summary: 'Xidmət verənə gələn rəylər (PENDING daxil)' })
   findReceived(
     @CurrentUser('id') userId: string,
     @Query() query: ReviewQueryDto,

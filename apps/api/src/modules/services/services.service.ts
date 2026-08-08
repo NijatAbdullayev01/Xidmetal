@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/database/prisma.service';
 import { StorageService } from '../../common/storage/storage.service';
+import { assertProviderVerified } from '../../common/provider/assert-provider-verified';
 import { CreateServiceDto, UpdateServiceDto, ServiceQueryDto } from './dto';
 import {
   UserRole,
@@ -95,6 +96,11 @@ export class ServicesService {
     const where = {
       status: ServiceStatus.ACTIVE,
       category: { isActive: true },
+      provider: {
+        isActive: true,
+        deletedAt: null,
+        providerProfile: { isVerified: true },
+      },
       ...(categoryId && { categoryId }),
       ...(providerId && { providerId }),
       ...(search && {
@@ -178,6 +184,9 @@ export class ServicesService {
       throw new NotFoundException('Xidmət tapılmadı');
     }
     if (!service.category.isActive && !isOwner && !isAdmin) {
+      throw new NotFoundException('Xidmət tapılmadı');
+    }
+    if (!service.provider.providerProfile?.isVerified && !isOwner && !isAdmin) {
       throw new NotFoundException('Xidmət tapılmadı');
     }
 
@@ -369,16 +378,8 @@ export class ServicesService {
       }
     }
 
-    if (dto.status === ServiceStatus.ACTIVE && role !== UserRole.ADMIN) {
-      const profile = await this.prisma.providerProfile.findUnique({
-        where: { userId: service.providerId },
-        select: { isVerified: true },
-      });
-      if (!profile?.isVerified) {
-        throw new ForbiddenException(
-          'Xidməti aktivləşdirmək üçün hesabınız admin tərəfindən təsdiqlənməlidir',
-        );
-      }
+    if (dto.status !== undefined && role !== UserRole.ADMIN) {
+      this.assertProviderStatusTransition(service.status, dto.status);
     }
 
     const { images, vehicleLength, vehicleWidth, vehicleHeight, cargoRouteScope, ...serviceFields } =
@@ -448,6 +449,66 @@ export class ServicesService {
     return this.mapService({ ...updated, provider: undefined });
   }
 
+  /**
+   * Xidmət verən elanı admin yoxlamasına göndərir.
+   * DRAFT | NEEDS_REVISION → PENDING_REVIEW (hesab təsdiqi məcburidir).
+   */
+  async submitForReview(id: string, providerId: string) {
+    const service = await this.prisma.service.findUnique({
+      where: { id },
+      include: {
+        category: { select: { id: true, name: true, slug: true, isActive: true } },
+        images: SERVICE_IMAGES_INCLUDE,
+      },
+    });
+    if (!service) throw new NotFoundException('Xidmət tapılmadı');
+    if (service.providerId !== providerId) {
+      throw new ForbiddenException('Bu xidməti yoxlamaya göndərmək icazəniz yoxdur');
+    }
+    if (!service.category.isActive) {
+      throw new BadRequestException('Bu kateqoriya hazırda aktiv deyil');
+    }
+
+    await assertProviderVerified(
+      this.prisma,
+      providerId,
+      'Yoxlamaya göndərmək üçün hesabınız admin tərəfindən təsdiqlənməlidir',
+    );
+
+    if (
+      service.status !== ServiceStatus.DRAFT &&
+      service.status !== ServiceStatus.NEEDS_REVISION
+    ) {
+      throw new BadRequestException(
+        'Yalnız qaralama və ya düzəliş tələb olunan xidmətlər yoxlamaya göndərilə bilər',
+      );
+    }
+
+    if (service.images.length < 1) {
+      throw new BadRequestException('Yoxlamaya göndərmək üçün ən azı 1 şəkil lazımdır');
+    }
+
+    this.assertCargoVehicleImages(
+      service.title,
+      service.images.map((image) => image.url),
+    );
+
+    const updated = await this.prisma.service.update({
+      where: { id },
+      data: {
+        status: ServiceStatus.PENDING_REVIEW,
+        submittedAt: new Date(),
+        // Köhnə düzəliş qeydi saxlanılır ki, admin müqayisə edə bilsin; təsdiqdə silinir
+      },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        images: SERVICE_IMAGES_INCLUDE,
+      },
+    });
+
+    return this.mapService({ ...updated, provider: undefined });
+  }
+
   async remove(id: string, userId: string, role: string) {
     const service = await this.prisma.service.findUnique({ where: { id } });
     if (!service) throw new NotFoundException('Xidmət tapılmadı');
@@ -484,6 +545,28 @@ export class ServicesService {
     await this.prisma.service.delete({ where: { id } });
     await this.storageService.deleteManyByPublicUrls(images.map((image) => image.url));
     return { message: 'Xidmət silindi' };
+  }
+
+  private assertProviderStatusTransition(from: ServiceStatus, to: ServiceStatus) {
+    if (from === to) return;
+
+    const allowed: Partial<Record<ServiceStatus, ServiceStatus[]>> = {
+      [ServiceStatus.ACTIVE]: [ServiceStatus.PAUSED, ServiceStatus.ARCHIVED],
+      [ServiceStatus.PAUSED]: [ServiceStatus.ACTIVE, ServiceStatus.ARCHIVED],
+      [ServiceStatus.DRAFT]: [ServiceStatus.ARCHIVED],
+      [ServiceStatus.PENDING_REVIEW]: [ServiceStatus.ARCHIVED],
+      [ServiceStatus.NEEDS_REVISION]: [ServiceStatus.ARCHIVED],
+    };
+
+    const next = allowed[from];
+    if (!next?.includes(to)) {
+      if (to === ServiceStatus.ACTIVE || to === ServiceStatus.PENDING_REVIEW) {
+        throw new ForbiddenException(
+          'Xidməti birbaşa aktivləşdirmək olmaz — «Yoxlamaya göndər» istifadə edin',
+        );
+      }
+      throw new ForbiddenException('Bu status keçidinə icazə verilmir');
+    }
   }
 
   private async countActiveBookingsByService(serviceIds: string[]) {
@@ -731,6 +814,9 @@ export class ServicesService {
     categoryId: string;
     providerId: string;
     status: string;
+    reviewNote?: string | null;
+    submittedAt?: Date | null;
+    reviewedAt?: Date | null;
     location: string | null;
     isRemote: boolean;
     serviceVenue?: string | null;
@@ -778,6 +864,9 @@ export class ServicesService {
       averageRating: service.averageRating ?? 0,
       reviewCount: service.reviewCount ?? 0,
       status: service.status,
+      reviewNote: service.reviewNote ?? null,
+      submittedAt: service.submittedAt?.toISOString() ?? null,
+      reviewedAt: service.reviewedAt?.toISOString() ?? null,
       location: service.location ?? undefined,
       isRemote: service.isRemote,
       serviceVenue: service.serviceVenue ?? undefined,

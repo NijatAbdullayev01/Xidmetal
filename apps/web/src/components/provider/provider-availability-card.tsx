@@ -44,6 +44,7 @@ export function ProviderAvailabilityCard() {
   });
 
   const profile = me?.providerProfile;
+  const isVerified = profile?.isVerified === true;
   const availability =
     (profile?.availability as ProviderAvailability | undefined) ?? ProviderAvailability.OFFLINE;
 
@@ -59,15 +60,19 @@ export function ProviderAvailabilityCard() {
   });
 
   const locationMutation = useMutation({
-    mutationFn: (coords: { lat: number; lng: number }) =>
-      api.geo.updateLocation(token!, {
+    mutationFn: (coords: { lat: number; lng: number }) => {
+      const nextAvailability = isVerified
+        ? availability === ProviderAvailability.OFFLINE
+          ? ProviderAvailability.ONLINE
+          : availability
+        : ProviderAvailability.OFFLINE;
+
+      return api.geo.updateLocation(token!, {
         lat: coords.lat,
         lng: coords.lng,
-        availability:
-          availability === ProviderAvailability.OFFLINE
-            ? ProviderAvailability.ONLINE
-            : availability,
-      }),
+        availability: nextAvailability,
+      });
+    },
     onSuccess: async () => {
       setGeoSuccess('Mövqe göndərildi');
       setGeoError(null);
@@ -110,6 +115,9 @@ export function ProviderAvailabilityCard() {
         <CardDescription>
           Onlayn = ani (on-demand) sifarişlərə hazırsınız. Mövqe göndərin ki, yaxınlıq
           axtarışında görünün. Bu, mesajlarda «son görülmə» (heartbeat) statusundan ayrıdır.
+          {!isVerified
+            ? ' Admin təsdiqinə qədər onlayn ola bilməzsiniz.'
+            : null}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -126,11 +134,20 @@ export function ProviderAvailabilityCard() {
                 next === ProviderAvailability.OFFLINE ||
                 next === ProviderAvailability.BUSY
               ) {
+                if (
+                  !isVerified &&
+                  (next === ProviderAvailability.ONLINE || next === ProviderAvailability.BUSY)
+                ) {
+                  setGeoError(
+                    'Onlayn olmaq üçün hesabınız admin tərəfindən təsdiqlənməlidir',
+                  );
+                  return;
+                }
                 availabilityMutation.mutate(next);
               }
             }}
             options={AVAILABILITY_OPTIONS}
-            disabled={!token || availabilityMutation.isPending}
+            disabled={!token || availabilityMutation.isPending || !isVerified}
             ariaLabel="Əlçatanlıq statusu"
           />
           <p className="text-sm text-muted-foreground">

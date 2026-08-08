@@ -23,6 +23,7 @@ import {
   SetReportStatusDto,
   SetReviewStatusDto,
   SetServiceStatusDto,
+  RequestServiceRevisionDto,
   SetUserActiveDto,
   UpdateCategoryDto,
 } from './dto';
@@ -100,6 +101,18 @@ export class AdminController {
   @ApiOperation({ summary: 'Xidmət statusunu dəyiş' })
   setServiceStatus(@Param('id') id: string, @Body() dto: SetServiceStatusDto) {
     return this.adminService.setServiceStatus(id, dto);
+  }
+
+  @Patch('services/:id/approve')
+  @ApiOperation({ summary: 'Xidməti təsdiqlə (PENDING_REVIEW → ACTIVE)' })
+  approveService(@Param('id') id: string) {
+    return this.adminService.approveService(id);
+  }
+
+  @Patch('services/:id/request-revision')
+  @ApiOperation({ summary: 'Xidməti düzəlişə göndər' })
+  requestServiceRevision(@Param('id') id: string, @Body() dto: RequestServiceRevisionDto) {
+    return this.adminService.requestServiceRevision(id, dto);
   }
 
   @Get('bookings')

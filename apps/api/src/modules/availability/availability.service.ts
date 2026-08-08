@@ -255,7 +255,7 @@ export class AvailabilityService {
     const days = await this.resolveSlots(serviceId, dateStr, dateStr, db);
     const day = days[0];
     if (!day || !day.hasCalendar) {
-      throw new BadRequestException('Provider hələ təqvim təyin etməyib');
+      throw new BadRequestException('Xidmət verən hələ təqvim təyin etməyib');
     }
 
     const slot = day.slots.find((s) => new Date(s.start).getTime() === scheduledAt.getTime());

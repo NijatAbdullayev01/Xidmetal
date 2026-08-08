@@ -11,11 +11,58 @@ import {
   Flag,
   FolderTree,
   ArrowRight,
+  UserCog,
+  type LucideIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { buttonStyles } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+
+interface StatCard {
+  label: string;
+  value: number | string;
+  /** Yalnız əsas rəqəmdən fərqli, əlavə kontekst verdikdə */
+  hint?: string;
+  icon: LucideIcon;
+  href: string;
+}
+
+function StatsGrid({
+  cards,
+  isLoading,
+}: {
+  cards: StatCard[];
+  isLoading: boolean;
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {cards.map((card) => {
+        const Icon = card.icon;
+        return (
+          <Link key={card.label} href={card.href}>
+            <Card className="h-full transition-colors hover:border-brand/50">
+              <CardContent className="flex items-start gap-4 p-6">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/15">
+                  <Icon className="h-5 w-5 text-brand-dark" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">{card.label}</p>
+                  <p className="text-2xl font-bold tabular-nums">
+                    {isLoading ? '…' : card.value}
+                  </p>
+                  {card.hint && (
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{card.hint}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function AdminOverviewPage() {
   const token = useAuthToken();
@@ -27,31 +74,26 @@ export default function AdminOverviewPage() {
     refetchInterval: 30_000,
   });
 
-  const cards = [
+  const inactiveServices =
+    stats != null ? stats.servicesTotal - stats.servicesActive : 0;
+
+  /** Moderasiya / növbə — yalnız diqqət tələb edən saylar */
+  const attentionCards: StatCard[] = [
     {
-      label: 'İstifadəçilər',
-      value: stats?.usersCustomers ?? '—',
-      hint: stats ? `Cəmi ${stats.usersTotal} hesab` : undefined,
-      icon: Users,
-      href: '/users',
-    },
-    {
-      label: 'Təsdiqlənməmiş provider',
+      label: 'Təsdiqlənməmiş xidmət verən',
       value: stats?.providersUnverified ?? '—',
       icon: ShieldCheck,
       href: '/providers',
     },
     {
-      label: 'Aktiv xidmətlər',
-      value: stats?.servicesActive ?? '—',
-      hint: stats ? `Cəmi ${stats.servicesTotal}` : undefined,
+      label: 'Yoxlama gözləyən xidmət',
+      value: stats?.servicesPendingReview ?? '—',
       icon: Briefcase,
       href: '/services',
     },
     {
       label: 'Gözləyən sifarişlər',
       value: stats?.bookingsPending ?? '—',
-      hint: stats ? `Cəmi ${stats.bookingsTotal}` : undefined,
       icon: ClipboardList,
       href: '/bookings',
     },
@@ -66,6 +108,38 @@ export default function AdminOverviewPage() {
       value: stats?.reportsPending ?? '—',
       icon: Flag,
       href: '/reports',
+    },
+  ];
+
+  /** Platforma icmalı — hər kart bir entity, qarışıq «cəmi» yox */
+  const overviewCards: StatCard[] = [
+    {
+      label: 'Müştərilər',
+      value: stats?.usersCustomers ?? '—',
+      icon: Users,
+      href: '/users',
+    },
+    {
+      label: 'Xidmət verənlər',
+      value: stats?.usersProviders ?? '—',
+      icon: UserCog,
+      href: '/providers',
+    },
+    {
+      label: 'Aktiv xidmətlər',
+      value: stats?.servicesActive ?? '—',
+      hint:
+        stats != null && inactiveServices > 0
+          ? `${inactiveServices} qeyri-aktiv`
+          : undefined,
+      icon: Briefcase,
+      href: '/services',
+    },
+    {
+      label: 'Sifarişlər',
+      value: stats?.bookingsTotal ?? '—',
+      icon: ClipboardList,
+      href: '/bookings',
     },
     {
       label: 'Aktiv kateqoriya',
@@ -84,31 +158,23 @@ export default function AdminOverviewPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Link key={card.label} href={card.href}>
-              <Card className="h-full transition-colors hover:border-brand/50">
-                <CardContent className="flex items-start gap-4 p-6">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/15">
-                    <Icon className="h-5 w-5 text-brand-dark" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm text-muted-foreground">{card.label}</p>
-                    <p className="text-2xl font-bold tabular-nums">
-                      {isLoading ? '…' : card.value}
-                    </p>
-                    {card.hint && (
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{card.hint}</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold tracking-tight">Diqqət tələb edir</h2>
+          <p className="text-xs text-muted-foreground">
+            Təsdiq və ya moderasiya gözləyən işlər
+          </p>
+        </div>
+        <StatsGrid cards={attentionCards} isLoading={isLoading} />
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold tracking-tight">Platforma</h2>
+          <p className="text-xs text-muted-foreground">Hesablar, xidmətlər və sifarişlər</p>
+        </div>
+        <StatsGrid cards={overviewCards} isLoading={isLoading} />
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -118,7 +184,7 @@ export default function AdminOverviewPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             {[
-              { href: '/providers', label: 'Provider təsdiqi' },
+              { href: '/providers', label: 'Xidmət verən təsdiqi' },
               { href: '/reviews', label: 'Rəy moderasiyası' },
               { href: '/categories', label: 'Kateqoriya idarəsi' },
               { href: '/announcements', label: 'Platforma bildirişi' },
@@ -146,8 +212,9 @@ export default function AdminOverviewPage() {
               verilənlər bazası vasitəsilə əlavə olunur.
             </p>
             <p>
-              İstifadəçini deaktiv etmək aktiv sessiyaları ləğv edir. Provider təsdiqi
-              etibar nişanıdır; rəylər təsdiqlənənə qədər ictimai siyahıda görünmür.
+              Müştərini deaktiv etmək aktiv sessiyaları ləğv edir. Xidmət verən
+              təsdiqi etibar nişanıdır; rəylər təsdiqlənənə qədər ictimai siyahıda
+              görünmür.
             </p>
           </CardContent>
         </Card>

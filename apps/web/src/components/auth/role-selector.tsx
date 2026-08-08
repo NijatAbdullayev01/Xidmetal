@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 const roles = [
   {
     value: UserRole.CUSTOMER,
-    label: 'İstifadəçi',
+    label: 'Müştəri',
     description: 'Xidmət sifariş etmək və xidmət verən tapmaq üçün',
     icon: User,
   },

@@ -13,6 +13,7 @@ const apiOrigin = (
 const nextConfig: NextConfig = {
   transpilePackages: ['@xidmetal/shared'],
   images: {
+    qualities: [75, 100],
     remotePatterns: [
       { protocol: 'https', hostname: '**' },
       { protocol: 'http', hostname: 'localhost' },

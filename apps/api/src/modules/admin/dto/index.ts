@@ -225,6 +225,14 @@ export class SetServiceStatusDto {
   status!: ServiceStatus;
 }
 
+export class RequestServiceRevisionDto {
+  @ApiProperty({ minLength: 5, maxLength: 2000 })
+  @IsString()
+  @MinLength(5, { message: 'Düzəliş qeydi minimum 5 simvol olmalıdır' })
+  @MaxLength(2000, { message: 'Düzəliş qeydi maksimum 2000 simvol ola bilər' })
+  note!: string;
+}
+
 export class SetReviewStatusDto {
   @ApiProperty({ enum: [ReviewStatus.APPROVED, ReviewStatus.REJECTED] })
   @IsEnum(ReviewStatus)

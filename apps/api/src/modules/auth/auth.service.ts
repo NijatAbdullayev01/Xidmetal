@@ -18,7 +18,7 @@ import {
   ResetPasswordDto,
   ConfirmEmailVerificationDto,
 } from './dto';
-import { CLIENT_APP, UserRole, type ClientApp } from '@xidmetal/shared';
+import { CLIENT_APP, ProviderAvailability, UserRole, type ClientApp } from '@xidmetal/shared';
 import { parseDurationMs } from '../../common/auth/auth-cookies';
 import { assertValidEmailCode } from '../../common/auth/email-verification-codes';
 import { hashRefreshToken } from '../../common/auth/refresh-token';
@@ -98,6 +98,7 @@ export class AuthService {
             providerProfile: { create: {} },
           }),
         },
+        include: { providerProfile: true },
       });
     } catch (error) {
       if (
@@ -132,7 +133,10 @@ export class AuthService {
   async login(dto: LoginDto, clientApp: ClientApp) {
     await this.captcha.assertValid(dto.captchaToken);
     const email = dto.email.trim().toLowerCase();
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { providerProfile: true },
+    });
     const usable =
       user && user.isActive && !user.deletedAt ? user : null;
 
@@ -192,6 +196,7 @@ export class AuthService {
             isActive: true,
             deletedAt: true,
             createdAt: true,
+            providerProfile: true,
           },
         },
       },
@@ -347,6 +352,7 @@ export class AuthService {
         isActive: true,
         deletedAt: true,
         createdAt: true,
+        providerProfile: true,
       },
     });
 
@@ -386,6 +392,7 @@ export class AuthService {
           role: true,
           isVerified: true,
           createdAt: true,
+          providerProfile: true,
         },
       });
     });
@@ -480,6 +487,20 @@ export class AuthService {
     role: string;
     isVerified: boolean;
     createdAt: Date;
+    providerProfile?: {
+      id: string;
+      bio: string | null;
+      experience: number | null;
+      location: string | null;
+      isVerified: boolean;
+      rating: number;
+      reviewCount: number;
+      availability: string;
+      lastLat: number | null;
+      lastLng: number | null;
+      lastHeading: number | null;
+      locationUpdatedAt: Date | null;
+    } | null;
   }) {
     return {
       id: user.id,
@@ -491,6 +512,25 @@ export class AuthService {
       role: user.role,
       isVerified: user.isVerified,
       createdAt: user.createdAt.toISOString(),
+      providerProfile: user.providerProfile
+        ? {
+            id: user.providerProfile.id,
+            bio: user.providerProfile.bio ?? undefined,
+            experience: user.providerProfile.experience ?? undefined,
+            location: user.providerProfile.location ?? undefined,
+            isVerified: user.providerProfile.isVerified,
+            rating: user.providerProfile.rating,
+            reviewCount: user.providerProfile.reviewCount,
+            availability:
+              (user.providerProfile.availability as ProviderAvailability | undefined) ??
+              ProviderAvailability.OFFLINE,
+            lastLat: user.providerProfile.lastLat ?? null,
+            lastLng: user.providerProfile.lastLng ?? null,
+            lastHeading: user.providerProfile.lastHeading ?? null,
+            locationUpdatedAt:
+              user.providerProfile.locationUpdatedAt?.toISOString() ?? null,
+          }
+        : undefined,
     };
   }
 }

@@ -50,7 +50,7 @@ export class GeoController {
   @Roles(UserRole.PROVIDER)
   @Post('me/location')
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Provider mövqeyini yenilə (lat/lng/heading)' })
+  @ApiOperation({ summary: 'Xidmət verənin mövqeyini yenilə (lat/lng/heading)' })
   updateLocation(
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateProviderLocationDto,
@@ -63,7 +63,7 @@ export class GeoController {
   @Roles(UserRole.PROVIDER)
   @Patch('me/availability')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Provider əlçatanlığını yenilə (ONLINE/OFFLINE/BUSY)' })
+  @ApiOperation({ summary: 'Xidmət verənin əlçatanlığını yenilə (ONLINE/OFFLINE/BUSY)' })
   updateAvailability(
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateProviderAvailabilityDto,

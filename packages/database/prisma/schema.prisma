@@ -153,6 +153,8 @@ model Category {
 
 enum ServiceStatus {
   DRAFT
+  PENDING_REVIEW
+  NEEDS_REVISION
   ACTIVE
   PAUSED
   ARCHIVED
@@ -195,6 +197,12 @@ model Service {
   /** Yükdaşıma: şəhərdaxili / şəhərlərarası */
   cargoRouteScope CargoRouteScope? @map("cargo_route_scope")
   status      ServiceStatus @default(DRAFT)
+  /** Admin düzəliş qeydi — NEEDS_REVISION olduqda xidmət verənə göstərilir */
+  reviewNote  String?   @map("review_note")
+  /** Yoxlamaya göndərilmə vaxtı */
+  submittedAt DateTime? @map("submitted_at")
+  /** Son admin qərarı (təsdiq / düzəliş) */
+  reviewedAt  DateTime? @map("reviewed_at")
   providerId  String        @map("provider_id")
   categoryId  String        @map("category_id")
   createdAt   DateTime      @default(now()) @map("created_at")

@@ -55,7 +55,7 @@ export class CreateBookingDto {
     enum: BookingType,
     default: BookingType.SCHEDULED,
     description:
-      'SCHEDULED (default) — slot + əl ilə təsdiq. INSTANT — yaxın provider-lərə avto-dispatch.',
+      'SCHEDULED (default) — slot + əl ilə təsdiq. INSTANT — yaxın xidmət verənlərə avto-dispatch.',
   })
   @IsOptional()
   @IsEnum(BookingType)

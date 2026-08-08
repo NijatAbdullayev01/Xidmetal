@@ -110,6 +110,12 @@ export function NewServiceForm() {
     queryKey: ['categories'],
     queryFn: () => api.categories(),
   });
+  const { data: me } = useQuery({
+    queryKey: ['users', 'me'],
+    queryFn: () => api.users.me(token!),
+    enabled: !!token,
+  });
+  const isProviderVerified = me?.providerProfile?.isVerified === true;
   const [currentStep, setCurrentStep] = useState(1);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -178,7 +184,15 @@ export function NewServiceForm() {
           : {}),
         images: serviceImages,
       });
-      return api.updateService(token, service.id, { status: 'ACTIVE' });
+      const profile = await queryClient.fetchQuery({
+        queryKey: ['users', 'me'],
+        queryFn: () => api.users.me(token),
+      });
+      // Admin hesab təsdiqi + xidmət yoxlaması — qaralama saxlanılır və ya yoxlamaya gedir
+      if (!profile.providerProfile?.isVerified) {
+        return service;
+      }
+      return api.submitServiceForReview(token, service.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services', 'mine'] });
@@ -827,7 +841,9 @@ export function NewServiceForm() {
                       Məlumatların düzgünlüyünü təsdiq edirəm
                     </span>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      Xidmətinizi yalnız siz təsdiqlədikdən sonra müştərilərə görünən olacaq.
+                      {isProviderVerified
+                        ? 'Xidmət yaradıldıqdan sonra admin yoxlamasına göndəriləcək. Təsdiqdən sonra müştərilərə görünəcək.'
+                        : 'Hesabınız hələ admin təsdiqi gözləyir — xidmət qaralama kimi saxlanılacaq. Hesab və elan təsdiqindən sonra görünəcək.'}
                     </p>
                   </div>
                 </label>

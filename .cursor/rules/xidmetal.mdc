@@ -24,6 +24,12 @@ Admin UI marketplace daxilində olmamalıdır — yalnız `apps/admin`.
 - Tünd: `brand-dark` (#E6B800), Açıq: `brand-light` (#FFD633)
 - Foreground: `brand-foreground` (#1A1A1A)
 
+## Terminologiya (UI)
+
+- Kodda `PROVIDER` qalır; **user-facing** mətndə heç vaxt «Provider» yazma → **Xidmət verən** (cəm: xidmət verənlər)
+- `CUSTOMER` → **Müştəri**
+- Ətraflı: `terminology-az.mdc`
+
 ## Kod standartları
 
 - TypeScript strict, `any` qadağandır

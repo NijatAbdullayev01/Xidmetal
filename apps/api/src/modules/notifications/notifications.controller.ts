@@ -53,7 +53,7 @@ export class NotificationsController {
   }
 
   @Get('review-unread-count')
-  @ApiOperation({ summary: 'Rəy bildirişləri sayı (provider reytinq badge)' })
+  @ApiOperation({ summary: 'Rəy bildirişləri sayı (xidmət verən reytinq badge)' })
   @Roles(UserRole.PROVIDER)
   getReviewUnreadCount(@CurrentUser('id') userId: string) {
     return this.notificationsService.getReviewAttentionCount(userId);

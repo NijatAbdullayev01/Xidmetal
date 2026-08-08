@@ -18,6 +18,7 @@ Bu layihə xidmət verənlərlə xidmət alanları birləşdirən marketplace pl
 3. **Shared package istifadə et** — frontend/backend arasında tip paylaşımı üçün
 4. **TypeScript strict** — `any` istifadə etmə
 5. **Error mesajları Azərbaycan dilində** olsun (user-facing)
+5b. **Rol adı UI-də:** `PROVIDER` → **Xidmət verən** (heç vaxt «Provider»); bax: `.cursor/rules/terminology-az.mdc`
 6. **Swagger decorator-ları** yeni API endpoint-lərə əlavə et
 7. **Responsivlik mütləqdir** — UI kodu yazılarkən mobil və desktop dizaynları düzgün yığılmalıdır
 

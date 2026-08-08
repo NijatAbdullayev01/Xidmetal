@@ -2,6 +2,8 @@ import { ServiceStatus, BookingStatus, BookingType } from '@xidmetal/shared';
 
 export const SERVICE_STATUS_LABELS: Record<ServiceStatus, string> = {
   [ServiceStatus.DRAFT]: 'Qaralama',
+  [ServiceStatus.PENDING_REVIEW]: 'Yoxlama gözləyir',
+  [ServiceStatus.NEEDS_REVISION]: 'Düzəliş lazımdır',
   [ServiceStatus.ACTIVE]: 'Aktiv',
   [ServiceStatus.PAUSED]: 'Dayandırılıb',
   [ServiceStatus.ARCHIVED]: 'Arxiv',
@@ -12,6 +14,8 @@ export const SERVICE_STATUS_VARIANTS: Record<
   'default' | 'success' | 'warning' | 'destructive' | 'muted'
 > = {
   [ServiceStatus.DRAFT]: 'muted',
+  [ServiceStatus.PENDING_REVIEW]: 'warning',
+  [ServiceStatus.NEEDS_REVISION]: 'destructive',
   [ServiceStatus.ACTIVE]: 'success',
   [ServiceStatus.PAUSED]: 'warning',
   [ServiceStatus.ARCHIVED]: 'destructive',

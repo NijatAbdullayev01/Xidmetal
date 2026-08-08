@@ -9,6 +9,7 @@ import {
   BookingStatus,
   NotificationType,
   Prisma,
+  ProviderAvailability,
   ReportStatus,
   ReviewStatus,
   ServiceStatus,
@@ -39,6 +40,7 @@ import {
   SetReportStatusDto,
   SetReviewStatusDto,
   SetServiceStatusDto,
+  RequestServiceRevisionDto,
   SetUserActiveDto,
   UpdateCategoryDto,
 } from './dto';
@@ -86,6 +88,7 @@ export class AdminService {
       providersUnverified,
       servicesTotal,
       servicesActive,
+      servicesPendingReview,
       bookingsTotal,
       bookingsPending,
       reviewsPending,
@@ -101,6 +104,7 @@ export class AdminService {
       this.prisma.providerProfile.count({ where: { isVerified: false } }),
       this.prisma.service.count(),
       this.prisma.service.count({ where: { status: ServiceStatus.ACTIVE } }),
+      this.prisma.service.count({ where: { status: ServiceStatus.PENDING_REVIEW } }),
       this.prisma.booking.count(),
       this.prisma.booking.count({ where: { status: BookingStatus.PENDING } }),
       this.prisma.review.count({ where: { status: ReviewStatus.PENDING } }),
@@ -116,6 +120,7 @@ export class AdminService {
       providersUnverified,
       servicesTotal,
       servicesActive,
+      servicesPendingReview,
       bookingsTotal,
       bookingsPending,
       reviewsPending,
@@ -236,9 +241,60 @@ export class AdminService {
       throw new NotFoundException('Xidmət verən tapılmadı');
     }
 
-    await this.prisma.providerProfile.update({
-      where: { userId },
-      data: { isVerified: dto.isVerified },
+    const wasVerified = user.providerProfile.isVerified;
+    if (wasVerified === dto.isVerified) {
+      return this.getUser(userId);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.providerProfile.update({
+        where: { userId },
+        data: {
+          isVerified: dto.isVerified,
+          ...(!dto.isVerified
+            ? { availability: ProviderAvailability.OFFLINE }
+            : {}),
+        },
+      });
+
+      // Təsdiq ləğv olunanda aktiv xidmətlər dayandırılsın — marketplace-də görünməsin
+      if (!dto.isVerified) {
+        await tx.service.updateMany({
+          where: { providerId: userId, status: ServiceStatus.ACTIVE },
+          data: { status: ServiceStatus.PAUSED },
+        });
+      }
+    });
+
+    const title = dto.isVerified
+      ? 'Hesabınız təsdiqləndi'
+      : 'Hesab təsdiqi ləğv edildi';
+    const body = dto.isVerified
+      ? 'Admin hesabınızı təsdiqlədi. İndi xidmətlərinizi aktivləşdirə və sifariş qəbul edə bilərsiniz.'
+      : 'Admin hesab təsdiqinizi ləğv etdi. Aktiv xidmətləriniz dayandırıldı; yenidən xidmət göstərmək üçün təsdiq gözləyin.';
+    const href = '/dashboard/provider/services';
+
+    const notification = await this.prisma.notification.create({
+      data: {
+        userId,
+        type: NotificationType.ADMIN_ANNOUNCEMENT,
+        title,
+        body,
+        data: { source: 'admin', href, providerVerified: dto.isVerified },
+      },
+    });
+
+    this.channels?.deliverAfterInApp({
+      userId,
+      title,
+      body,
+      type: NotificationType.ADMIN_ANNOUNCEMENT,
+      notificationId: notification.id,
+      data: {
+        source: 'admin',
+        href,
+        providerVerified: dto.isVerified,
+      },
     });
 
     return this.getUser(userId);
@@ -378,6 +434,9 @@ export class AdminService {
         averageRating: s.provider.providerProfile?.rating ?? 0,
         reviewCount: s.provider.providerProfile?.reviewCount ?? 0,
         status: s.status as ServiceSummary['status'],
+        reviewNote: s.reviewNote ?? null,
+        submittedAt: s.submittedAt?.toISOString() ?? null,
+        reviewedAt: s.reviewedAt?.toISOString() ?? null,
         location: s.location ?? undefined,
         isRemote: s.isRemote,
         serviceVenue: s.serviceVenue ?? undefined,
@@ -407,30 +466,187 @@ export class AdminService {
       throw new NotFoundException('Xidmət tapılmadı');
     }
 
+    if (dto.status === ServiceStatus.ACTIVE) {
+      return this.approveService(id);
+    }
+
     const updated = await this.prisma.service.update({
       where: { id },
       data: { status: dto.status },
+      include: this.serviceAdminInclude(),
+    });
+
+    return this.mapAdminService(updated);
+  }
+
+  async approveService(id: string): Promise<ServiceSummary> {
+    const existing = await this.prisma.service.findUnique({
+      where: { id },
       include: {
-        category: { select: { id: true, name: true } },
-        provider: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            avatarUrl: true,
-            providerProfile: { select: { experience: true, rating: true, reviewCount: true } },
-          },
+        provider: { select: { id: true, providerProfile: { select: { isVerified: true } } } },
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException('Xidmət tapılmadı');
+    }
+    if (!existing.provider.providerProfile?.isVerified) {
+      throw new BadRequestException(
+        'Əvvəlcə xidmət verənin profilini təsdiqləyin — sonra xidməti aktivləşdirmək olar',
+      );
+    }
+
+    const updated = await this.prisma.service.update({
+      where: { id },
+      data: {
+        status: ServiceStatus.ACTIVE,
+        reviewNote: null,
+        reviewedAt: new Date(),
+      },
+      include: this.serviceAdminInclude(),
+    });
+
+    const title = 'Xidmətiniz təsdiqləndi';
+    const body = `«${updated.title}» xidmətiniz yoxlamadan keçdi və müştərilərə görünür.`;
+    const href = '/dashboard/provider/services';
+    const notification = await this.prisma.notification.create({
+      data: {
+        userId: updated.providerId,
+        type: NotificationType.ADMIN_ANNOUNCEMENT,
+        title,
+        body,
+        data: { source: 'admin', href, serviceId: updated.id, serviceApproved: true },
+      },
+    });
+    this.channels?.deliverAfterInApp({
+      userId: updated.providerId,
+      title,
+      body,
+      type: NotificationType.ADMIN_ANNOUNCEMENT,
+      notificationId: notification.id,
+      data: { source: 'admin', href, serviceId: updated.id, serviceApproved: true },
+    });
+
+    return this.mapAdminService(updated);
+  }
+
+  async requestServiceRevision(
+    id: string,
+    dto: RequestServiceRevisionDto,
+  ): Promise<ServiceSummary> {
+    const existing = await this.prisma.service.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Xidmət tapılmadı');
+    }
+    if (
+      existing.status !== ServiceStatus.PENDING_REVIEW &&
+      existing.status !== ServiceStatus.ACTIVE
+    ) {
+      throw new BadRequestException(
+        'Yalnız yoxlamada olan və ya aktiv xidmətlər düzəlişə göndərilə bilər',
+      );
+    }
+
+    const note = dto.note.trim();
+    const updated = await this.prisma.service.update({
+      where: { id },
+      data: {
+        status: ServiceStatus.NEEDS_REVISION,
+        reviewNote: note,
+        reviewedAt: new Date(),
+      },
+      include: this.serviceAdminInclude(),
+    });
+
+    const title = 'Xidmət düzəlişə göndərildi';
+    const body = `«${updated.title}» xidmətiniz düzəliş tələb edir: ${note}`;
+    const href = `/dashboard/provider/services/${updated.id}/edit`;
+    const notification = await this.prisma.notification.create({
+      data: {
+        userId: updated.providerId,
+        type: NotificationType.ADMIN_ANNOUNCEMENT,
+        title,
+        body,
+        data: {
+          source: 'admin',
+          href,
+          serviceId: updated.id,
+          serviceNeedsRevision: true,
         },
-        images: { orderBy: { sortOrder: 'asc' }, take: 3 },
-        _count: { select: { bookings: true } },
+      },
+    });
+    this.channels?.deliverAfterInApp({
+      userId: updated.providerId,
+      title,
+      body,
+      type: NotificationType.ADMIN_ANNOUNCEMENT,
+      notificationId: notification.id,
+      data: {
+        source: 'admin',
+        href,
+        serviceId: updated.id,
+        serviceNeedsRevision: true,
       },
     });
 
+    return this.mapAdminService(updated);
+  }
+
+  private serviceAdminInclude() {
+    return {
+      category: { select: { id: true, name: true } },
+      provider: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          avatarUrl: true,
+          providerProfile: { select: { experience: true, rating: true, reviewCount: true } },
+        },
+      },
+      images: { orderBy: { sortOrder: 'asc' as const }, take: 3 },
+      _count: { select: { bookings: true } },
+    };
+  }
+
+  private mapAdminService(updated: {
+    id: string;
+    title: string;
+    description: string;
+    price: { toNumber(): number } | number;
+    priceUnit: string;
+    categoryId: string;
+    providerId: string;
+    status: ServiceStatus;
+    reviewNote: string | null;
+    submittedAt: Date | null;
+    reviewedAt: Date | null;
+    location: string | null;
+    isRemote: boolean;
+    serviceVenue: string | null;
+    vehicleLength: number | null;
+    vehicleWidth: number | null;
+    vehicleHeight: number | null;
+    cargoRouteScope: string | null;
+    createdAt: Date;
+    category: { id: string; name: string };
+    provider: {
+      firstName: string;
+      lastName: string;
+      avatarUrl: string | null;
+      providerProfile: {
+        experience: number | null;
+        rating: number;
+        reviewCount: number;
+      } | null;
+    };
+    images: Array<{ id: string; url: string; alt: string | null; sortOrder: number }>;
+    _count: { bookings: number };
+  }): ServiceSummary {
     return {
       id: updated.id,
       title: updated.title,
       description: updated.description,
-      price: Number(updated.price),
+      price: typeof updated.price === 'number' ? updated.price : Number(updated.price),
       priceUnit: updated.priceUnit,
       categoryId: updated.categoryId,
       categoryName: updated.category.name,
@@ -441,6 +657,9 @@ export class AdminService {
       averageRating: updated.provider.providerProfile?.rating ?? 0,
       reviewCount: updated.provider.providerProfile?.reviewCount ?? 0,
       status: updated.status as ServiceSummary['status'],
+      reviewNote: updated.reviewNote ?? null,
+      submittedAt: updated.submittedAt?.toISOString() ?? null,
+      reviewedAt: updated.reviewedAt?.toISOString() ?? null,
       location: updated.location ?? undefined,
       isRemote: updated.isRemote,
       serviceVenue: updated.serviceVenue ?? undefined,

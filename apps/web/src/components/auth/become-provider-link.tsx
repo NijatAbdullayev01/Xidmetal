@@ -17,7 +17,7 @@ const PROVIDER_DASHBOARD_HREF = '/dashboard/provider';
  * Mövcud müştəriyə ayrı hesab lazım olduğunu izah edir — bu axını dəyişmə.
  */
 const CUSTOMER_MESSAGE =
-  'Artıq siz bu profillə istifadəçi kimi qeydiyyat etmişsiniz. Əgər xidmət verən olmaq istəyirsinizsə, başqa hesab yaradın.';
+  'Artıq siz bu profillə müştəri kimi qeydiyyat etmişsiniz. Əgər xidmət verən olmaq istəyirsinizsə, başqa hesab yaradın.';
 
 interface BecomeProviderLinkProps {
   children: ReactNode;

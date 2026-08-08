@@ -76,6 +76,10 @@ export interface ServiceSummary {
   averageRating: number;
   reviewCount: number;
   status: ServiceStatus;
+  /** Admin düzəliş qeydi (NEEDS_REVISION) */
+  reviewNote?: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
   location?: string;
   isRemote: boolean;
   serviceVenue?: string;
@@ -188,6 +192,8 @@ export interface AdminDashboardStats {
   providersUnverified: number;
   servicesTotal: number;
   servicesActive: number;
+  /** Yoxlama növbəsindəki xidmətlər */
+  servicesPendingReview: number;
   bookingsTotal: number;
   bookingsPending: number;
   reviewsPending: number;

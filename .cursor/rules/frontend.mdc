@@ -71,7 +71,12 @@ UI kodu yazılarkən responsivlik **vacib tələbdir** — mobil və desktop diz
 ## UI mətn
 
 Bütün istifadəçiyə görünən mətnlər **Azərbaycan dilində**.
+Rol adı: kodda `PROVIDER`, UI-də **Xidmət verən** — «Provider» yazmaq qadağandır (`terminology-az.mdc`).
 
 ## Dropdown / Select
 
 Yeni dropdown-lar **yalnız** `@/components/ui/select` (`Select`) ilə — native `<select>` qadağandır. Ətraflı: `dropdown-select.mdc`.
+
+## Xidmət kartı
+
+Kart klik `/services/[id]`-ə aparmamalıdır — yalnız preview pop-up (`ServicePreviewDialog`). Ətraflı: `service-card.mdc`.

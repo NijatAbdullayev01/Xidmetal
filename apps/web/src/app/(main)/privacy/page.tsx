@@ -68,7 +68,7 @@ const sections: {
           'E-poçt ünvanı',
           'Telefon nömrəsi (istəyə bağlı)',
           'Parol (yalnız şifrələnmiş (hash) formada saxlanılır)',
-          'İstifadəçi rolu (xidmət alan, xidmət verən və ya administrator)',
+          'İstifadəçi rolu (müştəri, xidmət verən və ya administrator)',
           'Profil şəkli (avatar)',
         ],
       },

@@ -12,6 +12,7 @@ import {
   PriceUnit,
   ServiceVenue,
   CargoRouteScope,
+  ServiceStatus,
   requiresServiceVenue,
   requiresVehicleDetails,
   requiresCargoRouteScope,
@@ -140,7 +141,7 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
   }, [service, reset]);
 
   const updateMutation = useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       data,
       serviceImages,
     }: {
@@ -149,7 +150,7 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
     }) => {
       if (!token) throw new ApiError('Autentifikasiya tələb olunur', 401);
       const category = categories.find((cat) => cat.id === data.categoryId);
-      return api.updateService(token, serviceId, {
+      const updated = await api.updateService(token, serviceId, {
         title: data.title,
         description: data.description,
         categoryId: data.categoryId,
@@ -170,6 +171,19 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
           : {}),
         images: serviceImages,
       });
+
+      // Düzəlişdən sonra yenidən yoxlamaya göndər
+      if (service?.status === ServiceStatus.NEEDS_REVISION) {
+        const profile = await queryClient.fetchQuery({
+          queryKey: ['users', 'me'],
+          queryFn: () => api.users.me(token),
+        });
+        if (profile.providerProfile?.isVerified) {
+          return api.submitServiceForReview(token, serviceId);
+        }
+      }
+
+      return updated;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services', 'mine'] });
@@ -352,6 +366,19 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
           Geri
         </Link>
       </div>
+
+      {service.status === ServiceStatus.NEEDS_REVISION && service.reviewNote ? (
+        <div
+          className="rounded-xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-100"
+          role="status"
+        >
+          <p className="font-medium">Admin düzəliş tələb edir</p>
+          <p className="mt-1">{service.reviewNote}</p>
+          <p className="mt-2 text-xs opacity-90">
+            Dəyişiklikləri yadda saxladıqdan sonra xidmət yenidən yoxlamaya göndəriləcək.
+          </p>
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -636,6 +663,11 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Yadda saxlanılır...
+                  </>
+                ) : service?.status === ServiceStatus.NEEDS_REVISION ? (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Saxla və yoxlamaya göndər
                   </>
                 ) : (
                   <>

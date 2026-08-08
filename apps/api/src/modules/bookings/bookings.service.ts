@@ -240,7 +240,7 @@ export class BookingsService {
       }
 
       if (!service.provider.providerProfile?.isVerified) {
-        throw new BadRequestException('Bu xidmət verən hələ təsdiqlənməyib');
+        throw new ForbiddenException('Bu xidmət verən hələ təsdiqlənməyib');
       }
 
       if (service.providerId === customerId) {

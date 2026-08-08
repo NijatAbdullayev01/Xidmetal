@@ -1,0 +1,28 @@
+---
+description: Xidmət kartı klik davranışı — səhifəyə keçid yox, preview pop-up
+globs: apps/web/src/components/services/**
+alwaysApply: false
+---
+
+# Xidmət kartı (ServiceCard) klik davranışı
+
+Marketplace-də xidmət kartına klik **detal səhifəsinə** (`/services/[id]`) aparmamalıdır.
+
+## Məcburi
+
+- Kartın əsas hit-target-i yalnız **preview pop-up** açıb: şəkillər + təsvir (`ServicePreviewDialog`).
+- Sifariş, rəylər və digər nested əməliyyatlar `InteractiveSlot` (və ya ekvivalent) ilə ayrıca qalır.
+- Kartdan `Link href="/services/..."` və ya `router.push('/services/...')` **qadağandır**.
+
+## İcazəli
+
+- `ServicePreviewDialog` — şəkillər, təsvir, qısa meta (məkan, ölçü və s.).
+- Birbaşa URL ilə `/services/[id]` səhifəsi (SEO / bookmark) — kart naviqasiyası deyil.
+
+## Qadağan
+
+```
+❌ <Link href={`/services/${service.id}`}> kart üzərində
+❌ Kart klik → detal səhifəsinə redirect
+✅ Kart klik → ServicePreviewDialog (şəkillər + təsvir)
+```

@@ -32,6 +32,13 @@ export default function MyServicesPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
+  const { data: me } = useQuery({
+    queryKey: ['users', 'me'],
+    queryFn: () => api.users.me(token!),
+    enabled: !!token,
+  });
+  const isVerified = me?.providerProfile?.isVerified === true;
+
   const { data, isLoading } = useQuery({
     queryKey: ['services', 'mine'],
     queryFn: () => api.myServices(token!, { limit: '50' }),
@@ -54,6 +61,26 @@ export default function MyServicesPage() {
         setActionError(error.message);
       } else {
         setActionError('Status yenilənərkən xəta baş verdi');
+      }
+    },
+  });
+
+  const submitReviewMutation = useMutation({
+    mutationFn: (id: string) => {
+      if (!token) throw new ApiError('Autentifikasiya tələb olunur', 401);
+      return api.submitServiceForReview(token, id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['services', 'mine'] });
+      setActionId(null);
+      setActionError(null);
+    },
+    onError: (error) => {
+      setActionId(null);
+      if (error instanceof ApiError) {
+        setActionError(error.message);
+      } else {
+        setActionError('Yoxlamaya göndərilərkən xəta baş verdi');
       }
     },
   });
@@ -86,6 +113,12 @@ export default function MyServicesPage() {
     setActionError(null);
     setActionId(id);
     updateMutation.mutate({ id, status });
+  };
+
+  const handleSubmitForReview = (id: string) => {
+    setActionError(null);
+    setActionId(id);
+    submitReviewMutation.mutate(id);
   };
 
   const openDeleteDialog = (id: string, title: string, hasBookingHistory: boolean) => {
@@ -162,6 +195,19 @@ export default function MyServicesPage() {
                 <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
                   {service.description}
                 </p>
+                {service.status === ServiceStatus.NEEDS_REVISION && service.reviewNote ? (
+                  <p
+                    className="mt-2 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-100"
+                    role="status"
+                  >
+                    Admin qeydi: {service.reviewNote}
+                  </p>
+                ) : null}
+                {service.status === ServiceStatus.PENDING_REVIEW ? (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Admin yoxlamasındadır — təsdiqdən sonra müştərilərə görünəcək.
+                  </p>
+                ) : null}
                 <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                   <span>{service.categoryName}</span>
                   <span>
@@ -182,16 +228,22 @@ export default function MyServicesPage() {
                   <Pencil className="h-4 w-4" />
                   Düzəliş et
                 </Link>
-                {service.status === ServiceStatus.DRAFT && (
+                {(service.status === ServiceStatus.DRAFT ||
+                  service.status === ServiceStatus.NEEDS_REVISION) && (
                   <Button
                     size="sm"
-                    disabled={actionId === service.id}
-                    onClick={() => handleStatusChange(service.id, ServiceStatus.ACTIVE)}
+                    disabled={actionId === service.id || !isVerified}
+                    title={
+                      !isVerified
+                        ? 'Yoxlamaya göndərmək üçün hesab təsdiqi lazımdır'
+                        : undefined
+                    }
+                    onClick={() => handleSubmitForReview(service.id)}
                   >
-                    {actionId === service.id ? (
+                    {actionId === service.id && submitReviewMutation.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      'Aktiv et'
+                      'Yoxlamaya göndər'
                     )}
                   </Button>
                 )}
@@ -208,7 +260,12 @@ export default function MyServicesPage() {
                 {service.status === ServiceStatus.PAUSED && (
                   <Button
                     size="sm"
-                    disabled={actionId === service.id}
+                    disabled={actionId === service.id || !isVerified}
+                    title={
+                      !isVerified
+                        ? 'Aktivləşdirmək üçün hesab təsdiqi lazımdır'
+                        : undefined
+                    }
                     onClick={() => handleStatusChange(service.id, ServiceStatus.ACTIVE)}
                   >
                     Aktiv et

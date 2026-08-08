@@ -1,0 +1,29 @@
+---
+description: Rol terminologiyası — UI-də Provider yox, Xidmət verən
+alwaysApply: true
+---
+
+# Rol terminologiyası (AZ UI)
+
+İstifadəçiyə görünən bütün mətnlərdə (UI label, placeholder, empty state, toast, e-poçt, API error mesajı, Swagger `@ApiOperation` summary) rol adı belə yazılsın:
+
+| Kod / enum | UI (Azərbaycan) |
+|---|---|
+| `PROVIDER` / provider | **Xidmət verən** (cəm: **xidmət verənlər**) |
+| `CUSTOMER` / customer | **Müştəri** |
+
+## Qadağan (user-facing)
+
+```
+❌ Provider, Providers, provider təsdiqi, Provider tapılmadı
+✅ Xidmət verən, Xidmət verənlər, Xidmət verən təsdiqi, Xidmət verən tapılmadı
+```
+
+## İstisna (kodda saxlanılır)
+
+- Identifikatorlar: `providerId`, `UserRole.PROVIDER`, `providerProfile`, route `/dashboard/provider`
+- React context: `ThemeProvider`, `QueryProvider`
+- Ödəniş/SMS adapter: `PaymentProvider`, `SMS_PROVIDER`
+- Daxili şərh və test adları (istəyə görə AZ da ola bilər)
+
+Yeni UI yazarkən heç vaxt «Provider» sözünü istifadəçi mətninə yapışdırma.

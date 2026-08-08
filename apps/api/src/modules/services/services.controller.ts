@@ -33,7 +33,7 @@ export class ServicesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.PROVIDER)
   @Get('mine')
-  @ApiOperation({ summary: 'Provider-in öz xidmətləri' })
+  @ApiOperation({ summary: 'Xidmət verənin öz xidmətləri' })
   findMine(@CurrentUser('id') userId: string, @Query() query: ServiceQueryDto) {
     return this.servicesService.findMine(userId, query);
   }
@@ -55,7 +55,7 @@ export class ServicesController {
   @Roles(UserRole.PROVIDER)
   @RequireEmailVerified()
   @Post()
-  @ApiOperation({ summary: 'Yeni xidmət yarat (Provider)' })
+  @ApiOperation({ summary: 'Yeni xidmət yarat (xidmət verən)' })
   create(@CurrentUser('id') userId: string, @Body() dto: CreateServiceDto) {
     return this.servicesService.create(userId, dto);
   }
@@ -73,6 +73,18 @@ export class ServicesController {
     @Body() dto: UpdateServiceDto,
   ) {
     return this.servicesService.update(id, userId, role, dto);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard, EmailVerifiedGuard)
+  @Roles(UserRole.PROVIDER)
+  @RequireEmailVerified()
+  @Post(':id/submit-review')
+  @ApiOperation({
+    summary: 'Xidməti admin yoxlamasına göndər (DRAFT / NEEDS_REVISION → PENDING_REVIEW)',
+  })
+  submitForReview(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.servicesService.submitForReview(id, userId);
   }
 
   @ApiBearerAuth()

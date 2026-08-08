@@ -280,7 +280,9 @@ export const updateServiceSchema = z.object({
   vehicleWidth: vehicleDimensionSchema.optional(),
   vehicleHeight: vehicleDimensionSchema.optional(),
   cargoRouteScope: z.enum(CARGO_ROUTE_SCOPE_VALUES).optional(),
-  status: z.enum(['DRAFT', 'ACTIVE', 'PAUSED', 'ARCHIVED']).optional(),
+  status: z
+    .enum(['DRAFT', 'PENDING_REVIEW', 'NEEDS_REVISION', 'ACTIVE', 'PAUSED', 'ARCHIVED'])
+    .optional(),
   /** Göndərildikdə mövcud şəkilləri tam əvəz edir */
   images: serviceImagesSchema.optional(),
 });
@@ -458,6 +460,14 @@ export const adminSetServiceStatusSchema = z.object({
   status: z.nativeEnum(ServiceStatus),
 });
 
+export const adminRequestServiceRevisionSchema = z.object({
+  note: z
+    .string()
+    .trim()
+    .min(5, 'Düzəliş qeydi minimum 5 simvol olmalıdır')
+    .max(2000, 'Düzəliş qeydi maksimum 2000 simvol ola bilər'),
+});
+
 export const adminSetReviewStatusSchema = z.object({
   status: z.enum([ReviewStatus.APPROVED, ReviewStatus.REJECTED]),
 });
@@ -595,6 +605,9 @@ export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
 export type AdminSetUserActiveInput = z.infer<typeof adminSetUserActiveSchema>;
 export type AdminSetProviderVerifiedInput = z.infer<typeof adminSetProviderVerifiedSchema>;
 export type AdminSetServiceStatusInput = z.infer<typeof adminSetServiceStatusSchema>;
+export type AdminRequestServiceRevisionInput = z.infer<
+  typeof adminRequestServiceRevisionSchema
+>;
 export type AdminSetReviewStatusInput = z.infer<typeof adminSetReviewStatusSchema>;
 export type AdminAnnouncementInput = z.infer<typeof adminAnnouncementSchema>;
 export type CreateReportInput = z.infer<typeof createReportSchema>;

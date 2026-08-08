@@ -14,6 +14,8 @@ const apiOrigin = (
 const nextConfig: NextConfig = {
   transpilePackages: ['@xidmetal/shared'],
   images: {
+    // Next 16+: quality prop yalnız bu siyahıdakı dəyərlərlə uyğun olmalıdır
+    qualities: [75, 100],
     remotePatterns: [
       { protocol: 'https', hostname: '**' },
       { protocol: 'http', hostname: 'localhost' },

@@ -48,7 +48,8 @@ export default function AdminProvidersPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Xidmət verənlər</h1>
         <p className="mt-1 text-muted-foreground">
-          Provider profillərini yoxlayın və etibar nişanını təyin edin.
+          Xidmət verən qeydiyyatdan sonra burada təsdiq almalıdır. Təsdiqsiz hesab
+          xidmət aktivləşdirə və sifariş qəbul edə bilməz.
         </p>
       </div>
 
@@ -74,7 +75,9 @@ export default function AdminProvidersPage() {
             <p className="py-8 text-center text-sm text-muted-foreground">Yüklənir…</p>
           )}
           {!isLoading && data?.items.length === 0 && (
-            <p className="py-8 text-center text-sm text-muted-foreground">Provider tapılmadı</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Xidmət verən tapılmadı
+            </p>
           )}
 
           <ul className="divide-y divide-border">
