@@ -2,19 +2,40 @@ import type { NextFunction, Request, Response } from 'express';
 import {
   MEDIA_EXP_PARAM,
   MEDIA_SIG_PARAM,
+  isPrivateUploadKey,
   verifyPrivateMediaAccess,
 } from '../storage/signed-media';
 
-/**
- * `/uploads/bookings/...` yalnız etibarlı HMAC ilə.
- * services/avatars açıq qalır (marketplace SEO).
- */
+/** `..` / boş seqment / null byte — path traversal qarşısı */
+function normalizeUploadKey(rawPath: string): string | null {
+  const raw = rawPath.startsWith('/') ? rawPath.slice(1) : rawPath;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+  if (!decoded || decoded.includes('\0')) return null;
+  const parts = decoded.split('/');
+  if (parts.some((part) => part === '' || part === '.' || part === '..')) {
+    return null;
+  }
+  return parts.join('/');
+}
+
+/** `/uploads/...` private media yalnız etibarlı imza ilə açılır. */
 export function createPrivateUploadsGuard(secret: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const rawPath = req.path.startsWith('/') ? req.path.slice(1) : req.path;
-    const uploadKey = decodeURIComponent(rawPath);
+    const uploadKey = normalizeUploadKey(req.path);
+    if (!uploadKey) {
+      res.status(400).json({
+        statusCode: 400,
+        message: 'Etibarsız fayl yolu',
+      });
+      return;
+    }
 
-    if (!uploadKey.startsWith('bookings/')) {
+    if (!isPrivateUploadKey(uploadKey)) {
       next();
       return;
     }

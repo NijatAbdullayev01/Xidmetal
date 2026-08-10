@@ -2,7 +2,7 @@
 
 Bu sənəd xidmət verənin yolda olduğu zaman xəritədə **canlı izlənməsi** üçün texniki dizaynı təsvir edir.
 
-> **Cari vəziyyət (2026-08, Faza 3):** Socket.IO gateway + `tracking` modulu **implemented**. Mesajlar/bildirişlər üçün TanStack Query **polling** saxlanılır (additive fallback); WS `booking:status` / `notification:new` ilə invalidate edilə bilər. Bax: [ROADMAP.md](./ROADMAP.md) Faza 3.
+> **Cari vəziyyət (2026-08, Faza 3):** Socket.IO gateway + `tracking` / dispatch / **`message:new`** **implemented**. Mesajlar/bildirişlər üçün TanStack Query **polling** fallback saxlanılır; WS ilə invalidate. Bax: [ROADMAP.md](./ROADMAP.md) Faza 3.
 
 ---
 
@@ -24,7 +24,7 @@ apps/api/src/modules/realtime/
 ├── realtime.module.ts
 ├── realtime.gateway.ts      # @WebSocketGateway
 ├── realtime.service.ts      # otaq/yayım məntiqi
-├── ws-auth.service.ts       # handshake JWT (cookie | auth.token | Bearer)
+├── ws-auth.service.ts       # handshake auth (cookie-first, auth.token/Bearer fallback)
 ├── realtime.controller.ts   # GET /realtime/socket-token
 └── redis-io.adapter.ts      # @socket.io/redis-adapter
 
@@ -40,9 +40,9 @@ apps/api/src/modules/tracking/
 
 ### Handshake auth
 
-1. Frontend `GET /api/v1/realtime/socket-token` (cookie session) → access JWT.
-2. Socket.IO `handshake.auth.token` (+ `clientApp: marketplace`).
-3. Alternativ: `Authorization: Bearer` və ya cookie `xidmetal_access` (reverse-proxy eyni origin).
+1. Frontend `io(..., { withCredentials: true, auth: { clientApp: marketplace } })`.
+2. Socket.IO handshake cookie header-indən app-scoped httpOnly access cookie oxunur.
+3. Alternativ fallback: `handshake.auth.token` və ya `Authorization: Bearer`.
 
 Etibarsız token → bağlantı rədd edilir. HTTP `JwtStrategy` ilə eyni secret / `passwordChangedAt` / audience qaydaları.
 
@@ -93,11 +93,13 @@ Provider PWA                Gateway              Customer PWA
                             └─ (hər ~15s) LocationPing DB
 ```
 
-- **Provider:** `navigator.geolocation.watchPosition` → ~3s throttle → `location:push` (yalnız `EN_ROUTE`).
-- **Server:** validasiya, otağa yayım, sampling `LocationPing`, ETA (Mapbox Directions və ya haversine).
+- **Provider:** `navigator.geolocation.watchPosition` → ~3s throttle → `location:push` (yalnız trackable status).
+- **Server hot path:** validate + Redis throttle → **WS `location:update` dərhal** (haversine ETA).
+- **Server background:** ProviderProfile/PostGIS sync ~15s; `LocationPing` ~15s; Mapbox ETA dəqiqləşdirmə (opsional).
 - **Müştəri:** `location:update` → Mapbox marker + ETA/məsafə.
 
 > Battery/data: throttle interval və `enableHighAccuracy` balanslıdır. Background GPS brauzer/OS limitlərinə tabedir (tab açıq olanda etibarlı).
+> Miqyas: bax [CAPACITY.md](./CAPACITY.md).
 
 ---
 
@@ -136,5 +138,6 @@ Provider PWA                Gateway              Customer PWA
 
 ## 10. Test
 
-- Unit: room auth (`realtime-auth.spec.ts`), throttle/sample + ETA (`location-throttle.spec.ts`).
-- İnteqrasiya / yük: gələcək (socket.io-client e2e, Artillery).
+- Unit: room auth (`realtime-auth.spec.ts`), throttle/sample + ETA (`location-throttle.spec.ts`), `RealtimeService` emit (`realtime.service.spec.ts`), messages WS (`messages.service.spec.ts`).
+- Socket.IO smoke (əl ilə): `pnpm load:realtime` — handshake / auth reject; API yoxdursa fail-soft exit 0.
+- İnteqrasiya / ağır yük: opsional Artillery / k6 WS ssenariləri (CI default-da yox).

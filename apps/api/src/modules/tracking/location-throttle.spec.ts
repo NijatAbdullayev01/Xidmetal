@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  LOCATION_GEO_SYNC_INTERVAL_MS,
   LOCATION_PING_SAMPLE_INTERVAL_MS,
   LOCATION_PUSH_MIN_INTERVAL_MS,
   estimateEtaSeconds,
@@ -32,6 +33,14 @@ describe('location ping sampling', () => {
     const t0 = 50_000;
     expect(shouldSampleLocationPing(t0, t0 + LOCATION_PING_SAMPLE_INTERVAL_MS - 1)).toBe(false);
     expect(shouldSampleLocationPing(t0, t0 + LOCATION_PING_SAMPLE_INTERVAL_MS)).toBe(true);
+  });
+});
+
+describe('location geo sync interval constant', () => {
+  it('geo sync ≥ push interval (DB yazısı seyrək)', () => {
+    expect(LOCATION_GEO_SYNC_INTERVAL_MS).toBeGreaterThanOrEqual(
+      LOCATION_PUSH_MIN_INTERVAL_MS,
+    );
   });
 });
 

@@ -3,8 +3,11 @@ import {
   UserRole,
   BOOKING_NOTIFICATION_TYPES,
   REVIEW_NOTIFICATION_TYPES,
+  sanitizeInternalPath,
 } from '@xidmetal/shared';
 import type { NotificationSummary } from '@xidmetal/shared';
+
+export { sanitizeInternalPath };
 
 const BOOKING_TYPES = new Set<string>(BOOKING_NOTIFICATION_TYPES);
 const REVIEW_TYPES = new Set<string>(REVIEW_NOTIFICATION_TYPES);
@@ -13,15 +16,6 @@ function roleDashboardBase(role: UserRole): '/dashboard/customer' | '/dashboard/
   if (role === UserRole.CUSTOMER) return '/dashboard/customer';
   if (role === UserRole.PROVIDER) return '/dashboard/provider';
   return null;
-}
-
-/** Yalnız eyni origin relative path — open redirect qorunması */
-export function sanitizeInternalPath(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed.startsWith('/') || trimmed.startsWith('//')) return null;
-  if (trimmed.includes('://')) return null;
-  return trimmed;
 }
 
 /**

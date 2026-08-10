@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Express } from 'express';
+import { Prisma } from '@xidmetal/database';
 import { PrismaService } from '../database/prisma.service';
 import { detectImageMime } from './image-mime';
 import { LocalStorageDriver } from './local.driver';
@@ -24,6 +25,7 @@ const EXT_BY_MIME: Record<string, string> = {
 };
 
 const ORPHAN_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+type DbClient = PrismaService | Prisma.TransactionClient;
 
 @Injectable()
 export class StorageService implements OnModuleInit {
@@ -98,7 +100,7 @@ export class StorageService implements OnModuleInit {
     return stripMediaSignature(url);
   }
 
-  /** Brauzerə qaytarılarkən private (bookings) URL-ləri imzala / S3 presign */
+  /** Brauzerə qaytarılarkən qorunan media URL-lərini imzala / S3 presign et */
   async toReadableMediaUrl(url: string | null | undefined): Promise<string | undefined> {
     if (!url) return undefined;
     const canonical = stripMediaSignature(url);
@@ -113,10 +115,35 @@ export class StorageService implements OnModuleInit {
 
   /** Local HMAC — JWT rotasiyasından asılı olmamaq üçün ayrı secret üstünlük təşkil edir */
   mediaSigningSecret(): string {
+    const nodeEnv = this.config.get<string>('NODE_ENV', 'development');
     return (
       this.config.get<string>('MEDIA_SIGNING_SECRET')?.trim() ||
-      this.config.get<string>('JWT_SECRET', '')
+      (nodeEnv === 'production' ? '' : this.config.get<string>('JWT_SECRET', ''))
     );
+  }
+
+  async assertOwnedUploadUrl(
+    url: string,
+    folder: UploadFolder,
+    userId: string,
+    db: DbClient = this.prisma,
+  ): Promise<string> {
+    this.assertAllowedMediaUrl(url);
+    const canonical = this.toCanonicalMediaUrl(url);
+    const uploaded = await db.uploadedObject.findFirst({
+      where: {
+        url: canonical,
+        folder,
+        userId,
+      },
+      select: { id: true },
+    });
+
+    if (!uploaded) {
+      throw new BadRequestException('Şəkil yalnız öz yükləmənizdən seçilə bilər');
+    }
+
+    return canonical;
   }
 
   async uploadImage(
@@ -156,8 +183,8 @@ export class StorageService implements OnModuleInit {
       throw new BadRequestException('Dəstəklənməyən şəkil formatı');
     }
 
-    // Ownership: folder/userId/uuid.ext
-    const ownedFolder = `${folder}/${userId}`;
+    // Public qovluqlarda user ID-ni URL-ə yazmırıq; ownership DB ilə izlənir.
+    const ownedFolder = folder;
     const stored = await this.driver.upload({
       buffer: file.buffer,
       contentType: detected,

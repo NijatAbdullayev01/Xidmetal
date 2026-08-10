@@ -21,7 +21,6 @@ import {
   UpdateProfileDto,
   RequestEmailChangeDto,
   ConfirmEmailChangeDto,
-  ConfirmPhoneVerifyDto,
   DeleteAccountDto,
 } from './dto';
 import { JwtAuthGuard, RolesGuard } from '../../common/guards';
@@ -92,34 +91,10 @@ export class UsersController {
     return this.usersService.confirmEmailChange(userId, dto);
   }
 
-  @Post('me/phone/request-verify')
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
-  @ApiOperation({ summary: 'Mobil nömrə üçün SMS təsdiq kodu göndər' })
-  requestPhoneVerify(@CurrentUser('id') userId: string) {
-    return this.usersService.requestPhoneVerify(userId);
-  }
-
-  @Post('me/phone/confirm-verify')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
-  @ApiOperation({ summary: 'SMS kodu ilə telefonu təsdiqlə' })
-  confirmPhoneVerify(
-    @CurrentUser('id') userId: string,
-    @Body() dto: ConfirmPhoneVerifyDto,
-  ) {
-    return this.usersService.confirmPhoneVerify(userId, dto);
-  }
-
-  @Get('me/export')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
-  @ApiOperation({ summary: 'Şəxsi məlumatların JSON ixracı (GDPR)' })
-  exportMe(@CurrentUser('id') userId: string) {
-    return this.usersService.exportMyData(userId);
-  }
-
   @Delete('me')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 3, ttl: 60000 } })
-  @ApiOperation({ summary: 'Hesabı soft-delete et (şifrə + SIL təsdiqi)' })
+  @ApiOperation({ summary: 'Hesabı soft-delete et (şifrə + Sil təsdiqi)' })
   async deleteMe(
     @CurrentUser('id') userId: string,
     @Body() dto: DeleteAccountDto,

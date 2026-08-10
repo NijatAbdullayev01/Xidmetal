@@ -5,6 +5,7 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import type { ServerOptions } from 'socket.io';
 import Redis from 'ioredis';
 import type { INestApplication } from '@nestjs/common';
+import { buildSocketCorsOptions } from './realtime-cors';
 
 /**
  * Socket.IO Redis adapter — REDIS_URL varsa multi-instance yayım.
@@ -63,7 +64,10 @@ export class RedisIoAdapter extends IoAdapter {
   }
 
   override createIOServer(port: number, options?: Partial<ServerOptions>) {
-    const server = super.createIOServer(port, options);
+    const server = super.createIOServer(port, {
+      ...options,
+      cors: buildSocketCorsOptions(this.config),
+    });
     if (this.adapterConstructor) {
       server.adapter(this.adapterConstructor);
     }

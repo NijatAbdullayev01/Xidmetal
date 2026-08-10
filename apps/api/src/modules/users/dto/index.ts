@@ -83,18 +83,10 @@ export class ConfirmEmailChangeDto {
   @IsEmail({}, { message: 'Düzgün e-poçt daxil edin' })
   newEmail!: string;
 
-  @ApiProperty({ example: '123456' })
+  @ApiProperty({ example: '12345678' })
   @IsString()
-  @Length(6, 6, { message: 'Təsdiq kodu 6 rəqəm olmalıdır' })
-  @Matches(/^\d{6}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
-  code!: string;
-}
-
-export class ConfirmPhoneVerifyDto {
-  @ApiProperty({ example: '123456' })
-  @IsString()
-  @Length(6, 6, { message: 'Təsdiq kodu 6 rəqəm olmalıdır' })
-  @Matches(/^\d{6}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
+  @Length(8, 8, { message: 'Təsdiq kodu 8 rəqəm olmalıdır' })
+  @Matches(/^\d{8}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
   code!: string;
 }
 
@@ -104,8 +96,8 @@ export class DeleteAccountDto {
   @MinLength(1, { message: 'Şifrə tələb olunur' })
   password!: string;
 
-  @ApiProperty({ example: 'SIL', description: 'Təsdiq üçün SIL yazın' })
+  @ApiProperty({ example: 'Sil', description: 'Təsdiq üçün Sil yazın' })
   @IsString()
-  @Matches(/^SIL$/i, { message: 'Təsdiq üçün SIL yazın' })
+  @Matches(/^SIL$/i, { message: 'Təsdiq üçün Sil yazın' })
   confirmText!: string;
 }

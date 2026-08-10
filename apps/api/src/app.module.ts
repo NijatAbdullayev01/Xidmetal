@@ -24,6 +24,7 @@ import { DispatchModule } from './modules/dispatch/dispatch.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { DevicesModule } from './modules/devices/devices.module';
 import { DatabaseModule } from './common/database/database.module';
+import { RedisModule } from './common/redis/redis.module';
 import { MailModule } from './common/mail/mail.module';
 import { StorageModule } from './common/storage/storage.module';
 import { NotificationChannelsModule } from './common/notifications/notification-channels.module';
@@ -37,11 +38,15 @@ import { RedisThrottlerStorage } from './common/throttler/redis-throttler.storag
   imports: [
     SentryModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../../.env', '.env'] }),
+    RedisModule,
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const redisUrl = config.get<string>('REDIS_URL')?.trim();
-        const throttlers = [{ ttl: 60_000, limit: 100 }];
+        // 5k concurrent dashboard: WS + seyrək poll; NAT arxasında TRUST_PROXY məcburi
+        const limitRaw = config.get<string>('THROTTLE_LIMIT')?.trim();
+        const limit = Math.max(50, Number(limitRaw) || 300);
+        const throttlers = [{ ttl: 60_000, limit }];
 
         if (!redisUrl) {
           return { throttlers };

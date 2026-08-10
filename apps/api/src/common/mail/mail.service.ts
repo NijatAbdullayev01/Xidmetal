@@ -4,7 +4,7 @@ import * as nodemailer from 'nodemailer';
 
 export interface MailSendResult {
   delivered: boolean;
-  /** Yalnız development + SMTP yoxdursa — test üçün */
+  /** Yalnız non-production — test/dev üçün OTP UI-də göstərilir */
   previewCode?: string;
 }
 
@@ -211,7 +211,7 @@ export class MailService {
       );
       return {
         delivered: false,
-        ...(input.previewCode ? { previewCode: input.previewCode } : {}),
+        ...this.devPreview(input.previewCode),
       };
     }
 
@@ -223,7 +223,16 @@ export class MailService {
       text: input.text,
       html: input.html,
     });
-    return { delivered: true };
+    return {
+      delivered: true,
+      // Test rejimində SMTP olsa belə kodu API cavabında qaytar (prod-da heç vaxt)
+      ...this.devPreview(input.previewCode),
+    };
+  }
+
+  private devPreview(previewCode?: string): { previewCode?: string } {
+    if (this.isProduction || !previewCode) return {};
+    return { previewCode };
   }
 }
 

@@ -83,7 +83,7 @@ export default function CustomerBookingsPage() {
             : {}),
       }),
     enabled: !!token,
-    refetchInterval: 5_000,
+    refetchInterval: 20_000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
   });

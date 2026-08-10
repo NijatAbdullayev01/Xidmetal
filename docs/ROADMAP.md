@@ -4,7 +4,7 @@ Bu sənəd hədəf arxitekturaya çatmaq üçün mərhələli, prioritetləşdir
 
 Əlaqəli sənədlər: [TARGET_ARCHITECTURE.md](./TARGET_ARCHITECTURE.md), [DATA_MODEL.md](./DATA_MODEL.md), [REALTIME_TRACKING.md](./REALTIME_TRACKING.md), [BOOKING_LIFECYCLE.md](./BOOKING_LIFECYCLE.md), [ARCHITECTURE.md](./ARCHITECTURE.md) (cari vəziyyət).
 
-> **Cari baza (2026-08):** marketplace MVP + on-demand — auth, services, availability, bookings (SCHEDULED + INSTANT), dispatch, live tracking (Socket.IO), reviews, messages (REST), in-app/push/SMS kanalları (env), payments scaffolding (flag OFF), reports, contact, admin panel. Aşağıdakı checkbox-lar hədəf yola nisbətən yenilənib.
+> **Cari baza (2026-08):** marketplace MVP + on-demand — auth, services, availability, bookings (SCHEDULED + INSTANT), dispatch, live tracking (Socket.IO), reviews, messages (REST), in-app/push kanalları (env), payments scaffolding (flag OFF), reports, contact, admin panel. Aşağıdakı checkbox-lar hədəf yola nisbətən yenilənib.
 
 > **Məhsul qərarı (rol):** bir hesab = bir rol (`CUSTOMER` **və ya** `PROVIDER`). Eyni hesabla müştəridən xidmət verənə keçid / dual-role **yoxdur** — bu boşluq deyil, qəsdən qərardır. Xidmət verən olmaq üçün ayrı qeydiyyat. Ətraflı: [ARCHITECTURE.md](./ARCHITECTURE.md) § Rollar.
 
@@ -20,7 +20,7 @@ Bu sənəd hədəf arxitekturaya çatmaq üçün mərhələli, prioritetləşdir
 
 ## Faza 1 — Domain tamlığı (mövcud boşluqlar)
 - [x] **Reviews modulu** — yaratma + rating aggregate (transaction); admin moderation var.
-- [x] **Notifications modulu** — in-app siyahı + oxundu; push/SMS ✅ Faza 5.
+- [x] **Notifications modulu** — in-app siyahı + oxundu; push ✅ Faza 5.
 - [x] **Messages modulu** — REST chat (WebSocket ayrı fazada).
 - [x] **Booking state machine (əsas)** — icazəli keçidlər + rol matrisi (`PENDING`…`COMPLETED`); admin bypass.
 - [x] Booking lifecycle tam hədəf: `EN_ROUTE`, `ARRIVED`; `BookingType` (INSTANT/SCHEDULED); timestamp sahələri (`acceptedAt`/`enRouteAt`/`arrivedAt`/`startedAt`/`completedAt`/`cancelledAt`). INSTANT avto-dispatch Phase 4.
@@ -34,11 +34,12 @@ Bu sənəd hədəf arxitekturaya çatmaq üçün mərhələli, prioritetləşdir
 - [x] Booking-ə origin/dest koordinatları.
 
 ## Faza 3 — Real-time & tracking
-- [x] Socket.IO gateway + JWT handshake auth (hazırda mesaj/bildiriş **polling** fallback saxlanılır; WS additive).
+- [x] Socket.IO gateway + JWT handshake auth (mesajlar: `message:new` + HTTP polling fallback; bildirişlər: `notification:new` + polling).
 - [x] Redis adapter (miqyaslama) — Redis artıq throttler üçün bağlıdır; Socket.IO `@socket.io/redis-adapter` əlavə olunub (REDIS_URL yoxdursa in-memory).
 - [x] `tracking` modulu: `location:push` → yayım + `LocationPing` (sampling).
 - [x] Frontend: canlı xəritə (Mapbox), provider marker, ETA.
 - [x] Provider PWA: `watchPosition` + throttle (+ minimal manifest/SW).
+- [x] Chat realtime: `MESSAGE_NEW` emit + web invalidate (polling interval WS bağlı olanda yavaşladılır).
 
 ## Faza 4 — Dispatch (on-demand çağırış)
 - [x] `dispatch` modulu: yaxın provider tapma + sıralama.
@@ -49,7 +50,7 @@ Bu sənəd hədəf arxitekturaya çatmaq üçün mərhələli, prioritetləşdir
 > **Cari məhsul qərarı (2026-08):** Platforma **ödənişsizdir** — xidmət verənlərdən komissiya/abunə alınmır; tərəflər öz aralarında razılaşır. Daxili ödəniş modulunun tətbiqi gələcək məhsul qərarından asılıdır.
 - [x] `payments` modulu — **scaffolding + feature flag** (`PAYMENTS_ENABLED=false` default). Intent/hold/capture/refund + Noop/Stripe stub; booking axını PaymentIntent tələb etmir.
 - [x] İdempotency açarları — `Payment.idempotencyKey` + `IdempotencyRecord` (TTL + saatlıq cleanup); `Idempotency-Key` header payments route-larında.
-- [x] Push (FCM) + SMS — `DeviceToken`; FCM HTTP v1/legacy + Twilio real send (credentials); default noop. Web Firebase `getToken`. SMS yalnız `phoneVerifiedAt` + `SMS_STATUS_ENABLED`.
+- [x] Push (FCM) — `DeviceToken`; FCM HTTP v1/legacy real send (credentials); default noop. Web Firebase `getToken`.
 
 ## Faza 6 — Miqyas & keyfiyyət
 - [x] Fayl saxlama (local + S3/R2 driver) — `POST /uploads`; magic-byte yoxlama + orphan silinmə.

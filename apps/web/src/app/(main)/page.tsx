@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { CategorySummary } from '@xidmetal/shared';
 import { BecomeProviderLink } from '@/components/auth/become-provider-link';
+import { UrgentOrderButton } from '@/components/home/urgent-order-button';
 import { HomeCategoriesSkeleton } from '@/components/ui/page-skeletons';
 import { api } from '@/lib/api';
 import { getCategoryIcon } from '@/lib/category-icons';
@@ -123,7 +124,7 @@ async function HomeCategories() {
         }));
 
   return (
-    <section className="pt-8 pb-12 sm:pt-[50px] sm:pb-20">
+    <section className="pt-4 pb-12 sm:pt-6 sm:pb-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
           Xidmətlər
@@ -200,6 +201,9 @@ export default function HomePage() {
                 Xidmətal xidmət verənlərlə xidmət alanları bir araya gətirən etibarlı
                 platformadır. Ev təmiri, təmizlik, gözəllik və daha çoxu — hamısı bir yerdə.
               </p>
+              <div className="flex justify-center">
+                <UrgentOrderButton />
+              </div>
             </div>
           </div>
         </div>

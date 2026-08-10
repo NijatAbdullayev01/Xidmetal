@@ -25,7 +25,7 @@ Swagger / xarici klientlər Bearer header dəstəklənir. Access default: `15m`.
 
 Yeni istifadəçi. `role`: `CUSTOMER` | `PROVIDER` (`ADMIN` qeydiyyatı qadağandır).
 **Məhsul qərarı:** rol qeydiyyatda seçilir və dəyişmir; `CUSTOMER` → `PROVIDER` upgrade endpoint-i yoxdur (ayrı hesab lazımdır).
-Qeydiyyatdan sonra e-poçt təsdiq kodu göndərilir (`isVerified: false` qalır — soft verify; girişə mane olmur).
+Qeydiyyatdan sonra e-poçt təsdiq kodu göndərilir (`isVerified: false`). Marketplace kabinetinə keçid üçün e-poçt təsdiqi məcburidir (`/verify-email`); təsdiqlənənə qədər dashboard açıla bilməz.
 Opsional `captchaToken` — `TURNSTILE_SECRET_KEY` setdirsə məcburidir.
 
 **Body:**
@@ -118,18 +118,6 @@ Yeni e-poçt üçün kod (SMTP varsa mail; yoxdursa dev log).
 ### POST /users/me/email/confirm-change 🔒
 
 Kod ilə e-poçt təsdiqi.
-
-### POST /users/me/phone/request-verify 🔒
-
-Telefon OTP (SMS; `SMS_PROVIDER=noop` olduqda `previewCode`).
-
-### POST /users/me/phone/confirm-verify 🔒
-
-Kod ilə `phoneVerifiedAt` təsdiqi.
-
-### GET /users/me/export 🔒
-
-Şəxsi məlumatların JSON ixracı (profil, sifarişlər, bildirişlər, maskalanmış device token-lər).
 
 ### DELETE /users/me 🔒
 
@@ -304,7 +292,7 @@ Soft-delete (yalnız öz siyahısından).
 
 Typing indicator (DB `typing_presences`; multi-instance; ~4s TTL). E-poçt təsdiqi məcburidir.
 
-> Mesajlar üçün WS hələ yox — frontend polling; sifariş tracking üçün Socket.IO (aşağıya bax).
+> Mesajlar: REST + Socket.IO `message:new` (polling fallback saxlanılır); sifariş tracking üçün Socket.IO (aşağıya bax).
 
 ---
 
@@ -343,9 +331,10 @@ Socket.IO eyni API prosesində (`http://localhost:4000/socket.io`). CORS: `CORS_
 
 ### GET /realtime/socket-token 🔒
 
-httpOnly cookie (və ya Bearer) access JWT-ni WS `auth.token` üçün qaytarır.
+WS sessiyasının hazır olduğunu yoxlayır. Socket.IO handshake auth üçün bearer qaytarmır;
+brauzer client `withCredentials` + httpOnly cookie ilə qoşulur.
 
-**Response:** `{ "token": "<jwt>" }`
+**Response:** `{ "authenticated": true }`
 
 ### GET /bookings/:id/location-pings 🔒
 
@@ -362,6 +351,8 @@ httpOnly cookie (və ya Bearer) access JWT-ni WS `auth.token` üçün qaytarır.
 | S→C | `location:update` | `booking:{id}` otağı + ETA |
 | S→C | `booking:status` | Status dəyişəndə |
 | S→C | `notification:new` | Opsional `user:{id}` |
+| S→C | `message:new` | Chat: `user:{recipientId}` — `{ conversationId, messageId, senderId, preview, createdAt }` |
+| S→C | `dispatch:offer` / `dispatch:offer-expired` / `dispatch:offer-result` | Provider otağı / booking |
 
 Env: `NEXT_PUBLIC_WS_URL`, `NEXT_PUBLIC_MAPBOX_TOKEN`, `MAPBOX_ACCESS_TOKEN` (Directions; boş = haversine ETA).
 
@@ -393,7 +384,7 @@ Yalnız admin inbox bildirişlərini oxundu edir.
 > **Kanal qaydası:** zəng / `/notifications` = yalnız `ADMIN_*`; sifariş = booking badge; mesaj = söhbət; rəy = review badge.
 > Emit olunanlar: `BOOKING_CREATED`, `BOOKING_CONFIRMED`, `BOOKING_REJECTED`, `BOOKING_CANCELLED`, `BOOKING_IN_PROGRESS`, `BOOKING_COMPLETED`, `BOOKING_RESCHEDULE_PROPOSED`, `BOOKING_RESCHEDULE_REJECTED` (tarix təklifi rədd — sifariş PENDING qalır), `REVIEW_RECEIVED`, `MESSAGE_RECEIVED` (söhbət üzrə dedupe), `ADMIN_ANNOUNCEMENT`. Admin `CONFIRMED`/`REJECTED` keçidləri də müştəriyə in-app bildiriş göndərir.
 > Review unread: `GET/POST …/review-unread-count` / `review-read-all`.
-> In-app create-dən sonra best-effort **push** (DeviceToken + FCM/noop). Kritik statuslar üçün **SMS** yalnız `SMS_STATUS_ENABLED=true` və `user.phone` olduqda.
+> In-app create-dən sonra best-effort **push** (DeviceToken + FCM/noop).
 
 ---
 

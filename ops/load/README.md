@@ -15,10 +15,16 @@ pnpm load:smoke
 
 # Stress (~80s, ramp 25 VU)
 pnpm load:stress
+
+# Capacity (ramp → 5000 VU, HTTP) — 5k hədəf yoxlaması
+pnpm load:capacity
+
+# Socket.IO handshake smoke (node + apps/web socket.io-client)
+pnpm load:realtime
 ```
 
-k6 yoxdursa skript xəbərdarlıq verir və **exit 0** (fail-soft).
-
+k6 yoxdursa smoke/stress xəbərdarlıq verir və **exit 0** (fail-soft).
+`load:realtime` API və ya socket.io-client yoxdursa eyni fail-soft.
 ## Env
 
 | Dəyişən | Default | Təsvir |
@@ -34,6 +40,7 @@ Secret-ləri commit etməyin. Nümunə: `.env.example`.
 |--------|------------|-----|
 | smoke | `<1%` | `<500ms` |
 | stress | `<5%` | `<2s` |
+| capacity | `<5%` | `<2s` |
 
 ## Nəticələr
 

@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { UserRole } from '@xidmetal/shared';
 import { RequireRole } from '@/components/auth/require-role';
 import { DashboardSidebar } from '@/components/layout/dashboard-sidebar';
-import { NotificationPermissionBanner } from '@/components/notifications/notification-permission-banner';
+import { ProviderDutyLocationSync } from '@/components/provider/provider-duty-location-sync';
 import { usePresenceHeartbeat } from '@/hooks/use-presence-heartbeat';
 import { cn } from '@/lib/utils';
 
@@ -23,24 +23,22 @@ export default function ProviderDashboardLayout({ children }: { children: React.
 
   return (
     <RequireRole role={UserRole.PROVIDER}>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <NotificationPermissionBanner />
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-          <DashboardSidebar variant="provider" />
-          <main
-            className={cn('min-h-0 flex-1', isFillViewport ? 'overflow-hidden' : 'overflow-y-auto')}
+      <ProviderDutyLocationSync />
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        <DashboardSidebar variant="provider" />
+        <main
+          className={cn('min-h-0 flex-1', isFillViewport ? 'overflow-hidden' : 'overflow-y-auto')}
+        >
+          <div
+            className={cn(
+              'px-4 sm:px-6 lg:px-8',
+              isFullWidth ? 'w-full' : 'mx-auto max-w-6xl',
+              isFillViewport ? 'flex h-full min-h-0 flex-col py-4' : 'py-6',
+            )}
           >
-            <div
-              className={cn(
-                'px-4 sm:px-6 lg:px-8',
-                isFullWidth ? 'w-full' : 'mx-auto max-w-6xl',
-                isFillViewport ? 'flex h-full min-h-0 flex-col py-4' : 'py-6',
-              )}
-            >
-              {children}
-            </div>
-          </main>
-        </div>
+            {children}
+          </div>
+        </main>
       </div>
     </RequireRole>
   );

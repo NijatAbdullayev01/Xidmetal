@@ -96,6 +96,34 @@ export class CreateBookingDto {
   @Min(-180)
   @Max(180)
   originLng?: number;
+
+  @ApiPropertyOptional({
+    description: 'INSTANT dispatch — minimum xidmət verən reytinqi (0–5)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(5)
+  minRating?: number;
+
+  @ApiPropertyOptional({
+    description: 'INSTANT dispatch — minimum xidmət qiyməti',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minPrice?: number;
+
+  @ApiPropertyOptional({
+    description: 'INSTANT dispatch — maksimum xidmət qiyməti',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxPrice?: number;
 }
 
 export class UpdateBookingStatusDto {

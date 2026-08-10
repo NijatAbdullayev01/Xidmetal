@@ -17,6 +17,7 @@ import {
   assertProviderVerified,
   isProviderDutyAvailability,
 } from '../../common/provider/assert-provider-verified';
+import { StorageService } from '../../common/storage/storage.service';
 import { GEOCODER_ADAPTER, type GeocoderAdapter } from './geocoder';
 import type {
   NearbyProvidersQueryDto,
@@ -47,6 +48,7 @@ export class GeoService {
   constructor(
     private prisma: PrismaService,
     @Inject(GEOCODER_ADAPTER) private geocoder: GeocoderAdapter,
+    private storageService: StorageService,
   ) {}
 
   async geocode(query: string) {
@@ -96,6 +98,43 @@ export class GeoService {
       lastHeading: dto.heading ?? null,
       locationUpdatedAt: now.toISOString(),
     };
+  }
+
+  /**
+   * Canlı izləmə hot-path üçün yüngül sync — verify/availability toxunmur.
+   * Hər 3s push əvəzinə TrackingService interval ilə çağırır.
+   */
+  async syncTrackingCoordinates(
+    userId: string,
+    coords: { lat: number; lng: number; heading?: number | null },
+  ): Promise<void> {
+    this.assertCoords(coords.lat, coords.lng);
+    if (!isValidHeading(coords.heading)) {
+      throw new BadRequestException('İstiqamət 0…360 aralığında olmalıdır');
+    }
+
+    const now = new Date();
+    try {
+      const profile = await this.prisma.providerProfile.update({
+        where: { userId },
+        data: {
+          lastLat: coords.lat,
+          lastLng: coords.lng,
+          lastHeading: coords.heading ?? null,
+          locationUpdatedAt: now,
+        },
+        select: { id: true },
+      });
+      await this.syncLastLocationGeography(profile.id, coords.lat, coords.lng);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        return;
+      }
+      throw error;
+    }
   }
 
   async updateMyAvailability(userId: string, dto: UpdateProviderAvailabilityDto) {
@@ -251,7 +290,7 @@ export class GeoService {
           LIMIT ${limit}
         `);
 
-    return rows.map((row) => this.mapNearbyRow(row));
+    return Promise.all(rows.map((row) => this.mapNearbyRow(row)));
   }
 
   private async findNearbyHaversine(params: {
@@ -315,7 +354,7 @@ export class GeoService {
         userId: p.user.id,
         firstName: p.user.firstName,
         lastName: p.user.lastName,
-        avatarUrl: p.user.avatarUrl ?? undefined,
+        avatarUrl: await this.storageService.toReadableMediaUrl(p.user.avatarUrl),
         rating: p.rating,
         reviewCount: p.reviewCount,
         isVerified: p.isVerified,
@@ -331,12 +370,12 @@ export class GeoService {
     return scored.slice(0, limit);
   }
 
-  private mapNearbyRow(row: NearbyRawRow): NearbyProviderSummary {
+  private async mapNearbyRow(row: NearbyRawRow): Promise<NearbyProviderSummary> {
     return {
       userId: row.user_id,
       firstName: row.first_name,
       lastName: row.last_name,
-      avatarUrl: row.avatar_url ?? undefined,
+      avatarUrl: await this.storageService.toReadableMediaUrl(row.avatar_url),
       rating: Number(row.rating),
       reviewCount: Number(row.review_count),
       isVerified: row.is_verified,

@@ -82,7 +82,7 @@ model Booking {
   completedAt    DateTime?   @map("completed_at")
   cancelledAt    DateTime?   @map("cancelled_at")
   cancelReason   String?     @map("cancel_reason")
-  cancelledBy    String?     @map("cancelled_by")   // userId
+  cancelledBy    String?     @map("cancelled_by")   // CUSTOMER | PROVIDER | ADMIN | SYSTEM
 
   // Hədəf (Phase 3–5):
   locationPings  LocationPing[]
@@ -239,7 +239,7 @@ model IdempotencyRecord {
 ## 8. Mövcud modellər
 
 `Review`, `Notification`, `Payment`, `DeviceToken` schema + backend modulları mövcuddur.
-- `notifications` — in-app + best-effort push/SMS kanalları.
+- `notifications` — in-app + best-effort push kanalları.
 - `payments` — flag-gated scaffolding.
 - `devices` — DeviceToken register/unregister.
 

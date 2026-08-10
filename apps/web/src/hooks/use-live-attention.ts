@@ -20,7 +20,6 @@ import {
 import {
   dashboardBookingsPath,
   dashboardMessagesPath,
-  requestNotificationPermission,
   showOsNotification,
   vibrateAttention,
 } from '@/lib/live-attention';
@@ -101,13 +100,12 @@ export function useLiveAttention(enabled: boolean) {
     [queryClient],
   );
 
-  // Audio + Notification icazəsi — ilk istifadəçi jestində
+  // Audio unlock — ilk istifadəçi jestində (icazə dialoqu yalnız «İcazə ver» düyməsindən)
   useEffect(() => {
     if (!enabled) return;
 
     const unlock = () => {
       void unlockNotificationAudio();
-      void requestNotificationPermission();
     };
 
     window.addEventListener('pointerdown', unlock, { once: true });

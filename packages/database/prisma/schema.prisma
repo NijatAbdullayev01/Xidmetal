@@ -22,8 +22,6 @@ model User {
   firstName     String    @map("first_name")
   lastName      String    @map("last_name")
   phone         String?   @unique
-  /** SMS/OTP — yalnız təsdiqlənmiş nömrəyə status SMS göndərilir */
-  phoneVerifiedAt DateTime? @map("phone_verified_at")
   avatarUrl     String?   @map("avatar_url")
   role          UserRole  @default(CUSTOMER)
   isVerified    Boolean   @default(false) @map("is_verified")
@@ -61,8 +59,6 @@ enum EmailVerificationPurpose {
   EMAIL_CHANGE
   SIGNUP_VERIFY
   PASSWORD_RESET
-  /** `email` sütununda E.164 telefon saxlanılır */
-  PHONE_VERIFY
 }
 
 model EmailVerificationCode {
@@ -315,7 +311,7 @@ model Booking {
   imageUrl    String?       @map("image_url") @db.Text
   /** Ləğv səbəbi (CANCELLED olduqda) */
   cancelReason String?      @map("cancel_reason") @db.VarChar(500)
-  /** CUSTOMER | PROVIDER | ADMIN */
+  /** CUSTOMER | PROVIDER | ADMIN | SYSTEM */
   cancelledBy  String?      @map("cancelled_by") @db.VarChar(20)
   cancelledAt  DateTime?    @map("cancelled_at")
   /** PENDING → CONFIRMED */

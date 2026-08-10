@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { DevicePlatform, type DeviceTokenSummary } from '@xidmetal/shared';
 import { PrismaService } from '../../common/database/prisma.service';
 import type { RegisterDeviceTokenDto, UnregisterDeviceTokenDto } from './dto';
@@ -16,6 +20,17 @@ export class DevicesService {
       throw new BadRequestException('Cihaz tokeni etibarsızdır');
     }
 
+    const existing = await this.prisma.deviceToken.findUnique({
+      where: { token: dto.token },
+      select: { id: true, userId: true },
+    });
+
+    if (existing && existing.userId !== userId) {
+      throw new ConflictException(
+        'Bu cihaz tokeni başqa hesaba bağlıdır',
+      );
+    }
+
     const row = await this.prisma.deviceToken.upsert({
       where: { token: dto.token },
       create: {
@@ -24,7 +39,6 @@ export class DevicesService {
         platform: dto.platform,
       },
       update: {
-        userId,
         platform: dto.platform,
       },
     });

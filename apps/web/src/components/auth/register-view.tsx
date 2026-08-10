@@ -35,7 +35,7 @@ export function RegisterView({ defaultRole }: RegisterViewProps) {
         showSuccess
           ? user?.isVerified
             ? 'Qeydiyyat uğurla tamamlandı. Sizi hesabınıza yönləndiririk…'
-            : 'Qeydiyyat uğurla tamamlandı. E-poçt təsdiqinə yönləndirilirsiniz…'
+            : 'Qeydiyyat uğurla tamamlandı. Hesaba keçmək üçün e-poçtunuzu təsdiqləyin…'
           : 'Hesab növünü seçin və məlumatlarınızı daxil edin'
       }
     >

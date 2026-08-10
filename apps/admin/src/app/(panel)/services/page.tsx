@@ -236,15 +236,26 @@ export default function AdminServicesPage() {
                       {service.description}
                     </p>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-                      <span>{service.categoryName}</span>
+                      <span>
+                        Kateqoriya:{' '}
+                        <span className="text-foreground">{service.categoryName}</span>
+                      </span>
                       <span aria-hidden className="text-border">
                         ·
                       </span>
-                      <span className="truncate">{service.providerName}</span>
+                      <span className="truncate">
+                        Xidmət verən:{' '}
+                        <span className="text-foreground">{service.providerName}</span>
+                      </span>
                       <span aria-hidden className="text-border">
                         ·
                       </span>
-                      <span>{formatPrice(service.price)}</span>
+                      <span>
+                        Qiymət:{' '}
+                        <span className="text-foreground">
+                          {formatPrice(service.price)}
+                        </span>
+                      </span>
                     </div>
                     {service.reviewNote ? (
                       <p className="rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">

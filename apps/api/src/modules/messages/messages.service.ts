@@ -5,7 +5,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/database/prisma.service';
+import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
+import { StorageService } from '../../common/storage/storage.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { CreateConversationDto, SendMessageDto } from './dto';
 import { clearTypingDb, isPeerTypingDb, setTypingDb } from './typing.store';
 import { UserRole, NotificationType } from '@xidmetal/shared';
@@ -49,6 +52,9 @@ export class MessagesService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private storageService: StorageService,
+    private realtime: RealtimeService,
+    private notificationChannels: NotificationChannelsService,
   ) {}
 
   private conversationWhereForUser(userId: string, role: string) {
@@ -155,8 +161,10 @@ export class MessagesService {
       }
     }
 
-    const items = conversations.map((conv) =>
-      this.mapConversation(conv, unreadCounts.get(conv.id) ?? 0, 'desc'),
+    const items = await Promise.all(
+      conversations.map((conv) =>
+        this.mapConversation(conv, unreadCounts.get(conv.id) ?? 0, 'desc'),
+      ),
     );
 
     return {
@@ -224,7 +232,7 @@ export class MessagesService {
       messages: messagesAsc,
     };
 
-    const summary = this.mapConversation(withMessages, unreadCount, 'asc');
+    const summary = await this.mapConversation(withMessages, unreadCount, 'asc');
     return {
       ...summary,
       messages: messagesAsc.map((m) => this.mapMessage(m)),
@@ -532,7 +540,9 @@ export class MessagesService {
         ? conversation.providerId
         : conversation.customerId;
 
-    const message = await this.prisma.$transaction(async (tx) => {
+    const preview = content.length > 80 ? `${content.slice(0, 80)}…` : content;
+
+    const { message, notification } = await this.prisma.$transaction(async (tx) => {
       const created = await tx.message.create({
         data: {
           conversationId,
@@ -562,9 +572,14 @@ export class MessagesService {
         select: { id: true },
       });
 
+      let createdNotification: {
+        id: string;
+        title: string;
+        body: string;
+      } | null = null;
+
       if (!existingUnread) {
-        const preview = content.length > 80 ? `${content.slice(0, 80)}…` : content;
-        await tx.notification.create({
+        createdNotification = await tx.notification.create({
           data: {
             userId: recipientId,
             type: NotificationType.MESSAGE_RECEIVED,
@@ -572,11 +587,32 @@ export class MessagesService {
             body: `${created.sender.firstName}: ${preview}`,
             data: { conversationId, messageId: created.id },
           },
+          select: { id: true, title: true, body: true },
         });
       }
 
-      return created;
+      return { message: created, notification: createdNotification };
     });
+
+    // Best-effort: canlı chat + (yeni in-app olduqda) push/WS notification
+    this.realtime.emitMessageNew(recipientId, {
+      conversationId,
+      messageId: message.id,
+      senderId: userId,
+      preview,
+      createdAt: message.createdAt.toISOString(),
+    });
+
+    if (notification) {
+      this.notificationChannels.deliverAfterInApp({
+        userId: recipientId,
+        notificationId: notification.id,
+        title: notification.title,
+        body: notification.body,
+        type: NotificationType.MESSAGE_RECEIVED,
+        data: { conversationId, messageId: message.id },
+      });
+    }
 
     return this.mapMessage(message);
   }
@@ -614,13 +650,13 @@ export class MessagesService {
     };
   }
 
-  private mapConversation(
+  private async mapConversation(
     conv: Omit<ConversationWithRelations, 'messages'> & {
       messages?: ConversationWithRelations['messages'];
     },
     unreadCount: number,
     messageOrder: 'asc' | 'desc',
-  ): ConversationSummary {
+  ): Promise<ConversationSummary> {
     const messages = conv.messages ?? [];
     const lastMsg =
       messageOrder === 'desc' ? messages[0] : messages.length > 0 ? messages[messages.length - 1] : undefined;
@@ -628,10 +664,10 @@ export class MessagesService {
       id: conv.id,
       customerId: conv.customerId,
       customerName: `${conv.customer.firstName} ${conv.customer.lastName}`,
-      customerAvatarUrl: conv.customer.avatarUrl ?? undefined,
+      customerAvatarUrl: await this.storageService.toReadableMediaUrl(conv.customer.avatarUrl),
       providerId: conv.providerId,
       providerName: `${conv.provider.firstName} ${conv.provider.lastName}`,
-      providerAvatarUrl: conv.provider.avatarUrl ?? undefined,
+      providerAvatarUrl: await this.storageService.toReadableMediaUrl(conv.provider.avatarUrl),
       bookingId: conv.bookingId ?? undefined,
       serviceTitle: conv.booking?.service.title,
       lastMessage: lastMsg?.content,

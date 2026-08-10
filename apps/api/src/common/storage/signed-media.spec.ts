@@ -15,10 +15,18 @@ describe('signed-media', () => {
     ).toBe('http://localhost:4000/uploads/bookings/a.jpg');
   });
 
-  it('services ictimai qalır', () => {
+  it('services imzalanır', () => {
     const url = 'http://localhost:4000/uploads/services/x.jpg';
-    expect(signPrivateMediaUrl(url, secret)).toBe(url);
-    expect(isPrivateUploadKey('services/x.jpg')).toBe(false);
+    const signed = signPrivateMediaUrl(url, secret, 60);
+    expect(signed).toContain('sig=');
+    expect(isPrivateUploadKey('services/x.jpg')).toBe(true);
+  });
+
+  it('avatars imzalanır', () => {
+    const url = 'http://localhost:4000/uploads/avatars/x.jpg';
+    const signed = signPrivateMediaUrl(url, secret, 60);
+    expect(signed).toContain('sig=');
+    expect(isPrivateUploadKey('avatars/x.jpg')).toBe(true);
   });
 
   it('bookings imzalanır və doğrulanır', () => {
@@ -48,5 +56,32 @@ describe('signed-media', () => {
         secret,
       }),
     ).toBe(false);
+  });
+
+  it('services və avatars da doğrulanır', () => {
+    for (const key of ['services/x.jpg', 'avatars/x.jpg'] as const) {
+      const signed = signPrivateMediaUrl(
+        `http://localhost:4000/uploads/${key}`,
+        secret,
+        60,
+      );
+      const parsed = new URL(signed);
+      expect(
+        verifyPrivateMediaAccess({
+          uploadKey: key,
+          expRaw: parsed.searchParams.get('exp') ?? undefined,
+          sigRaw: parsed.searchParams.get('sig') ?? undefined,
+          secret,
+        }),
+      ).toBe(true);
+      expect(
+        verifyPrivateMediaAccess({
+          uploadKey: key,
+          expRaw: undefined,
+          sigRaw: undefined,
+          secret,
+        }),
+      ).toBe(false);
+    }
   });
 });

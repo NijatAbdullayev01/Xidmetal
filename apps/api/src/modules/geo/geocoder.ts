@@ -47,6 +47,7 @@ export class NominatimGeocoder implements GeocoderAdapter {
     this.userAgent =
       this.config.get<string>('GEOCODER_USER_AGENT')?.trim() ||
       'Xidmetal/1.0 (geo@xidmetal.az)';
+    this.assertAllowedBaseUrl();
   }
 
   async geocode(query: string): Promise<GeocodeResult[]> {
@@ -101,6 +102,25 @@ export class NominatimGeocoder implements GeocoderAdapter {
         `Nominatim xəta: ${error instanceof Error ? error.message : String(error)}`,
       );
       return [] as T;
+    }
+  }
+
+  private assertAllowedBaseUrl(): void {
+    const parsed = new URL(this.baseUrl);
+    if (parsed.protocol !== 'https:') {
+      throw new Error('GEOCODER_BASE_URL yalnız https ola bilər');
+    }
+
+    const allowedHosts = (
+      this.config.get<string>('GEOCODER_ALLOWED_HOSTS')?.trim() ||
+      'nominatim.openstreetmap.org'
+    )
+      .split(',')
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (!allowedHosts.includes(parsed.hostname.toLowerCase())) {
+      throw new Error('GEOCODER_BASE_URL təsdiqlənmiş host siyahısında deyil');
     }
   }
 }

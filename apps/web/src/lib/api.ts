@@ -6,7 +6,6 @@ import type {
   RequestEmailVerificationInput,
   ConfirmEmailVerificationInput,
   UserProfile,
-  UserDataExport,
   ServiceSummary,
   BookingSummary,
   CategorySummary,
@@ -290,21 +289,6 @@ export const api = {
         token,
         body: JSON.stringify(data),
       }),
-    requestPhoneVerify: (token: string) =>
-      apiClient<{
-        message: string;
-        alreadyVerified?: boolean;
-        previewCode?: string;
-      }>('/users/me/phone/request-verify', {
-        method: 'POST',
-        token,
-      }),
-    confirmPhoneVerify: (token: string, data: { code: string }) =>
-      apiClient<UserProfile>('/users/me/phone/confirm-verify', {
-        method: 'POST',
-        token,
-        body: JSON.stringify(data),
-      }),
     deleteAccount: (
       token: string,
       data: { password: string; confirmText: string },
@@ -313,10 +297,6 @@ export const api = {
         method: 'DELETE',
         token,
         body: JSON.stringify(data),
-      }),
-    exportData: (token: string) =>
-      apiClient<UserDataExport>('/users/me/export', {
-        token,
       }),
   },
 
@@ -495,11 +475,6 @@ export const api = {
       `/bookings/${bookingId}/location-pings${query}`,
       { token },
     );
-  },
-
-  realtime: {
-    socketToken: (token: string) =>
-      apiClient<{ token: string }>('/realtime/socket-token', { token }),
   },
 
   createReview: (token: string, data: CreateReviewInput) =>

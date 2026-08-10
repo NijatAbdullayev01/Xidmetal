@@ -141,7 +141,7 @@ export function AdminSidebar() {
   return (
     <>
       <div className="sticky top-0 z-40 flex h-14 min-h-[3.5rem] items-center justify-between border-b border-border bg-background px-4 safe-top lg:hidden">
-        <p className="text-sm font-semibold">Xidmətal Admin</p>
+        <p className="text-sm font-semibold">İdarə etmə paneli</p>
         <div className="flex items-center gap-1">
           <ThemeToggle variant="switch" />
           <button
@@ -177,7 +177,7 @@ export function AdminSidebar() {
 
       <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-border bg-card lg:flex lg:h-[100dvh] lg:overflow-hidden">
         <div className="flex h-16 items-center justify-between gap-2 border-b border-border px-4">
-          <p className="truncate text-sm font-semibold">Xidmətal Admin</p>
+          <p className="truncate text-sm font-semibold">İdarə etmə paneli</p>
           <ThemeToggle variant="switch" />
         </div>
         {navContent}

@@ -20,6 +20,12 @@
     "db:studio": "pnpm --filter @xidmetal/database studio",
     "load:smoke": "bash ops/load/run.sh smoke",
     "load:stress": "bash ops/load/run.sh stress",
+    "load:capacity": "bash ops/load/run.sh capacity",
+    "load:capacity-mid": "bash ops/load/run.sh capacity-mid",
+    "load:realtime": "node ops/load/realtime-smoke.mjs",
+    "docker:infra": "docker compose up -d",
+    "docker:prod": "docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d --build --scale api=${API_REPLICAS:-3}",
+    "docker:prod:down": "docker compose -f docker-compose.yml -f docker-compose.prod.yml down",
     "clean": "turbo clean && rm -rf node_modules"
   },
   "devDependencies": {

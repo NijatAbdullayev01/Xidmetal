@@ -28,7 +28,11 @@ export function stripMediaSignature(url: string): string {
 }
 
 export function isPrivateUploadKey(key: string): boolean {
-  return key.startsWith(`${UPLOAD_FOLDERS.BOOKINGS}/`);
+  return (
+    key.startsWith(`${UPLOAD_FOLDERS.BOOKINGS}/`) ||
+    key.startsWith(`${UPLOAD_FOLDERS.SERVICES}/`) ||
+    key.startsWith(`${UPLOAD_FOLDERS.AVATARS}/`)
+  );
 }
 
 function hmacHex(secret: string, payload: string): string {
@@ -47,8 +51,7 @@ function safeEqualHex(a: string, b: string): boolean {
 }
 
 /**
- * Private upload (bookings) URL-ə qısaömürlü HMAC əlavə edir.
- * Public qovluqlar (services/avatars) dəyişməz qalır.
+ * Private upload URL-lərinə qısaömürlü HMAC əlavə edir.
  */
 export function signPrivateMediaUrl(
   url: string,

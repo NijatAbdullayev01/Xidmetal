@@ -104,6 +104,8 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /** Retry-də eyni açar — mutationFn daxilində UUID yaratmamaq üçün */
+  const idempotencyKeyRef = useRef<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | undefined>();
   const [imageError, setImageError] = useState<string | null>(null);
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
@@ -192,6 +194,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
     setImageError(null);
     setActivePicker(null);
     setBookingMode('SCHEDULED');
+    idempotencyKeyRef.current = null;
     clearErrors();
   }, [open, reset, clearErrors, service.id]);
 
@@ -211,10 +214,13 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
       const token = useAuthStore.getState().session ? 'session' : null;
       if (!token) throw new Error('Autentifikasiya tələb olunur');
 
-      const idempotencyKey =
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-          ? crypto.randomUUID()
-          : `booking-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      if (!idempotencyKeyRef.current) {
+        idempotencyKeyRef.current =
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `booking-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      }
+      const idempotencyKey = idempotencyKeyRef.current;
 
       if (bookingMode === 'INSTANT') {
         const destLat = Number(values.destLat);

@@ -15,6 +15,7 @@ const POLL_MS = 8_000;
 
 /**
  * Provider pending dispatch offers — WS `dispatch:offer` + REST polling fallback.
+ * WS bağlı olanda yalnız 90s safety-net.
  */
 export function useDispatchOffers(enabled = true) {
   const token = useAuthToken();
@@ -26,7 +27,8 @@ export function useDispatchOffers(enabled = true) {
     queryKey: ['dispatch', 'pending'],
     queryFn: () => api.dispatch.pendingOffers(token!),
     enabled: enabled && !!token,
-    refetchInterval: connected ? POLL_MS * 2 : POLL_MS,
+    refetchInterval: connected ? 90_000 : POLL_MS,
+    staleTime: 5_000,
   });
 
   const invalidate = useCallback(() => {

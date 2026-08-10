@@ -13,6 +13,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { UserRole } from '@xidmetal/shared';
 import { CurrentUser, Roles } from '../../common/decorators';
 import { JwtAuthGuard, RolesGuard } from '../../common/guards';
@@ -50,6 +51,7 @@ export class DispatchController {
 
   @Post('offers/:id/accept')
   @Roles(UserRole.PROVIDER)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @ApiOperation({ summary: 'On-demand təklifi qəbul et' })
   accept(
     @Param('id', ParseUUIDPipe) id: string,
@@ -60,6 +62,7 @@ export class DispatchController {
 
   @Post('offers/:id/reject')
   @Roles(UserRole.PROVIDER)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @ApiOperation({ summary: 'On-demand təklifi rədd et' })
   reject(
     @Param('id', ParseUUIDPipe) id: string,

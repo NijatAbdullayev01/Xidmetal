@@ -10,7 +10,6 @@ import {
   WsException,
 } from '@nestjs/websockets';
 import { Inject, Logger, forwardRef } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import type { Server, Socket } from 'socket.io';
 import {
   REALTIME_EVENTS,
@@ -28,29 +27,7 @@ import { ProviderPresenceService } from './provider-presence.service';
 import type { WsAuthenticatedUser } from './realtime-auth';
 import { MetricsService } from '../../common/metrics/metrics.service';
 
-function resolveCorsOrigins(config: ConfigService): string | string[] {
-  const socketCors = config.get<string>('SOCKET_CORS_ORIGIN')?.trim();
-  const corsOriginRaw =
-    socketCors ||
-    config.get<string>(
-      'CORS_ORIGIN',
-      'http://localhost:3020,http://localhost:3021',
-    );
-  const origins = [
-    ...corsOriginRaw.split(','),
-    config.get<string>('NEXT_PUBLIC_APP_URL'),
-    config.get<string>('NEXT_PUBLIC_ADMIN_URL'),
-  ]
-    .map((origin) => origin?.trim())
-    .filter((origin): origin is string => Boolean(origin))
-    .filter((origin, index, all) => all.indexOf(origin) === index);
-
-  if (origins.length === 0) return '*';
-  return origins.length === 1 ? origins[0]! : origins;
-}
-
 @WebSocketGateway({
-  cors: { origin: true, credentials: true },
   transports: ['websocket', 'polling'],
 })
 export class RealtimeGateway
@@ -66,33 +43,11 @@ export class RealtimeGateway
     private realtime: RealtimeService,
     @Inject(forwardRef(() => TrackingService))
     private tracking: TrackingService,
-    private config: ConfigService,
     private presence: ProviderPresenceService,
     private metrics: MetricsService,
   ) {}
 
   afterInit(server: Server): void {
-    const origins = resolveCorsOrigins(this.config);
-    server.engine.on(
-      'headers',
-      (
-        headers: Record<string, string>,
-        req: { headers?: { origin?: string } },
-      ) => {
-        const origin = req.headers?.origin;
-        if (!origin) return;
-        const allowed =
-          origins === '*' ||
-          (typeof origins === 'string'
-            ? origins === origin
-            : origins.includes(origin));
-        if (allowed) {
-          headers['Access-Control-Allow-Origin'] = origin;
-          headers['Access-Control-Allow-Credentials'] = 'true';
-        }
-      },
-    );
-
     this.realtime.setServer(server);
     this.logger.log('Socket.IO gateway hazır');
   }

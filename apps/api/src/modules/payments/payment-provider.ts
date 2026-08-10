@@ -1,6 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentStatus, PAYMENTS } from '@xidmetal/shared';
+
+const STRIPE_STUB_MESSAGE =
+  'Stripe ödəniş inteqrasiyası hələ hazır deyil — real charge yoxdur';
 
 export interface CreateIntentParams {
   amount: number;
@@ -73,55 +81,40 @@ export class NoopPaymentProvider implements PaymentProviderAdapter {
 }
 
 /**
- * Stripe skeleton — real charge etmir.
- * Env placeholder: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+ * Stripe skeleton — real charge / webhook yoxdur.
+ * Bütün əməliyyatlar 501: saxta CAPTURED status yaratmağa yol vermir.
+ * Env placeholder (gələcək): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
  */
 @Injectable()
 export class StripePaymentProvider implements PaymentProviderAdapter {
   readonly name = 'stripe';
   private readonly logger = new Logger(StripePaymentProvider.name);
-  private readonly secretKey: string | null;
 
   constructor(private config: ConfigService) {
-    this.secretKey = this.config.get<string>('STRIPE_SECRET_KEY')?.trim() || null;
-  }
-
-  async createIntent(params: CreateIntentParams): Promise<ProviderIntentResult> {
-    this.logger.log(
-      `[stripe stub] createIntent amount=${params.amount} (real charge deferred; key=${this.secretKey ? 'set' : 'missing'})`,
+    const key = this.config.get<string>('STRIPE_SECRET_KEY')?.trim();
+    this.logger.warn(
+      `[stripe stub] aktivdir amma real charge yoxdur (key=${key ? 'set' : 'missing'})`,
     );
-    return {
-      externalId: `stripe_pi_stub_${Date.now()}`,
-      status: PaymentStatus.REQUIRES_PAYMENT,
-      provider: this.name,
-    };
   }
 
-  async authorizeHold(externalId: string): Promise<ProviderIntentResult> {
-    this.logger.log(`[stripe stub] authorizeHold ${externalId}`);
-    return {
-      externalId,
-      status: PaymentStatus.AUTHORIZED,
-      provider: this.name,
-    };
+  private reject(): never {
+    throw new HttpException(STRIPE_STUB_MESSAGE, HttpStatus.NOT_IMPLEMENTED);
   }
 
-  async capture(externalId: string): Promise<ProviderIntentResult> {
-    this.logger.log(`[stripe stub] capture ${externalId}`);
-    return {
-      externalId,
-      status: PaymentStatus.CAPTURED,
-      provider: this.name,
-    };
+  async createIntent(_params: CreateIntentParams): Promise<ProviderIntentResult> {
+    this.reject();
   }
 
-  async refund(externalId: string): Promise<ProviderIntentResult> {
-    this.logger.log(`[stripe stub] refund ${externalId}`);
-    return {
-      externalId,
-      status: PaymentStatus.REFUNDED,
-      provider: this.name,
-    };
+  async authorizeHold(_externalId: string): Promise<ProviderIntentResult> {
+    this.reject();
+  }
+
+  async capture(_externalId: string): Promise<ProviderIntentResult> {
+    this.reject();
+  }
+
+  async refund(_externalId: string): Promise<ProviderIntentResult> {
+    this.reject();
   }
 }
 

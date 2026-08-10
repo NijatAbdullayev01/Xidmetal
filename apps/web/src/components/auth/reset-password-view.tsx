@@ -92,8 +92,8 @@ function ResetPasswordForm() {
           id="code"
           inputMode="numeric"
           autoComplete="one-time-code"
-          placeholder="123456"
-          maxLength={6}
+          placeholder="12345678"
+          maxLength={8}
           error={!!errors.code}
           disabled={isSubmitting}
           {...register('code')}

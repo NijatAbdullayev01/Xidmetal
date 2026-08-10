@@ -36,3 +36,18 @@ export function getDashboardPath(role: UserRole): string {
 export function getAdminAppUrl(): string {
   return process.env.NEXT_PUBLIC_ADMIN_URL ?? 'http://localhost:3021';
 }
+
+/** Dev/test — qeydiyyat cavabındakı OTP-ni verify səhifəsinə ötürmək üçün */
+const DEV_EMAIL_CODE_KEY = 'xidmetal:dev-verify-email-code';
+
+export function stashDevEmailCode(code: string | undefined): void {
+  if (typeof window === 'undefined' || !code) return;
+  sessionStorage.setItem(DEV_EMAIL_CODE_KEY, code);
+}
+
+export function takeDevEmailCode(): string | null {
+  if (typeof window === 'undefined') return null;
+  const code = sessionStorage.getItem(DEV_EMAIL_CODE_KEY);
+  if (code) sessionStorage.removeItem(DEV_EMAIL_CODE_KEY);
+  return code;
+}

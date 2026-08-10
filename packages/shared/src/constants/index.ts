@@ -19,6 +19,9 @@ export const API = {
   maxPageSize: 100,
 } as const;
 
+/** E-poçt təsdiq kodu — 8 rəqəm (6 rəqəm brute-force üçün zəifdir) */
+export const VERIFICATION_CODE_DIGITS = 8 as const;
+
 /** Brauzer klientləri — login audience (yanlış app-də cookie sızmasının qarşısı) */
 export const CLIENT_APP = {
   MARKETPLACE: 'marketplace',
@@ -47,8 +50,8 @@ export const DISPATCH = {
   QUEUE_NAME: 'dispatch-offers',
   /** Redis job prefix */
   QUEUE_PREFIX: 'xidmetal:dispatch',
-  /** Bir booking-ə eyni anda max aktiv PENDING offer */
-  MAX_ACTIVE_OFFERS: 1,
+  /** Bir booking-ə eyni anda max aktiv PENDING offer (bütün namizədlərə fan-out) */
+  MAX_ACTIVE_OFFERS: 20,
   /** Namizəd limiti */
   MAX_CANDIDATES: 20,
 } as const;
@@ -63,18 +66,8 @@ export const PAYMENTS = {
   IDEMPOTENCY_KEY_MAX_LEN: 128,
 } as const;
 
-/** Push / SMS kanalları (Faza 5) */
+/** Push / idempotency (Faza 5) */
 export const NOTIFICATION_CHANNELS = {
-  /** SMS yalnız bu tiplər üçün (SMS_STATUS_ENABLED=true) */
-  SMS_STATUS_TYPES: [
-    'BOOKING_CREATED',
-    'BOOKING_CONFIRMED',
-    'BOOKING_REJECTED',
-    'BOOKING_CANCELLED',
-    'BOOKING_EN_ROUTE',
-    'BOOKING_ARRIVED',
-    'BOOKING_COMPLETED',
-  ] as const,
   /** IdempotencyRecord default TTL (saat) */
   IDEMPOTENCY_TTL_HOURS: 24,
 } as const;

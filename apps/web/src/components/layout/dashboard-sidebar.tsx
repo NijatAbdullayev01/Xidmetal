@@ -20,7 +20,7 @@ import {
   Flag,
   type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { UserRole } from '@xidmetal/shared';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
@@ -113,6 +113,8 @@ function NavBadge({
 export function DashboardSidebar({ variant }: DashboardSidebarProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileHeaderRef = useRef<HTMLDivElement>(null);
+  const [mobilePanelTop, setMobilePanelTop] = useState(56);
   const user = useAuthStore((state) => state.user);
   const logout = useLogout();
   const { unreadCount: unreadMessages } = useMessageNotifications(!!user);
@@ -129,6 +131,35 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+
+  useLayoutEffect(() => {
+    const header = mobileHeaderRef.current;
+    if (!header) return;
+
+    const syncPanelTop = () => {
+      setMobilePanelTop(header.getBoundingClientRect().bottom);
+    };
+
+    syncPanelTop();
+    const observer = new ResizeObserver(syncPanelTop);
+    observer.observe(header);
+
+    // Bildiriş icazəsi banneri header ölçüsünü dəyişmədən onu aşağı itələyə bilər
+    let node: HTMLElement | null = header.parentElement;
+    while (node && node !== document.body) {
+      observer.observe(node);
+      node = node.parentElement;
+    }
+
+    window.addEventListener('resize', syncPanelTop);
+    window.addEventListener('scroll', syncPanelTop, true);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', syncPanelTop);
+      window.removeEventListener('scroll', syncPanelTop, true);
+    };
+  }, [mobileOpen]);
 
   const closeMobile = () => setMobileOpen(false);
 
@@ -210,7 +241,7 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
   );
 
   const mobileUserBlock = (
-    <div className="border-t border-border p-4 safe-bottom">
+    <div className="border-t border-border px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div className="mb-3 flex items-center gap-3 rounded-lg bg-muted px-3 py-3">
         {userAvatar}
         <div className="min-w-0 flex-1">
@@ -237,7 +268,10 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
 
   return (
     <>
-      <div className="sticky top-0 z-40 flex h-14 min-h-[3.5rem] items-center justify-between border-b border-border bg-background px-4 safe-top lg:hidden">
+      <div
+        ref={mobileHeaderRef}
+        className="sticky top-0 z-40 flex h-14 min-h-[3.5rem] items-center justify-between border-b border-border bg-background px-4 safe-top lg:hidden"
+      >
         <Link
           href="/"
           className="flex min-h-[44px] items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -250,12 +284,12 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
           <button
             type="button"
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md hover:bg-muted"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-muted/80 text-muted-foreground shadow-inner transition-colors hover:bg-muted hover:text-foreground"
             aria-expanded={mobileOpen}
             aria-controls="dashboard-mobile-nav"
             aria-label={mobileOpen ? 'Menyunu bağla' : 'Menyunu aç'}
           >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </button>
         </div>
       </div>
@@ -264,13 +298,18 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
         <>
           <button
             type="button"
-            className="fixed inset-0 top-14 z-40 bg-black/40 backdrop-blur-[2px] lg:hidden"
+            className="fixed inset-x-0 bottom-0 z-40 bg-black/40 backdrop-blur-[2px] lg:hidden"
+            style={{ top: mobilePanelTop }}
             aria-label="Menyunu bağla"
             onClick={closeMobile}
           />
           <div
             id="dashboard-mobile-nav"
-            className="fixed inset-x-0 top-14 z-50 flex max-h-[calc(100dvh-3.5rem)] flex-col overflow-y-auto overscroll-contain border-b border-border bg-card shadow-lg lg:hidden"
+            className="fixed inset-x-0 z-50 flex flex-col overflow-y-auto overscroll-contain border-b border-border bg-card shadow-lg lg:hidden"
+            style={{
+              top: mobilePanelTop,
+              maxHeight: `calc(100dvh - ${mobilePanelTop}px)`,
+            }}
           >
             {navContent}
             {mobileUserBlock}

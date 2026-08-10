@@ -9,6 +9,8 @@ export const REALTIME_EVENTS = {
   BOOKING_UNSUBSCRIBE: 'booking:unsubscribe',
   BOOKING_STATUS: 'booking:status',
   NOTIFICATION_NEW: 'notification:new',
+  /** Alıcı user otağına yeni chat mesajı */
+  MESSAGE_NEW: 'message:new',
   /** Provider otağına yeni dispatch təklifi */
   DISPATCH_OFFER: 'dispatch:offer',
   /** Təklif vaxtı bitdi */
@@ -56,6 +58,15 @@ export interface NotificationNewPayload {
   type: string;
   title: string;
   body: string;
+}
+
+/** Server → user:{recipientId} — canlı chat */
+export interface MessageNewPayload {
+  conversationId: string;
+  messageId: string;
+  senderId: string;
+  preview: string;
+  createdAt: string;
 }
 
 /** Server → provider:{id} — yeni on-demand təklif */
@@ -109,6 +120,12 @@ export const LOCATION_PUSH_MIN_INTERVAL_MS = 3_000;
 
 /** LocationPing DB sampling interval */
 export const LOCATION_PING_SAMPLE_INTERVAL_MS = 15_000;
+
+/**
+ * ProviderProfile / PostGIS sync interval — hər push-da yazmaq əvəzinə.
+ * WS yayımı 3s qalır; DB yazısı seyrəkləşir (5k concurrent üçün kritik).
+ */
+export const LOCATION_GEO_SYNC_INTERVAL_MS = 15_000;
 
 /** Şəhər daxili orta sürət fallback (~30 km/s → m/s) */
 export const DEFAULT_ETA_SPEED_MPS = 30_000 / 3_600;

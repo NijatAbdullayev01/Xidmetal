@@ -23,7 +23,7 @@ alwaysApply: true
 
 - Identifikatorlar: `providerId`, `UserRole.PROVIDER`, `providerProfile`, route `/dashboard/provider`
 - React context: `ThemeProvider`, `QueryProvider`
-- Ödəniş/SMS adapter: `PaymentProvider`, `SMS_PROVIDER`
+- Ödəniş/SMS adapter: `PaymentProvider`
 - Daxili şərh və test adları (istəyə görə AZ da ola bilər)
 
 Yeni UI yazarkən heç vaxt «Provider» sözünü istifadəçi mətninə yapışdırma.

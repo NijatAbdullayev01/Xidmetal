@@ -26,10 +26,15 @@ import { Modal } from '@/components/ui/modal';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { UNREAD_MESSAGES_QUERY_KEY } from '@/hooks/use-message-notifications';
+import { useMessagesRealtime } from '@/hooks/use-messages-realtime';
 import { playMessageNotificationSound } from '@/lib/notification-sound';
 import { formatPeerStatus } from '@/lib/format-last-seen';
 import { useAuthStore } from '@/store/auth.store';
 import { cn } from '@/lib/utils';
+
+const CONVERSATIONS_POLL_MS = 4_000;
+const CONVERSATION_POLL_MS = 2_500;
+const WS_FALLBACK_POLL_MS = 90_000;
 
 interface MessagesPanelProps {
   role: UserRole.CUSTOMER | UserRole.PROVIDER;
@@ -101,6 +106,8 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
   const basePath =
     role === UserRole.CUSTOMER ? '/dashboard/customer' : '/dashboard/provider';
 
+  const { connected: messagesWsConnected } = useMessagesRealtime(!!token);
+
   const selectConversation = (id: string | null) => {
     setSelectedId(id);
     const next = id ? `${basePath}/messages?conversationId=${id}` : `${basePath}/messages`;
@@ -117,7 +124,9 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
     queryKey: ['conversations'],
     queryFn: () => api.messages.conversations(token!, { limit: '50' }),
     enabled: !!token,
-    refetchInterval: 4_000,
+    refetchInterval: messagesWsConnected
+      ? WS_FALLBACK_POLL_MS
+      : CONVERSATIONS_POLL_MS,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
   });
@@ -130,7 +139,9 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
     queryKey: ['conversation', selectedId],
     queryFn: () => api.messages.conversation(token!, selectedId!),
     enabled: !!token && !!selectedId,
-    refetchInterval: 2_500,
+    refetchInterval: messagesWsConnected
+      ? WS_FALLBACK_POLL_MS
+      : CONVERSATION_POLL_MS,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     retry: (failureCount, error) => {

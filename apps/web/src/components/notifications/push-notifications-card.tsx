@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Bell, Loader2 } from 'lucide-react';
 import { DevicePlatform } from '@xidmetal/shared';
@@ -8,48 +8,87 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { requestNotificationPermission } from '@/lib/live-attention';
+import { blockedNotificationSteps } from '@/lib/notification-permission';
 import { isWebPushConfigured, registerWebPushToken } from '@/lib/web-push';
 
+type PermissionUi = 'unknown' | 'default' | 'granted' | 'denied' | 'unsupported';
+
 /**
- * FCM / VAPID konfiqurasiyası yoxdursa gizlədilir (graceful).
+ * Brauzer bildiriş icazəsi + (konfiqurasiya varsa) FCM push qeydiyyatı.
+ * FCM yoxdursa belə Notification icazəsi düyməsi görünür.
  */
 export function PushNotificationsCard() {
   const token = useAuthToken();
+  const [permission, setPermission] = useState<PermissionUi>('unknown');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const configured = isWebPushConfigured();
+  const fcmConfigured = isWebPushConfigured();
 
-  const registerMutation = useMutation({
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setPermission('unsupported');
+      return;
+    }
+    setPermission(Notification.permission);
+  }, []);
+
+  const enableMutation = useMutation({
     mutationFn: async () => {
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        throw new Error('Bu brauzer bildirişləri dəstəkləmir');
+      }
+
+      const next = await requestNotificationPermission();
+      if (next !== 'granted') {
+        throw new Error(`Bildiriş icazəsi verilmədi. ${blockedNotificationSteps()}`);
+      }
+
+      if (!fcmConfigured) {
+        return { mode: 'permission' as const };
+      }
+
       if (!token) throw new Error('Sessiya tapılmadı');
       const pushToken = await registerWebPushToken();
       if (!pushToken) {
         throw new Error('Brauzer push tokeni alına bilmədi');
       }
-      return api.devices.registerToken(token, {
+      await api.devices.registerToken(token, {
         token: pushToken,
         platform: DevicePlatform.WEB,
       });
+      return { mode: 'push' as const };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       setError(null);
-      setMessage('Push bildirişləri aktivləşdirildi.');
+      setPermission('granted');
+      setMessage(
+        result.mode === 'push'
+          ? 'Push bildirişləri aktivləşdirildi.'
+          : 'Brauzer bildirişləri aktivləşdirildi.',
+      );
     },
     onError: (err: unknown) => {
       setMessage(null);
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        setPermission(Notification.permission);
+      }
       setError(
         err instanceof ApiError
           ? err.message
           : err instanceof Error
             ? err.message
-            : 'Push aktivləşdirilmədi',
+            : 'Bildirişlər aktivləşdirilmədi',
       );
     },
   });
 
-  if (!configured) {
-    return null;
-  }
+  const buttonLabel =
+    permission === 'granted'
+      ? fcmConfigured
+        ? 'Push yenidən aktivləşdir'
+        : 'Bildirişlər aktivdir'
+      : 'Bildirişlərə icazə ver';
 
   return (
     <Card>
@@ -59,25 +98,40 @@ export function PushNotificationsCard() {
           Bildirişlər
         </CardTitle>
         <CardDescription>
-          Sifariş və platforma hadisələri üçün brauzer push bildirişləri (FCM).
+          {fcmConfigured
+            ? 'Sifariş və platforma hadisələri üçün brauzer bildirişləri (FCM).'
+            : 'Sifariş və mesajlar üçün brauzer bildirişləri.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <Button
           type="button"
           className="min-h-[44px] w-full sm:w-auto"
-          disabled={registerMutation.isPending || !token}
-          onClick={() => registerMutation.mutate()}
+          disabled={
+            enableMutation.isPending ||
+            permission === 'unsupported' ||
+            (permission === 'granted' && !fcmConfigured) ||
+            (fcmConfigured && !token)
+          }
+          onClick={() => enableMutation.mutate()}
         >
-          {registerMutation.isPending ? (
+          {enableMutation.isPending ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
               Aktivləşdirilir…
             </>
           ) : (
-            'Push bildirişləri aktivləşdir'
+            buttonLabel
           )}
         </Button>
+        {permission === 'denied' ? (
+          <p className="text-sm text-muted-foreground">{blockedNotificationSteps()}</p>
+        ) : null}
+        {permission === 'unsupported' ? (
+          <p className="text-sm text-muted-foreground">
+            Bu mühitdə brauzer bildirişləri dəstəklənmir.
+          </p>
+        ) : null}
         {message ? (
           <p className="text-sm text-foreground" role="status">
             {message}

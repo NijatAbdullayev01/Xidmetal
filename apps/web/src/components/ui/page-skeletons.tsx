@@ -6,7 +6,7 @@ function Pulse({ className }: { className?: string }) {
 
 export function HomeCategoriesSkeleton() {
   return (
-    <section className="pt-8 pb-12 sm:pt-[50px] sm:pb-20" aria-busy aria-label="Yüklənir">
+    <section className="pt-4 pb-12 sm:pt-6 sm:pb-20" aria-busy aria-label="Yüklənir">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Pulse className="h-7 w-36 sm:h-8" />
         <div className="-mx-4 mt-3 sm:-mx-6 lg:-mx-8">

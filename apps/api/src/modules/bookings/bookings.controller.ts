@@ -15,6 +15,7 @@ import {
   ApiOperation,
   ApiHeader,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { BookingsService } from './bookings.service';
 import {
   CreateBookingDto,
@@ -64,12 +65,13 @@ export class BookingsController {
   @UseGuards(RolesGuard, EmailVerifiedGuard)
   @Roles(UserRole.CUSTOMER)
   @RequireEmailVerified()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Yeni sifariş yarat' })
   @ApiHeader({
     name: 'Idempotency-Key',
     required: false,
     description:
-      'Təkrar submit-i eyni sifarişə bağlamaq üçün (INSTANT üçün tövsiyə olunur)',
+      'Təkrar submit-i eyni sifarişə bağlamaq üçün. INSTANT tipində məcburidir.',
   })
   create(
     @CurrentUser('id') userId: string,

@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { BookingStatus, type Prisma } from '@prisma/client';
+import { BookingStatus, ServiceStatus, type Prisma } from '@prisma/client';
 import { ACTIVE_BOOKING_STATUSES as SHARED_ACTIVE_BOOKING_STATUSES } from '@xidmetal/shared';
 import { PrismaService } from '../../common/database/prisma.service';
 import {
@@ -34,6 +34,7 @@ interface TimeRange {
 }
 
 type DbClient = PrismaService | Prisma.TransactionClient;
+type BookingScope = 'provider' | 'service';
 
 @Injectable()
 export class AvailabilityService {
@@ -150,6 +151,29 @@ export class AvailabilityService {
     to: string,
     db: DbClient = this.prisma,
   ): Promise<DayAvailability[]> {
+    return this.resolveSlotsInternal(serviceId, from, to, db, {
+      bookingScope: 'provider',
+      requirePublicService: false,
+    });
+  }
+
+  async resolvePublicSlots(serviceId: string, from: string, to: string): Promise<DayAvailability[]> {
+    return this.resolveSlotsInternal(serviceId, from, to, this.prisma, {
+      bookingScope: 'service',
+      requirePublicService: true,
+    });
+  }
+
+  private async resolveSlotsInternal(
+    serviceId: string,
+    from: string,
+    to: string,
+    db: DbClient,
+    options: {
+      bookingScope: BookingScope;
+      requirePublicService: boolean;
+    },
+  ): Promise<DayAvailability[]> {
     this.assertDateRange(from, to);
 
     const service = await db.service.findUnique({
@@ -158,9 +182,24 @@ export class AvailabilityService {
         id: true,
         providerId: true,
         duration: true,
+        status: true,
+        category: { select: { isActive: true } },
+        provider: {
+          select: {
+            providerProfile: { select: { isVerified: true } },
+          },
+        },
       },
     });
     if (!service) {
+      throw new NotFoundException('Xidmət tapılmadı');
+    }
+    if (
+      options.requirePublicService &&
+      (service.status !== ServiceStatus.ACTIVE ||
+        !service.category?.isActive ||
+        !service.provider.providerProfile?.isVerified)
+    ) {
       throw new NotFoundException('Xidmət tapılmadı');
     }
 
@@ -180,7 +219,9 @@ export class AvailabilityService {
       }),
       db.booking.findMany({
         where: {
-          providerId: service.providerId,
+          ...(options.bookingScope === 'provider'
+            ? { providerId: service.providerId }
+            : { serviceId }),
           status: { in: ACTIVE_BOOKING_STATUSES },
           scheduledAt: {
             gte: fromDate,

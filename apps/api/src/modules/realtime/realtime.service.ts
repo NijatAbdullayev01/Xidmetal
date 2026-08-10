@@ -6,6 +6,7 @@ import {
   userRoom,
   type BookingStatusPayload,
   type LocationUpdatePayload,
+  type MessageNewPayload,
   type NotificationNewPayload,
 } from '@xidmetal/shared';
 
@@ -36,6 +37,10 @@ export class RealtimeService {
 
   emitNotificationNew(userId: string, payload: NotificationNewPayload): void {
     this.emitToRoom(userRoom(userId), REALTIME_EVENTS.NOTIFICATION_NEW, payload);
+  }
+
+  emitMessageNew(recipientId: string, payload: MessageNewPayload): void {
+    this.emitToRoom(userRoom(recipientId), REALTIME_EVENTS.MESSAGE_NEW, payload);
   }
 
   emitToRoom(room: string, event: string, payload: unknown): void {

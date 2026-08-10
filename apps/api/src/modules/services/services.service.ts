@@ -71,7 +71,7 @@ export class ServicesService {
     ]);
 
     return {
-      items: items.map((service) => {
+      items: await Promise.all(items.map(async (service) => {
         const stats = reviewStats.get(service.id);
         return this.mapService({
           ...service,
@@ -81,7 +81,7 @@ export class ServicesService {
           averageRating: stats?.averageRating ?? 0,
           reviewCount: stats?.reviewCount ?? 0,
         });
-      }),
+      })),
       total,
       page,
       limit,
@@ -139,14 +139,14 @@ export class ServicesService {
     ]);
 
     const reviewStats = await this.getReviewStatsByService(items.map((service) => service.id));
-    const mappedItems = items.map((service) => {
+    const mappedItems = await Promise.all(items.map(async (service) => {
       const stats = reviewStats.get(service.id);
       return this.mapService({
         ...service,
         averageRating: stats?.averageRating ?? 0,
         reviewCount: stats?.reviewCount ?? 0,
       });
-    });
+    }));
     const dedupedItems = this.dedupePublicListingItems(mappedItems);
 
     return {
@@ -235,7 +235,7 @@ export class ServicesService {
       cargoRouteScope,
       ...serviceFields
     } = dto;
-    const normalizedImages = this.normalizeServiceImages(images);
+    const normalizedImages = await this.normalizeServiceImages(images, providerId);
     const vehicleFields = this.resolveVehicleFields(dto.title, {
       vehicleLength,
       vehicleWidth,
@@ -385,7 +385,7 @@ export class ServicesService {
     const { images, vehicleLength, vehicleWidth, vehicleHeight, cargoRouteScope, ...serviceFields } =
       dto;
     const normalizedImages =
-      images !== undefined ? this.normalizeServiceImages(images) : undefined;
+      images !== undefined ? await this.normalizeServiceImages(images, service.providerId) : undefined;
 
     const previousImages =
       normalizedImages !== undefined
@@ -792,20 +792,28 @@ export class ServicesService {
     }
   }
 
-  private normalizeServiceImages(images?: string[]): string[] {
+  private async normalizeServiceImages(images?: string[], userId?: string): Promise<string[]> {
     if (!images || images.length === 0) return [];
     if (images.length > MAX_SERVICE_IMAGES) {
       throw new BadRequestException(
         `Maksimum ${MAX_SERVICE_IMAGES} şəkil əlavə etmək olar`,
       );
     }
+    const normalized: string[] = [];
     for (const url of images) {
+      if (userId) {
+        normalized.push(
+          await this.storageService.assertOwnedUploadUrl(url, 'services', userId),
+        );
+        continue;
+      }
       this.storageService.assertAllowedMediaUrl(url);
+      normalized.push(this.storageService.toCanonicalMediaUrl(url));
     }
-    return images;
+    return normalized;
   }
 
-  private mapService(service: {
+  private async mapService(service: {
     id: string;
     title: string;
     description: string;
@@ -859,7 +867,9 @@ export class ServicesService {
       providerName: service.provider
         ? `${service.provider.firstName} ${service.provider.lastName}`
         : '',
-      providerAvatarUrl: service.provider?.avatarUrl ?? undefined,
+      providerAvatarUrl: await this.storageService.toReadableMediaUrl(
+        service.provider?.avatarUrl,
+      ),
       providerExperience: service.provider?.providerProfile?.experience ?? undefined,
       averageRating: service.averageRating ?? 0,
       reviewCount: service.reviewCount ?? 0,
@@ -880,12 +890,14 @@ export class ServicesService {
         activeBookingCount: service.activeBookingCount,
       }),
       ...(service.images !== undefined && {
-        images: service.images.map((image) => ({
-          id: image.id,
-          url: image.url,
-          alt: image.alt ?? undefined,
-          sortOrder: image.sortOrder,
-        })),
+        images: await Promise.all(
+          service.images.map(async (image) => ({
+            id: image.id,
+            url: (await this.storageService.toReadableMediaUrl(image.url)) ?? image.url,
+            alt: image.alt ?? undefined,
+            sortOrder: image.sortOrder,
+          })),
+        ),
       }),
     };
   }

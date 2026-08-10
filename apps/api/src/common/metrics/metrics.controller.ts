@@ -9,9 +9,17 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
+import { timingSafeEqual } from 'crypto';
 import type { Response } from 'express';
 import { Public } from '../decorators';
 import { MetricsService } from './metrics.service';
+
+function safeEqualUtf8(a: string, b: string): boolean {
+  const ba = Buffer.from(a, 'utf8');
+  const bb = Buffer.from(b, 'utf8');
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
 
 @ApiTags('Metrics')
 @Controller('metrics')
@@ -27,7 +35,7 @@ export class MetricsController {
   @Header('Cache-Control', 'no-store')
   @ApiOperation({
     summary:
-      'Prometheus metrics (exposition). Production-da optional METRICS_TOKEN Bearer.',
+      'Prometheus metrics (exposition). Production-da METRICS_TOKEN Bearer məcburidir.',
   })
   async scrape(
     @Res({ passthrough: true }) res: Response,
@@ -53,7 +61,7 @@ export class MetricsController {
     }
 
     const expected = `Bearer ${token}`;
-    if (authorization !== expected) {
+    if (!authorization || !safeEqualUtf8(authorization, expected)) {
       throw new UnauthorizedException('Metrics üçün etibarlı token tələb olunur');
     }
   }

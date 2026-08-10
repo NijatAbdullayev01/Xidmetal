@@ -31,7 +31,7 @@ export class AvailabilityController {
   @Get(':serviceId/availability')
   @ApiOperation({ summary: 'Xidmət üçün boş/dolu slotlar (public)' })
   getAvailability(@Param('serviceId') serviceId: string, @Query() query: AvailabilityQueryDto) {
-    return this.availabilityService.resolveSlots(serviceId, query.from, query.to);
+    return this.availabilityService.resolvePublicSlots(serviceId, query.from, query.to);
   }
 
   @ApiBearerAuth()

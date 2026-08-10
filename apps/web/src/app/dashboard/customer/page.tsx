@@ -12,6 +12,7 @@ import { useAuthToken } from '@/hooks/use-auth-token';
 import { useAuthStore } from '@/store/auth.store';
 import { formatPrice } from '@/lib/utils';
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_VARIANTS } from '@/lib/provider-labels';
+import { DASHBOARD_LIST_POLL_MS } from '@/lib/live-attention';
 
 export default function CustomerOverviewPage() {
   const token = useAuthToken();
@@ -21,7 +22,7 @@ export default function CustomerOverviewPage() {
     queryKey: ['bookings', 'all'],
     queryFn: () => api.bookings(token!, { limit: '100' }),
     enabled: !!token,
-    refetchInterval: 5_000,
+    refetchInterval: DASHBOARD_LIST_POLL_MS,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
   });
@@ -30,7 +31,7 @@ export default function CustomerOverviewPage() {
     queryKey: ['conversations'],
     queryFn: () => api.messages.conversations(token!, { limit: '100' }),
     enabled: !!token,
-    refetchInterval: 4_000,
+    refetchInterval: DASHBOARD_LIST_POLL_MS,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
   });

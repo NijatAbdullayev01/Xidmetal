@@ -2,10 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import { CLIENT_APP, CLIENT_APP_HEADER } from '@xidmetal/shared';
-import { api, ApiError } from '@/lib/api';
+import { CLIENT_APP } from '@xidmetal/shared';
 import { useAuthToken } from '@/hooks/use-auth-token';
-import { useAuthStore } from '@/store/auth.store';
 
 /**
  * WS origin — REST eyni origin rewrite ilə gedirsə belə Socket.IO birbaşa API-yə.
@@ -23,19 +21,6 @@ let sharedSocket: Socket | null = null;
 let sharedToken: string | null = null;
 let connectPromise: Promise<Socket | null> | null = null;
 
-async function fetchSocketToken(sessionToken: string): Promise<string | null> {
-  try {
-    const res = await api.realtime.socketToken(sessionToken);
-    return res.token;
-  } catch (error) {
-    // Admin cookie marketplace-ə qarışanda / aud uyğunsuzluğu — local session təmizlə
-    if (error instanceof ApiError && (error.status === 403 || error.status === 401)) {
-      useAuthStore.getState().logout();
-    }
-    return null;
-  }
-}
-
 async function ensureSocket(sessionToken: string): Promise<Socket | null> {
   if (sharedSocket?.connected && sharedToken === sessionToken) {
     return sharedSocket;
@@ -44,9 +29,6 @@ async function ensureSocket(sessionToken: string): Promise<Socket | null> {
   if (connectPromise) return connectPromise;
 
   connectPromise = (async () => {
-    const jwt = await fetchSocketToken(sessionToken);
-    if (!jwt) return null;
-
     if (sharedSocket) {
       sharedSocket.removeAllListeners();
       sharedSocket.disconnect();
@@ -58,11 +40,7 @@ async function ensureSocket(sessionToken: string): Promise<Socket | null> {
       withCredentials: true,
       transports: ['websocket', 'polling'],
       auth: {
-        token: jwt,
         clientApp: CLIENT_APP.MARKETPLACE,
-      },
-      extraHeaders: {
-        [CLIENT_APP_HEADER]: CLIENT_APP.MARKETPLACE,
       },
       reconnection: true,
       reconnectionAttempts: 10,
@@ -111,8 +89,8 @@ export function getSharedSocket(): Socket | null {
 }
 
 /**
- * Marketplace Socket.IO — JWT cookie → /realtime/socket-token → auth.token.
- * x-xidmetal-client həmişə göndərilir (app-scoped cookie seçimi).
+ * Marketplace Socket.IO — yalnız httpOnly cookie sessiyası ilə autentifikasiya olunur.
+ * `clientApp` handshake auth-da ötürülür ki, düzgün app-scoped cookie seçilsin.
  * Polling fallback saxlanılır; WS additive qatdır.
  */
 export function useSocket(enabled = true): {

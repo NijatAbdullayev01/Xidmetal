@@ -8,11 +8,30 @@ export const LIVE_POLL_HIDDEN_MS = 12_000;
 export const BOOKING_POLL_VISIBLE_MS = 5_000;
 export const BOOKING_POLL_HIDDEN_MS = 12_000;
 
+/**
+ * WS bağlı olanda REST poll yalnız nadir safety-net (invalidate əsas mənbədir).
+ * 5k concurrent üçün kritik — əks halda HTTP fırtınası yaranır.
+ */
+export const WS_CONNECTED_FALLBACK_POLL_MS = 90_000;
+
+/** Dashboard siyahıları (overview / bookings) — WS invalidate + seyrək poll */
+export const DASHBOARD_LIST_POLL_MS = 20_000;
+
 export function livePollIntervalMs(visibleMs: number, hiddenMs: number): number {
   if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
     return hiddenMs;
   }
   return visibleMs;
+}
+
+/** WS bağlı → uzun fallback; əks halda görünən/gizli poll */
+export function wsAwarePollIntervalMs(
+  connected: boolean,
+  visibleMs: number,
+  hiddenMs: number,
+): number {
+  if (connected) return WS_CONNECTED_FALLBACK_POLL_MS;
+  return livePollIntervalMs(visibleMs, hiddenMs);
 }
 
 export function dashboardMessagesPath(role: string | undefined): string {
@@ -63,13 +82,20 @@ export function showOsNotification(options: {
   }
 }
 
-/** Brauzer bildiriş icazəsini istifadəçi jestində soruşur. */
-export async function requestNotificationPermission(): Promise<NotificationPermission | null> {
-  if (typeof window === 'undefined' || !('Notification' in window)) return null;
-  if (Notification.permission !== 'default') return Notification.permission;
-  try {
-    return await Notification.requestPermission();
-  } catch {
-    return null;
-  }
+/**
+ * Brauzer bildiriş icazəsi — `@/lib/notification-permission`.
+ * Bu faylda yalnız diqqət/poll köməkçiləri qalır; icazə API re-export olunur.
+ */
+export {
+  openNotificationPermissionUi,
+  requestNotificationPermission,
+  tryOpenOsNotificationSettings as tryOpenNotificationPermissionSettings,
+} from '@/lib/notification-permission';
+
+/**
+ * Auth düyməsi / form submit zamanı SINXRON çağırın (ilk sətir).
+ * İcazə yalnız açıq CTA-dan soruşulur — login jestində avtomatik dialoq yoxdur.
+ */
+export function primeBrowserNotificationPermission(): void {
+  // no-op: təsadüfi Block riskini azaldır; banner «İcazə ver» native pəncərəni açır
 }

@@ -45,8 +45,6 @@ export interface UserProfile {
   firstName: string;
   lastName: string;
   phone?: string;
-  /** ISO — təsdiqlənmiş telefon; SMS üçün */
-  phoneVerifiedAt?: string | null;
   avatarUrl?: string;
   role: UserRole;
   isVerified: boolean;
@@ -364,61 +362,6 @@ export interface GeocodeResult {
   displayName: string;
   /** mock | nominatim */
   provider: string;
-}
-
-/** GDPR — istifadəçi məlumat ixracı */
-export interface UserDataExport {
-  exportedAt: string;
-  profile: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    phone: string | null;
-    phoneVerifiedAt: string | null;
-    role: string;
-    isVerified: boolean;
-    createdAt: string;
-    providerProfile: {
-      bio: string | null;
-      experience: number | null;
-      location: string | null;
-      isVerified: boolean;
-      rating: number;
-      reviewCount: number;
-      availability: string;
-    } | null;
-  };
-  services: Array<{
-    id: string;
-    title: string;
-    status: string;
-    price: number;
-    createdAt: string;
-  }>;
-  bookings: Array<{
-    id: string;
-    serviceTitle: string;
-    status: string;
-    type: string;
-    scheduledAt: string;
-    totalPrice: number;
-    role: 'customer' | 'provider';
-    createdAt: string;
-  }>;
-  notifications: Array<{
-    id: string;
-    type: string;
-    title: string;
-    createdAt: string;
-    isRead: boolean;
-  }>;
-  deviceTokens: Array<{
-    id: string;
-    platform: string;
-    tokenMasked: string;
-    createdAt: string;
-  }>;
 }
 
 export interface UnreadMessagesSummary {

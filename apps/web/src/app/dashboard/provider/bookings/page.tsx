@@ -189,7 +189,7 @@ export default function ProviderBookingsPage() {
             : {}),
       }),
     enabled: !!token,
-    refetchInterval: 5_000,
+    refetchInterval: 20_000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
   });

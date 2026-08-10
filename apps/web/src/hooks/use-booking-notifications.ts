@@ -3,29 +3,32 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { useNotificationsRealtime } from '@/hooks/use-notifications-realtime';
 import {
   BOOKING_POLL_HIDDEN_MS,
   BOOKING_POLL_VISIBLE_MS,
-  livePollIntervalMs,
+  wsAwarePollIntervalMs,
 } from '@/lib/live-attention';
 
 export const BOOKING_ATTENTION_QUERY_KEY = ['notifications', 'booking-unread-count'] as const;
 
 /**
  * Sifariş hadisələrinin sayını poll edir.
- * Səs / toast / OS bildirişi yalnız `useLiveAttention` (AttentionProvider) tərəfindən verilir.
+ * WS bağlı olanda seyrək fallback; invalidate `booking:status` / attention ilə.
  */
 export function useBookingNotifications(enabled = true) {
   const token = useAuthToken();
+  const { connected } = useNotificationsRealtime(enabled && !!token);
 
   const attentionQuery = useQuery({
     queryKey: BOOKING_ATTENTION_QUERY_KEY,
     queryFn: () => api.notifications.bookingUnreadCount(token!),
     enabled: enabled && !!token,
-    refetchInterval: () => livePollIntervalMs(BOOKING_POLL_VISIBLE_MS, BOOKING_POLL_HIDDEN_MS),
+    refetchInterval: () =>
+      wsAwarePollIntervalMs(connected, BOOKING_POLL_VISIBLE_MS, BOOKING_POLL_HIDDEN_MS),
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
-    staleTime: 2_000,
+    staleTime: 5_000,
   });
 
   const data = attentionQuery.data;

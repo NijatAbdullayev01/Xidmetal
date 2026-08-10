@@ -114,8 +114,8 @@ export const loginSchema = z.object({
 
 const verificationCodeSchema = z
   .string()
-  .length(6, 'Təsdiq kodu 6 rəqəm olmalıdır')
-  .regex(/^\d{6}$/, 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır');
+  .length(8, 'Təsdiq kodu 8 rəqəm olmalıdır')
+  .regex(/^\d{8}$/, 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır');
 
 export const forgotPasswordSchema = z.object({
   email: emailSchema,
@@ -136,6 +136,7 @@ export const resetPasswordSchema = z
 
 export const requestEmailVerificationSchema = z.object({
   email: emailSchema,
+  captchaToken: z.string().optional(),
 });
 
 export const confirmEmailVerificationSchema = z.object({
@@ -194,6 +195,11 @@ export const createBookingSchema = withOptionalCoordPairs(
     destLng: longitudeSchema.optional(),
     originLat: latitudeSchema.optional(),
     originLng: longitudeSchema.optional(),
+    /** INSTANT dispatch filtri — minimum xidmət verən reytinqi */
+    minRating: z.number().min(0).max(5).optional(),
+    /** INSTANT dispatch filtri — xidmət qiymət diapazonu */
+    minPrice: z.number().min(0).optional(),
+    maxPrice: z.number().min(0).optional(),
   }),
   [
     { latKey: 'destLat', lngKey: 'destLng', label: 'Təyinat' },
@@ -223,6 +229,17 @@ export const createBookingSchema = withOptionalCoordPairs(
         path: ['destLat'],
       });
     }
+  }
+  if (
+    data.minPrice !== undefined &&
+    data.maxPrice !== undefined &&
+    data.minPrice > data.maxPrice
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Minimum qiymət maksimumdan böyük ola bilməz',
+      path: ['maxPrice'],
+    });
   }
 });
 
@@ -354,7 +371,7 @@ export const deleteAccountSchema = z.object({
   confirmText: z
     .string()
     .refine((v) => v.trim().toUpperCase() === 'SIL', {
-      message: 'Təsdiq üçün SIL yazın',
+      message: 'Təsdiq üçün Sil yazın',
     }),
 });
 
@@ -364,10 +381,7 @@ export const requestEmailChangeSchema = z.object({
 
 export const confirmEmailChangeSchema = z.object({
   newEmail: emailSchema,
-  code: z
-    .string()
-    .length(6, 'Təsdiq kodu 6 rəqəm olmalıdır')
-    .regex(/^\d{6}$/, 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır'),
+  code: verificationCodeSchema,
 });
 
 export const createConversationSchema = z.object({

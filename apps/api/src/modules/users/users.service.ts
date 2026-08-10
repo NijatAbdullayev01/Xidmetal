@@ -6,20 +6,19 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { randomBytes, randomInt } from 'crypto';
+import { randomBytes } from 'crypto';
 import { EmailVerificationPurpose, UserRole, ServiceStatus, BookingStatus } from '@prisma/client';
 import { ACTIVE_BOOKING_STATUSES, ProviderAvailability } from '@xidmetal/shared';
 import { PrismaService } from '../../common/database/prisma.service';
 import { MailService } from '../../common/mail/mail.service';
-import { SmsService } from '../../common/sms/sms.service';
 import { assertValidEmailCode } from '../../common/auth/email-verification-codes';
+import { generateNumericOtp } from '../../common/auth/otp';
 import { StorageService } from '../../common/storage/storage.service';
 import {
   ChangePasswordDto,
   UpdateProfileDto,
   RequestEmailChangeDto,
   ConfirmEmailChangeDto,
-  ConfirmPhoneVerifyDto,
   DeleteAccountDto,
 } from './dto';
 
@@ -30,7 +29,6 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
-    private smsService: SmsService,
     private storageService: StorageService,
   ) {}
 
@@ -43,7 +41,6 @@ export class UsersService {
         firstName: true,
         lastName: true,
         phone: true,
-        phoneVerifiedAt: true,
         avatarUrl: true,
         role: true,
         isVerified: true,
@@ -111,9 +108,10 @@ export class UsersService {
     const existing = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!existing) throw new NotFoundException('İstifadəçi tapılmadı');
 
-    if (dto.avatarUrl !== undefined && dto.avatarUrl !== null && dto.avatarUrl !== '') {
-      this.storageService.assertAllowedMediaUrl(dto.avatarUrl);
-    }
+    const normalizedAvatarUrl =
+      dto.avatarUrl !== undefined && dto.avatarUrl !== null && dto.avatarUrl !== ''
+        ? await this.storageService.assertOwnedUploadUrl(dto.avatarUrl, 'avatars', userId)
+        : dto.avatarUrl;
 
     if (
       (dto.experience !== undefined || dto.bio !== undefined || dto.location !== undefined) &&
@@ -135,12 +133,9 @@ export class UsersService {
       }
     }
 
-    const phoneChanged =
-      dto.phone !== undefined && (phone ?? null) !== (existing.phone ?? null);
-
     const previousAvatarUrl = existing.avatarUrl;
     const nextAvatarUrl =
-      dto.avatarUrl !== undefined ? dto.avatarUrl || null : previousAvatarUrl;
+      dto.avatarUrl !== undefined ? normalizedAvatarUrl || null : previousAvatarUrl;
 
     const providerProfileData: {
       experience?: number;
@@ -159,10 +154,9 @@ export class UsersService {
         ...(dto.lastName !== undefined && { lastName: dto.lastName }),
         ...(dto.phone !== undefined && {
           phone,
-          ...(phoneChanged ? { phoneVerifiedAt: null } : {}),
         }),
         ...(dto.avatarUrl !== undefined && {
-          avatarUrl: dto.avatarUrl || null,
+          avatarUrl: normalizedAvatarUrl || null,
         }),
         ...(hasProviderProfileUpdate &&
           existing.role === UserRole.PROVIDER && {
@@ -180,7 +174,6 @@ export class UsersService {
         firstName: true,
         lastName: true,
         phone: true,
-        phoneVerifiedAt: true,
         avatarUrl: true,
         role: true,
         isVerified: true,
@@ -242,7 +235,7 @@ export class UsersService {
       throw new ConflictException('Bu e-poçt artıq istifadə olunur');
     }
 
-    const code = randomInt(100000, 1000000).toString();
+    const code = generateNumericOtp();
     const codeHash = await bcrypt.hash(code, 10);
     const expiresAt = new Date(Date.now() + EMAIL_CODE_EXPIRY_MS);
 
@@ -306,105 +299,6 @@ export class UsersService {
           firstName: true,
           lastName: true,
           phone: true,
-          phoneVerifiedAt: true,
-          avatarUrl: true,
-          role: true,
-          isVerified: true,
-          createdAt: true,
-          providerProfile: true,
-        },
-      });
-    });
-
-    return this.mapUserProfile(updatedUser);
-  }
-
-  /**
-   * SMS OTP — profil telefonunu təsdiqləyir (SMS_STATUS_ENABLED üçün tələb).
-   * Kod `email_verification_codes.email` sütununda E.164 kimi saxlanır.
-   */
-  async requestPhoneVerify(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException('İstifadəçi tapılmadı');
-
-    const phone = user.phone?.trim();
-    if (!phone) {
-      throw new BadRequestException(
-        'Əvvəlcə profilə mobil nömrə əlavə edin',
-      );
-    }
-
-    if (user.phoneVerifiedAt) {
-      return { message: 'Telefon artıq təsdiqlənib', alreadyVerified: true };
-    }
-
-    const code = randomInt(100000, 1000000).toString();
-    const codeHash = await bcrypt.hash(code, 10);
-    const expiresAt = new Date(Date.now() + EMAIL_CODE_EXPIRY_MS);
-
-    await this.prisma.$transaction([
-      this.prisma.emailVerificationCode.deleteMany({
-        where: { userId, purpose: EmailVerificationPurpose.PHONE_VERIFY },
-      }),
-      this.prisma.emailVerificationCode.create({
-        data: {
-          userId,
-          email: phone,
-          codeHash,
-          purpose: EmailVerificationPurpose.PHONE_VERIFY,
-          expiresAt,
-        },
-      }),
-    ]);
-
-    const body = `Xidmətal telefon təsdiq kodu: ${code}. 15 dəqiqə etibarlıdır.`;
-    await this.smsService.send({ to: phone, body });
-
-    const provider = this.smsService.adapterName;
-    return {
-      message:
-        provider === 'noop'
-          ? 'SMS provayder qurulmayıb — kod server loguna yazılmayıb; SMS_PROVIDER=console və ya twilio təyin edin'
-          : provider === 'console'
-            ? 'Təsdiq kodu server loguna yazıldı (console SMS)'
-            : 'Təsdiq kodu SMS ilə göndərildi',
-      ...(provider === 'console' || provider === 'noop'
-        ? { previewCode: code }
-        : {}),
-    };
-  }
-
-  async confirmPhoneVerify(userId: string, dto: ConfirmPhoneVerifyDto) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException('İstifadəçi tapılmadı');
-
-    const phone = user.phone?.trim();
-    if (!phone) {
-      throw new BadRequestException('Profilə mobil nömrə əlavə edilməyib');
-    }
-
-    await assertValidEmailCode(this.prisma, {
-      userId,
-      email: phone,
-      purpose: EmailVerificationPurpose.PHONE_VERIFY,
-      code: dto.code,
-    });
-
-    const updatedUser = await this.prisma.$transaction(async (tx) => {
-      await tx.emailVerificationCode.deleteMany({
-        where: { userId, purpose: EmailVerificationPurpose.PHONE_VERIFY },
-      });
-
-      return tx.user.update({
-        where: { id: userId },
-        data: { phoneVerifiedAt: new Date() },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
-          phoneVerifiedAt: true,
           avatarUrl: true,
           role: true,
           isVerified: true,
@@ -460,9 +354,19 @@ export class UsersService {
 
     const tombstoneEmail = `deleted+${userId}@deleted.xidmetal.local`;
     const scrambledHash = await bcrypt.hash(randomBytes(32).toString('hex'), 12);
+    const redactedMessage = '[silinib]';
 
-    await this.prisma.$transaction([
-      this.prisma.user.update({
+    const bookingIds = (
+      await this.prisma.booking.findMany({
+        where: {
+          OR: [{ customerId: userId }, { providerId: userId }],
+        },
+        select: { id: true },
+      })
+    ).map((b) => b.id);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
         where: { id: userId },
         data: {
           deletedAt: new Date(),
@@ -475,10 +379,61 @@ export class UsersService {
           firstName: 'Silinmiş',
           lastName: 'İstifadəçi',
         },
-      }),
-      this.prisma.refreshToken.deleteMany({ where: { userId } }),
-      this.prisma.emailVerificationCode.deleteMany({ where: { userId } }),
-    ]);
+      });
+
+      await tx.refreshToken.deleteMany({ where: { userId } });
+      await tx.emailVerificationCode.deleteMany({ where: { userId } });
+      await tx.deviceToken.deleteMany({ where: { userId } });
+
+      await tx.message.updateMany({
+        where: { senderId: userId },
+        data: { content: redactedMessage },
+      });
+
+      if (bookingIds.length > 0) {
+        await tx.locationPing.deleteMany({
+          where: { bookingId: { in: bookingIds } },
+        });
+
+        await tx.booking.updateMany({
+          where: { id: { in: bookingIds } },
+          data: {
+            notes: null,
+            address: null,
+            imageUrl: null,
+            destLat: null,
+            destLng: null,
+            originLat: null,
+            originLng: null,
+            cancelReason: null,
+          },
+        });
+      }
+
+      await tx.providerProfile.updateMany({
+        where: { userId },
+        data: {
+          bio: null,
+          location: null,
+          lastLat: null,
+          lastLng: null,
+          lastHeading: null,
+          locationUpdatedAt: null,
+          availability: ProviderAvailability.OFFLINE,
+        },
+      });
+    });
+
+    // PostGIS geography sütunu Prisma Unsupported — raw scrub
+    try {
+      await this.prisma.$executeRaw`
+        UPDATE provider_profiles
+        SET last_location = NULL
+        WHERE user_id = ${userId}
+      `;
+    } catch {
+      // best-effort — PostGIS yoxdursa və ya sync artıq NULL
+    }
 
     if (user.avatarUrl) {
       await this.storageService.deleteByPublicUrl(user.avatarUrl);
@@ -487,191 +442,12 @@ export class UsersService {
     return { message: 'Hesabınız silindi' };
   }
 
-  async exportMyData(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        phoneVerifiedAt: true,
-        role: true,
-        isVerified: true,
-        createdAt: true,
-        deletedAt: true,
-        isActive: true,
-        providerProfile: {
-          select: {
-            bio: true,
-            experience: true,
-            location: true,
-            isVerified: true,
-            rating: true,
-            reviewCount: true,
-            availability: true,
-          },
-        },
-      },
-    });
-
-    if (!user || user.deletedAt || !user.isActive) {
-      throw new NotFoundException('İstifadəçi tapılmadı');
-    }
-
-    const [services, bookingsAsCustomer, bookingsAsProvider, notifications, deviceTokens] =
-      await Promise.all([
-        this.prisma.service.findMany({
-          where: { providerId: userId },
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            price: true,
-            createdAt: true,
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 500,
-        }),
-        this.prisma.booking.findMany({
-          where: { customerId: userId },
-          select: {
-            id: true,
-            status: true,
-            type: true,
-            scheduledAt: true,
-            totalPrice: true,
-            createdAt: true,
-            service: { select: { title: true } },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 500,
-        }),
-        this.prisma.booking.findMany({
-          where: { providerId: userId },
-          select: {
-            id: true,
-            status: true,
-            type: true,
-            scheduledAt: true,
-            totalPrice: true,
-            createdAt: true,
-            service: { select: { title: true } },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 500,
-        }),
-        this.prisma.notification.findMany({
-          where: { userId },
-          select: {
-            id: true,
-            type: true,
-            title: true,
-            createdAt: true,
-            isRead: true,
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 200,
-        }),
-        this.prisma.deviceToken.findMany({
-          where: { userId },
-          select: {
-            id: true,
-            platform: true,
-            token: true,
-            createdAt: true,
-          },
-          take: 50,
-        }),
-      ]);
-
-    const mapBooking = (
-      b: {
-        id: string;
-        status: string;
-        type: string;
-        scheduledAt: Date;
-        totalPrice: number | { toNumber?: () => number } | unknown;
-        createdAt: Date;
-        service: { title: string };
-      },
-      role: 'customer' | 'provider',
-    ) => ({
-      id: b.id,
-      serviceTitle: b.service.title,
-      status: b.status,
-      type: b.type,
-      scheduledAt: b.scheduledAt.toISOString(),
-      totalPrice:
-        typeof b.totalPrice === 'number'
-          ? b.totalPrice
-          : Number(b.totalPrice),
-      role,
-      createdAt: b.createdAt.toISOString(),
-    });
-
-    return {
-      exportedAt: new Date().toISOString(),
-      profile: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phone: user.phone,
-        phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
-        role: user.role,
-        isVerified: user.isVerified,
-        createdAt: user.createdAt.toISOString(),
-        providerProfile: user.providerProfile
-          ? {
-              bio: user.providerProfile.bio,
-              experience: user.providerProfile.experience,
-              location: user.providerProfile.location,
-              isVerified: user.providerProfile.isVerified,
-              rating: user.providerProfile.rating,
-              reviewCount: user.providerProfile.reviewCount,
-              availability: String(user.providerProfile.availability),
-            }
-          : null,
-      },
-      services: services.map((s) => ({
-        id: s.id,
-        title: s.title,
-        status: s.status,
-        price: Number(s.price),
-        createdAt: s.createdAt.toISOString(),
-      })),
-      bookings: [
-        ...bookingsAsCustomer.map((b) => mapBooking(b, 'customer')),
-        ...bookingsAsProvider.map((b) => mapBooking(b, 'provider')),
-      ],
-      notifications: notifications.map((n) => ({
-        id: n.id,
-        type: n.type,
-        title: n.title,
-        createdAt: n.createdAt.toISOString(),
-        isRead: n.isRead,
-      })),
-      deviceTokens: deviceTokens.map((d) => ({
-        id: d.id,
-        platform: d.platform,
-        tokenMasked:
-          d.token.length <= 8
-            ? '****'
-            : `${d.token.slice(0, 4)}…${d.token.slice(-4)}`,
-        createdAt: d.createdAt.toISOString(),
-      })),
-    };
-  }
-
-  private mapUserProfile(user: {
+  private async mapUserProfile(user: {
     id: string;
     email: string;
     firstName: string;
     lastName: string;
     phone: string | null;
-    phoneVerifiedAt?: Date | null;
     avatarUrl: string | null;
     role: string;
     isVerified: boolean;
@@ -697,8 +473,7 @@ export class UsersService {
       firstName: user.firstName,
       lastName: user.lastName,
       phone: user.phone ?? undefined,
-      phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
-      avatarUrl: user.avatarUrl ?? undefined,
+      avatarUrl: await this.storageService.toReadableMediaUrl(user.avatarUrl),
       role: user.role,
       isVerified: user.isVerified,
       createdAt: user.createdAt.toISOString(),

@@ -4,7 +4,7 @@
 
 Xidmətal, provider (xidmət verən) və customer (xidmət alan) rollarını birləşdirən marketplace tipli platformadır. İstifadəçilər xidmət axtara, planlaşdırılmış sifariş verə, mesajlaşa, rəy yaza və provider kimi xidmət təklif edə bilərlər.
 
-**Cari vəziyyət:** scheduled + on-demand marketplace MVP — auth, kateqoriya/xidmət, təqvim, sifariş lifecycle (`EN_ROUTE`/`ARRIVED`), INSTANT dispatch, canlı izləmə (Socket.IO + Mapbox), chat, in-app/push/SMS kanalları, rəy, admin panel. Ödəniş modul scaffolding var, default **OFF** (`PAYMENTS_ENABLED=false`). Native mobil deferred — bax: `docs/ROADMAP.md`, `docs/MOBILE.md`.
+**Cari vəziyyət:** scheduled + on-demand marketplace MVP — auth, kateqoriya/xidmət, təqvim, sifariş lifecycle (`EN_ROUTE`/`ARRIVED`), INSTANT dispatch, canlı izləmə (Socket.IO + Mapbox), chat, in-app/push kanalları, rəy, admin panel. Ödəniş modul scaffolding var, default **OFF** (`PAYMENTS_ENABLED=false`). Native mobil deferred — bax: `docs/ROADMAP.md`, `docs/MOBILE.md`.
 
 ## Texnologiya yığını
 

@@ -11,6 +11,7 @@ import { useAuthToken } from '@/hooks/use-auth-token';
 import { formatPrice } from '@/lib/utils';
 import { DispatchOffersCard } from '@/components/dispatch/dispatch-offers-card';
 import { ProviderVerificationBanner } from '@/components/provider/provider-verification-banner';
+import { DASHBOARD_LIST_POLL_MS } from '@/lib/live-attention';
 
 export default function ProviderOverviewPage() {
   const token = useAuthToken();
@@ -19,7 +20,7 @@ export default function ProviderOverviewPage() {
     queryKey: ['users', 'dashboard-stats'],
     queryFn: () => api.users.dashboardStats(token!),
     enabled: !!token,
-    refetchInterval: 15_000,
+    refetchInterval: DASHBOARD_LIST_POLL_MS,
     refetchOnWindowFocus: true,
   });
 
@@ -33,7 +34,7 @@ export default function ProviderOverviewPage() {
     queryKey: ['bookings', 'recent'],
     queryFn: () => api.bookings(token!, { limit: '10' }),
     enabled: !!token,
-    refetchInterval: 5_000,
+    refetchInterval: DASHBOARD_LIST_POLL_MS,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
   });
@@ -42,7 +43,7 @@ export default function ProviderOverviewPage() {
     queryKey: ['conversations'],
     queryFn: () => api.messages.conversations(token!, { limit: '100' }),
     enabled: !!token,
-    refetchInterval: 4_000,
+    refetchInterval: DASHBOARD_LIST_POLL_MS,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
   });
@@ -105,25 +106,31 @@ export default function ProviderOverviewPage() {
         </Link>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Link key={stat.label} href={stat.href}>
-              <Card className="transition-colors hover:border-brand/50">
-                <CardContent className="flex items-center gap-4 p-6">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/15">
-                    <Icon className="h-5 w-5 text-brand-dark" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">{stat.label}</p>
-                    <p className="text-2xl font-bold">{stat.value}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
+      <div className="@container">
+        <div className="grid grid-cols-2 gap-3 @3xl:grid-cols-4 @3xl:gap-4">
+          {stats.map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <Link key={stat.label} href={stat.href} className="min-w-0">
+                <Card className="h-full transition-colors hover:border-brand/50">
+                  <CardContent className="flex items-start gap-3 p-4 @xl:items-center @xl:gap-4 @xl:p-5 @3xl:p-6">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/15 @xl:h-10 @xl:w-10">
+                      <Icon className="h-4 w-4 text-brand-dark @xl:h-5 @xl:w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs leading-snug text-muted-foreground @xl:text-sm">
+                        {stat.label}
+                      </p>
+                      <p className="mt-0.5 text-xl font-bold tabular-nums @xl:text-2xl">
+                        {stat.value}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
       <DispatchOffersCard />

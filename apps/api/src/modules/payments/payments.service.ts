@@ -330,11 +330,12 @@ export class PaymentsService {
         result = await this.provider.authorizeHold(payment.externalId);
         break;
       case 'capture':
-        if (
-          payment.status !== PaymentStatus.AUTHORIZED &&
-          payment.status !== PaymentStatus.REQUIRES_PAYMENT
-        ) {
-          throw new ConflictException('Bu statusda capture mümkün deyil');
+        // Yalnız hold (AUTHORIZED) sonrası — REQUIRES_PAYMENT-dən birbaşa
+        // capture PSP təsdiqi olmadan saxta «tutuldu» statusuna yol verir.
+        if (payment.status !== PaymentStatus.AUTHORIZED) {
+          throw new ConflictException(
+            'Capture yalnız hold edilmiş (AUTHORIZED) ödəniş üçün mümkündür',
+          );
         }
         result = await this.provider.capture(payment.externalId);
         break;

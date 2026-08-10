@@ -69,6 +69,20 @@ docker compose ps
 
 > Postgres image: **PostGIS** (`postgis/postgis:16-3.5`). Əvvəl `postgres:16-alpine` volume istifadə olunubsa: `docker compose down -v && docker compose up -d` (data silinir).
 
+### Full stack (api + web + admin)
+
+Production-like konteynerlər (migration on boot):
+
+```bash
+pnpm docker:prod
+# default: API ×3 + nginx LB (5k concurrent — docs/CAPACITY.md)
+# API_REPLICAS=4 pnpm docker:prod
+```
+
+Konteyner daxilində DB/Redis host adları `postgres` / `redis`-dir — `DATABASE_URL_DOCKER` / `REDIS_URL_DOCKER` (bax: `.env.example`). Dayandırmaq: `pnpm docker:prod:down`. Host API portu **nginx** (`api-proxy`) vasitəsilədir.
+
+CD: GitHub Actions `Deploy images` — GHCR push; `deploy_runtime=true` + `DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY` ilə host-da compose pull+up.
+
 ## 5. Database schema
 
 ```bash
@@ -89,7 +103,7 @@ Lokal yeni dəyişiklik üçün: `pnpm db:migrate` (`prisma migrate dev`).
 Faza 5 migration (ödəniş/device/idempotency): `20260807190000_payments_device_tokens_idempotency`.
 Production: `pnpm db:migrate:deploy`.
 
-> **Ödəniş:** `PAYMENTS_ENABLED=false` (default) — marketplace ödənişsiz qalır. Push/SMS üçün `.env.example`-də `FCM_*` / `SMS_*` bax.
+> **Ödəniş:** `PAYMENTS_ENABLED=false` (default) — marketplace ödənişsiz qalır. Push üçün `.env.example`-də `FCM_*` bax.
 
 ## 6. Development serverləri
 

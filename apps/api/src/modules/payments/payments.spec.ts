@@ -196,4 +196,49 @@ describe('PaymentsService access hardening', () => {
     expect(summary.bookingId).toBe('b1');
     expect(prisma.payment.create).toHaveBeenCalled();
   });
+
+  it('capture yalnız AUTHORIZED statusdan mümkündür', async () => {
+    const { ConflictException } = await import('@nestjs/common');
+    const { svc } = makeService({
+      booking: {
+        id: 'b1',
+        customerId: 'c1',
+        providerId: 'p1',
+        totalPrice: 10,
+      },
+      payment: {
+        id: 'pay1',
+        bookingId: 'b1',
+        amount: { toString: () => '10' },
+        commission: { toString: () => '0' },
+        currency: 'AZN',
+        status: PaymentStatus.REQUIRES_PAYMENT,
+        provider: 'noop',
+        externalId: 'x',
+        idempotencyKey: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+    await expect(
+      svc.capture('c1', UserRole.CUSTOMER, 'pay1', {}),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+describe('StripePaymentProvider stub', () => {
+  it('bütün əməliyyatlar 501 verir', async () => {
+    const { StripePaymentProvider } = await import('./payment-provider');
+    const { HttpException } = await import('@nestjs/common');
+    const provider = new StripePaymentProvider({
+      get: () => undefined,
+    } as never);
+
+    await expect(
+      provider.createIntent({ amount: 10, currency: 'AZN' }),
+    ).rejects.toBeInstanceOf(HttpException);
+    await expect(provider.authorizeHold('x')).rejects.toBeInstanceOf(HttpException);
+    await expect(provider.capture('x')).rejects.toBeInstanceOf(HttpException);
+    await expect(provider.refund('x')).rejects.toBeInstanceOf(HttpException);
+  });
 });

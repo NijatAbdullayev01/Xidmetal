@@ -9,6 +9,13 @@ describe('sanitizeInternalPath', () => {
     expect(sanitizeInternalPath('//evil.com')).toBeNull();
     expect(sanitizeInternalPath('dashboard')).toBeNull();
   });
+
+  it('backslash və host-hijack open redirect-i bloklayır', () => {
+    expect(sanitizeInternalPath('/\\evil.com')).toBeNull();
+    expect(sanitizeInternalPath('/\\\\evil.com')).toBeNull();
+    expect(sanitizeInternalPath('/%5cevil.com')).toBeNull();
+    expect(sanitizeInternalPath('/%5Cevil.com')).toBeNull();
+  });
 });
 
 describe('resolveNotificationHref', () => {

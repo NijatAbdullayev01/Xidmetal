@@ -8,7 +8,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { randomBytes, randomInt } from 'crypto';
+import { randomBytes } from 'crypto';
 import { EmailVerificationPurpose, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/database/prisma.service';
 import { MailService, type MailSendResult } from '../../common/mail/mail.service';
@@ -21,8 +21,10 @@ import {
 import { CLIENT_APP, ProviderAvailability, UserRole, type ClientApp } from '@xidmetal/shared';
 import { parseDurationMs } from '../../common/auth/auth-cookies';
 import { assertValidEmailCode } from '../../common/auth/email-verification-codes';
+import { generateNumericOtp } from '../../common/auth/otp';
 import { hashRefreshToken } from '../../common/auth/refresh-token';
 import { CaptchaService } from '../../common/captcha/captcha.service';
+import { StorageService } from '../../common/storage/storage.service';
 
 const UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
 const EMAIL_CODE_EXPIRY_MS = 15 * 60 * 1000;
@@ -54,6 +56,7 @@ export class AuthService {
     private config: ConfigService,
     private mailService: MailService,
     private captcha: CaptchaService,
+    private storageService: StorageService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -124,7 +127,7 @@ export class AuthService {
       CLIENT_APP.MARKETPLACE,
     );
     return {
-      user: this.sanitizeUser(user),
+      user: await this.sanitizeUser(user),
       tokens,
       ...this.mailMeta(mail),
     };
@@ -156,7 +159,7 @@ export class AuthService {
       usable.role,
       clientApp,
     );
-    return { user: this.sanitizeUser(usable), tokens };
+    return { user: await this.sanitizeUser(usable), tokens };
   }
 
   /**
@@ -241,7 +244,7 @@ export class AuthService {
       storedApp,
     );
     return {
-      user: this.sanitizeUser(stored.user),
+      user: await this.sanitizeUser(stored.user),
       tokens,
       clientApp: storedApp,
     };
@@ -316,7 +319,8 @@ export class AuthService {
     return { message: 'Şifrə uğurla yeniləndi. Yenidən daxil olun' };
   }
 
-  async requestEmailVerification(email: string) {
+  async requestEmailVerification(email: string, captchaToken?: string) {
+    await this.captcha.assertValid(captchaToken);
     const normalized = email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({
       where: { email: normalized },
@@ -363,7 +367,7 @@ export class AuthService {
     if (user.isVerified) {
       return {
         message: 'E-poçt artıq təsdiqlənib',
-        user: this.sanitizeUser(user),
+        user: await this.sanitizeUser(user),
       };
     }
 
@@ -399,7 +403,7 @@ export class AuthService {
 
     return {
       message: 'E-poçt uğurla təsdiqləndi',
-      user: this.sanitizeUser(updated),
+      user: await this.sanitizeUser(updated),
     };
   }
 
@@ -409,7 +413,7 @@ export class AuthService {
     purpose: EmailVerificationPurpose,
     send: (email: string, code: string) => Promise<MailSendResult>,
   ): Promise<MailSendResult> {
-    const code = randomInt(100000, 1000000).toString();
+    const code = generateNumericOtp();
     const codeHash = await bcrypt.hash(code, 10);
     const expiresAt = new Date(Date.now() + EMAIL_CODE_EXPIRY_MS);
 
@@ -477,7 +481,7 @@ export class AuthService {
     return 'Bu e-poçt artıq qeydiyyatdan keçib';
   }
 
-  private sanitizeUser(user: {
+  private async sanitizeUser(user: {
     id: string;
     email: string;
     firstName: string;
@@ -508,7 +512,7 @@ export class AuthService {
       firstName: user.firstName,
       lastName: user.lastName,
       phone: user.phone ?? undefined,
-      avatarUrl: user.avatarUrl ?? undefined,
+      avatarUrl: await this.storageService.toReadableMediaUrl(user.avatarUrl),
       role: user.role,
       isVerified: user.isVerified,
       createdAt: user.createdAt.toISOString(),

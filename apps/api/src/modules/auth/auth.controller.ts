@@ -214,7 +214,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'E-poçt təsdiq kodunu (yenidən) göndər' })
   requestEmailVerification(@Body() dto: RequestEmailVerificationDto) {
-    return this.authService.requestEmailVerification(dto.email);
+    return this.authService.requestEmailVerification(dto.email, dto.captchaToken);
   }
 
   @Public()

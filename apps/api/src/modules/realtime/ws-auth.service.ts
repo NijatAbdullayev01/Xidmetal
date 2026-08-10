@@ -25,8 +25,8 @@ interface JwtPayload {
 }
 
 /**
- * Socket.IO handshake JWT — HTTP JwtStrategy məntiqinin güzgü nüsxəsi.
- * Token: auth.token | Authorization Bearer | cookie (app-scoped)
+ * Socket.IO handshake auth — prioritet httpOnly cookie sessiyasıdır.
+ * Fallback: auth.token | Authorization Bearer
  */
 @Injectable()
 export class WsAuthService {
@@ -112,6 +112,14 @@ export class WsAuthService {
   }
 
   extractToken(client: Socket, clientApp?: ClientApp): string | null {
+    const cookieHeader = client.handshake.headers.cookie;
+    if (typeof cookieHeader === 'string' && cookieHeader.length > 0) {
+      const cookieToken = readAccessTokenFromCookieHeader(cookieHeader, clientApp);
+      if (cookieToken) {
+        return cookieToken;
+      }
+    }
+
     const authToken = client.handshake.auth?.token;
     if (typeof authToken === 'string' && authToken.trim().length > 0) {
       return authToken.trim();
@@ -121,11 +129,6 @@ export class WsAuthService {
     if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
       const bearer = authHeader.slice('Bearer '.length).trim();
       if (bearer.length > 0) return bearer;
-    }
-
-    const cookieHeader = client.handshake.headers.cookie;
-    if (typeof cookieHeader === 'string' && cookieHeader.length > 0) {
-      return readAccessTokenFromCookieHeader(cookieHeader, clientApp);
     }
 
     return null;

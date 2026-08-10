@@ -11,6 +11,7 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 import { API } from '@xidmetal/shared';
 import { assertJwtSecretForRuntime } from './common/auth/jwt-secret';
+import { assertProductionRuntimeConfig } from './common/config/production-guards';
 import { createAppLogger } from './common/logging/app.logger';
 import { requestIdMiddleware } from './common/middleware/request-id.middleware';
 import { createPrivateUploadsGuard } from './common/middleware/private-uploads.middleware';
@@ -33,48 +34,24 @@ async function bootstrap() {
   const nodeEnv = configService.get<string>('NODE_ENV', 'development');
   const jwtSecret = configService.get<string>('JWT_SECRET', '');
   const mediaSigningSecret =
-    configService.get<string>('MEDIA_SIGNING_SECRET')?.trim() || jwtSecret;
+    configService.get<string>('MEDIA_SIGNING_SECRET')?.trim() ||
+    (nodeEnv === 'production' ? '' : jwtSecret);
   assertJwtSecretForRuntime(jwtSecret, nodeEnv);
-
-  if (nodeEnv === 'production' && !configService.get<string>('SMTP_HOST')?.trim()) {
-    logger.warn(
-      'SMTP_HOST təyin olunmayıb — verify/reset/contact e-poçtları uğursuz olacaq',
-      'Bootstrap',
-    );
-  }
+  assertProductionRuntimeConfig({
+    nodeEnv,
+    jwtSecret,
+    mediaSigningSecret,
+    smtpHost: configService.get<string>('SMTP_HOST'),
+    turnstileSecret: configService.get<string>('TURNSTILE_SECRET_KEY'),
+    redisUrl: configService.get<string>('REDIS_URL'),
+    metricsToken: configService.get<string>('METRICS_TOKEN'),
+    geocoderProvider: configService.get<string>('GEOCODER_PROVIDER'),
+    paymentsEnabled: configService.get<string>('PAYMENTS_ENABLED'),
+    paymentProvider: configService.get<string>('PAYMENT_PROVIDER'),
+  });
 
   if (nodeEnv === 'production' && !configService.get<string>('SENTRY_DSN')?.trim()) {
     logger.warn('SENTRY_DSN təyin olunmayıb — xəta izləmə deaktivdir', 'Bootstrap');
-  }
-
-  if (
-    nodeEnv === 'production' &&
-    !configService.get<string>('TURNSTILE_SECRET_KEY')?.trim()
-  ) {
-    logger.warn(
-      'TURNSTILE_SECRET_KEY təyin olunmayıb — auth/contact captcha skip olunur (spam riski)',
-      'Bootstrap',
-    );
-  }
-
-  if (
-    nodeEnv === 'production' &&
-    !configService.get<string>('METRICS_TOKEN')?.trim()
-  ) {
-    logger.warn(
-      'METRICS_TOKEN təyin olunmayıb — /metrics açıqdır; production-da token tövsiyə olunur',
-      'Bootstrap',
-    );
-  }
-
-  if (
-    nodeEnv === 'production' &&
-    !configService.get<string>('REDIS_URL')?.trim()
-  ) {
-    logger.warn(
-      'REDIS_URL təyin olunmayıb — ready probe fail edəcək; WS/dispatch/throttle multi-instance üçün Redis lazımdır',
-      'Bootstrap',
-    );
   }
 
   const trustProxy = configService.get<string>('TRUST_PROXY', '');
@@ -98,7 +75,7 @@ async function bootstrap() {
     .filter((origin, index, all) => all.indexOf(origin) === index);
 
   const localUploadDir = configService.get<string>('STORAGE_LOCAL_DIR', './uploads');
-  // Booking şəkilləri HMAC imza tələb edir; services/avatars açıqdır
+  // Private media (bookings/services/avatars) HMAC imza tələb edir
   app.use('/uploads', createPrivateUploadsGuard(mediaSigningSecret));
   app.useStaticAssets(join(process.cwd(), localUploadDir), {
     prefix: '/uploads/',

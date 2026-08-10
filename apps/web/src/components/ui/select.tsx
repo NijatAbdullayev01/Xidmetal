@@ -127,7 +127,11 @@ function computePanelCoords(
     spaceBelow >= Math.min(estimatedHeight, MIN_BOTTOM_SPACE) ||
     spaceBelow >= spaceAbove;
   const available = placeBottom ? spaceBelow : spaceAbove;
-  const maxHeight = Math.max(MIN_BOTTOM_SPACE, Math.min(estimatedHeight, available));
+  // maxHeight heç vaxt mövcud yerdən böyük olmamalıdır (əks halda siyahı kəsilir)
+  const maxHeight = Math.max(
+    Math.min(MIN_BOTTOM_SPACE, available),
+    Math.min(estimatedHeight, available),
+  );
 
   if (placeBottom) {
     return {
@@ -375,7 +379,8 @@ export function Select({
             : undefined
         }
         className={cn(
-          'fixed z-50 overflow-hidden rounded-xl border border-border bg-card shadow-lg',
+          // Modal (z-[100]) üzərində görünməsi üçün — portal body-dədir
+          'fixed z-[110] flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-lg',
           coords.placement === 'top' ? 'origin-bottom' : 'origin-top',
           'motion-safe:animate-[picker-in_160ms_ease-out]',
           panelClassName,
@@ -390,7 +395,7 @@ export function Select({
         onKeyDown={handleListKeyDown}
       >
         {panelHeader ? (
-          <div className="hidden border-b border-border/70 bg-muted/40 px-3.5 py-2.5 sm:block">
+          <div className="hidden shrink-0 border-b border-border/70 bg-muted/40 px-3.5 py-2.5 sm:block">
             {typeof panelHeader === 'string' ? (
               <p className="text-xs font-medium text-muted-foreground">{panelHeader}</p>
             ) : (
@@ -400,7 +405,7 @@ export function Select({
         ) : null}
 
         {searchable ? (
-          <div className="border-b border-border/70 bg-muted/30 p-2.5 sm:p-3">
+          <div className="shrink-0 border-b border-border/70 bg-muted/30 p-2.5 sm:p-3">
             <label htmlFor={searchId} className="sr-only">
               Axtarış
             </label>
@@ -433,13 +438,7 @@ export function Select({
 
         <div
           ref={listRef}
-          className="overflow-y-auto overscroll-contain p-1.5 sm:p-2"
-          style={{
-            maxHeight:
-              coords.maxHeight -
-              (searchable ? 68 : 0) -
-              (panelHeader ? 44 : 0),
-          }}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5 sm:p-2"
         >
           {clearable ? (
             <button
@@ -524,9 +523,11 @@ export function Select({
                             ) : null}
 
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate">{option.label}</span>
+                              <span className="block break-words whitespace-normal">
+                                {option.label}
+                              </span>
                               {showDescription ? (
-                                <span className="mt-0.5 block truncate text-xs leading-snug text-muted-foreground">
+                                <span className="mt-0.5 block break-words whitespace-normal text-xs leading-snug text-muted-foreground">
                                   {option.description}
                                 </span>
                               ) : null}

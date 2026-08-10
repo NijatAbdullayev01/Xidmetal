@@ -16,15 +16,21 @@ export function RequireAuth({ children }: RequireAuthProps) {
   // olduğu üçün Zustand onun dəyişməsini aşkarlaya bilmirdi (logout-dan sonra
   // yenidən render olunmurdu).
   const isAuthenticated = useAuthStore((state) => state.session && !!state.user);
+  const isVerified = useAuthStore((state) => state.user?.isVerified === true);
   const hydrated = useAuthHydrated();
 
   useEffect(() => {
-    if (hydrated && !isAuthenticated) {
+    if (!hydrated) return;
+    if (!isAuthenticated) {
       router.replace('/login');
+      return;
     }
-  }, [hydrated, isAuthenticated, router]);
+    if (!isVerified) {
+      router.replace('/verify-email');
+    }
+  }, [hydrated, isAuthenticated, isVerified, router]);
 
-  if (!hydrated || !isAuthenticated) {
+  if (!hydrated || !isAuthenticated || !isVerified) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-brand" />

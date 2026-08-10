@@ -7,6 +7,7 @@ import { AuthPageShell } from '@/components/auth/auth-page-shell';
 import { LoginForm } from '@/components/auth/login-form';
 import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 import { getPostAuthRedirectPath } from '@/lib/auth';
+import { sanitizeInternalPath } from '@/lib/notification-href';
 import { useAuthStore } from '@/store/auth.store';
 
 function LoginViewContent() {
@@ -20,14 +21,12 @@ function LoginViewContent() {
   useEffect(() => {
     if (!showSuccess || !user) return;
 
-    const redirect = searchParams.get('redirect');
+    const redirect = sanitizeInternalPath(searchParams.get('redirect'));
     if (!user.isVerified) {
       router.replace('/verify-email');
       return;
     }
-    router.replace(
-      redirect && redirect.startsWith('/') ? redirect : getPostAuthRedirectPath(user.role),
-    );
+    router.replace(redirect ?? getPostAuthRedirectPath(user.role));
   }, [showSuccess, user, searchParams, router]);
 
   return (

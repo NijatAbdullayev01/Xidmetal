@@ -37,7 +37,7 @@ Bu sənəd Xidmətal-ın **real-time, on-demand** platformaya çevrilməsi üç�
         │                    │                    │
    ┌────▼────┐        ┌──────▼──────┐      ┌───────▼───────┐
    │ Maps /  │        │ Push (FCM)  │      │ Payment PSP   │
-   │Directions│       │ SMS / Email │      │ (Stripe/local)│
+   │Directions│       │ + Email     │      │ (Stripe/local)│
    └─────────┘        └─────────────┘      └───────────────┘
 ```
 
@@ -54,7 +54,7 @@ Mövcud stack (Next.js 15, NestJS 11, Prisma, PostgreSQL, Redis) saxlanılır. A
 | Xəritə / ETA | **Mapbox GL JS** (və ya Google Maps) + Directions API | Canlı xəritə, marşrut, ETA |
 | Background jobs | **BullMQ** (Redis üzərində) | Dispatch timeout, bildiriş, rating aggregate |
 | Push bildiriş | **Firebase Cloud Messaging** (FCM) | Mobil/web push |
-| SMS / Email | Yerli SMS provayderi + **Resend/SendGrid** | OTP, təsdiq, bildiriş |
+| Email | **Resend/SendGrid** / SMTP | Təsdiq, status mail |
 | Ödəniş | **Stripe** və ya yerli PSP (payment intent + hold/capture) | Marketplace ödənişləri, komissiya |
 | Fayl saxlama | **S3 / Cloudflare R2** | Avatar, xidmət şəkilləri, sənədlər |
 | Observability | **Sentry** + structured logging (`pino`) + metrics | Xəta izləmə, monitorinq |
@@ -71,7 +71,7 @@ Cari vəziyyət üçün: [ARCHITECTURE.md](./ARCHITECTURE.md). Aşağıdakı cə
 | Modul | Məsuliyyət | Status (cari) |
 |-------|------------|----------------|
 | `reviews` | Rəy yaratma + rating aggregate | ✅ MVP (`PENDING` + admin moderation) |
-| `notifications` | In-app oxu/siyahı + push/SMS kanalları | ✅ (FCM/SMS adapter; default noop) |
+| `notifications` | In-app oxu/siyahı + push kanalları | ✅ (FCM adapter; default noop) |
 | `messages` | Müştəri↔provider chat | ✅ REST + polling (WS typing hələ yox; TypingPresence DB) |
 | `realtime` (gateway) | Socket.IO gateway, otaqlar; provider presence | ✅ |
 | `tracking` | Provider lokasiya axını, marşrut, ETA, LocationPing | ✅ |
@@ -142,11 +142,10 @@ Prisma PostGIS-i native dəstəkləmədiyi üçün `Unsupported("geography(Point
 | Kanal | İstifadə | Status |
 |-------|----------|--------|
 | In-app | Status, inbox/badge | ✅ |
-| Push (FCM) | App/brauzer bağlı olduqda | ✅ adapter (noop default; credentials → FCM stub) |
-| SMS | Kritik status (`SMS_STATUS_ENABLED`) | ✅ adapter (noop/console/twilio stub) |
+| Push (FCM) | App/brauzer bağlı olduqda | ✅ adapter (noop default; credentials → real FCM HTTP v1/legacy) |
 | Email | Status mail | ✅ best-effort |
 
-In-app create-dən sonra push best-effort; SMS yalnız flag + `user.phone`. Phone OTP verify — `phoneVerifiedAt` + `/users/me/phone/*`; SMS yalnız təsdiqlənmiş nömrəyə.
+In-app create-dən sonra push best-effort. SMS kanalı yoxdur.
 
 ---
 

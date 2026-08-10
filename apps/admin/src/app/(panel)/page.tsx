@@ -152,7 +152,7 @@ export default function AdminOverviewPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Admin paneli</h1>
+        <h1 className="text-2xl font-bold tracking-tight">İcmal</h1>
         <p className="mt-1 text-muted-foreground">
           Platformanın ümumi vəziyyəti, moderasiya və idarəetmə.
         </p>

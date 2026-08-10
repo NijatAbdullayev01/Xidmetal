@@ -33,6 +33,7 @@ import { AvailabilityService } from '../availability/availability.service';
 import { shouldNotifyCustomerOnConfirmOrReject } from './booking-status-notify';
 import { RealtimeService } from '../realtime/realtime.service';
 import { DispatchService } from '../dispatch/dispatch.service';
+import { TrackingService } from '../tracking/tracking.service';
 import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
 import { MetricsService } from '../../common/metrics/metrics.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
@@ -50,8 +51,6 @@ const bookingSummaryInclude = {
       firstName: true,
       lastName: true,
       email: true,
-      phone: true,
-      phoneVerifiedAt: true,
     },
   },
   provider: {
@@ -60,8 +59,6 @@ const bookingSummaryInclude = {
       firstName: true,
       lastName: true,
       email: true,
-      phone: true,
-      phoneVerifiedAt: true,
     },
   },
   review: { select: { id: true } },
@@ -83,6 +80,9 @@ export class BookingsService {
     @Optional()
     @Inject(forwardRef(() => DispatchService))
     private dispatch?: DispatchService,
+    @Optional()
+    @Inject(forwardRef(() => TrackingService))
+    private tracking?: TrackingService,
   ) {}
 
   async findById(id: string, userId: string, role: string) {
@@ -170,6 +170,9 @@ export class BookingsService {
       destLng: dto.destLng ?? null,
       originLat: dto.originLat ?? null,
       originLng: dto.originLng ?? null,
+      minRating: dto.minRating ?? null,
+      minPrice: dto.minPrice ?? null,
+      maxPrice: dto.maxPrice ?? null,
     };
 
     if (idempotencyKey) {
@@ -191,6 +194,12 @@ export class BookingsService {
 
     const bookingType = dto.type ?? BookingType.SCHEDULED;
     const isInstant = bookingType === BookingType.INSTANT;
+
+    if (isInstant && !idempotencyKey) {
+      throw new BadRequestException(
+        'Ani sifariş üçün Idempotency-Key başlığı məcburidir',
+      );
+    }
 
     let scheduledAt: Date;
     if (isInstant) {
@@ -214,12 +223,12 @@ export class BookingsService {
       }
     }
 
-    if (dto.imageUrl) {
-      this.storageService.assertAllowedMediaUrl(dto.imageUrl);
-    }
-
     const imageUrl = dto.imageUrl
-      ? this.storageService.toCanonicalMediaUrl(dto.imageUrl)
+      ? await this.storageService.assertOwnedUploadUrl(
+          dto.imageUrl,
+          'bookings',
+          customerId,
+        )
       : undefined;
 
     const booking = await this.prisma.$transaction(async (tx) => {
@@ -323,17 +332,21 @@ export class BookingsService {
         body: `${booking.customer.firstName} ${booking.customer.lastName} «${booking.service.title}» xidmətinə sifariş verdi.`,
         type: NotificationType.BOOKING_CREATED,
         data: { bookingId: booking.id },
-        phone: booking.provider.phone,
-        phoneVerifiedAt: booking.provider.phoneVerifiedAt,
         serviceTitle: booking.service.title,
         scheduledAtLabel: this.formatScheduledAt(booking.scheduledAt),
       });
     } else {
-      void this.dispatch?.startForBooking(booking.id).catch((err) => {
-        this.logger.warn(
-          `Dispatch start uğursuz: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      });
+      void this.dispatch
+        ?.startForBooking(booking.id, {
+          minRating: dto.minRating,
+          minPrice: dto.minPrice,
+          maxPrice: dto.maxPrice,
+        })
+        .catch((err) => {
+          this.logger.warn(
+            `Dispatch start uğursuz: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
     }
 
     this.metrics.incBookingCreated(
@@ -770,6 +783,7 @@ export class BookingsService {
       status: dto.status,
       timestamp: new Date().toISOString(),
     });
+    this.tracking?.invalidateBookingCache(updated.id);
 
     if (
       booking.type === BookingType.INSTANT &&
@@ -794,8 +808,8 @@ export class BookingsService {
       id: string;
       scheduledAt: Date;
       service: { title: string };
-      customer: { id: string; email: string; phone?: string | null; phoneVerifiedAt?: Date | null };
-      provider: { id: string; email: string; phone?: string | null; phoneVerifiedAt?: Date | null };
+      customer: { id: string; email: string };
+      provider: { id: string; email: string };
     },
     meta: {
       isProvider: boolean;
@@ -815,12 +829,6 @@ export class BookingsService {
       const recipientId = meta.isCustomer
         ? booking.provider.id
         : booking.customer.id;
-      const recipientPhone = meta.isCustomer
-        ? booking.provider.phone
-        : booking.customer.phone;
-      const recipientPhoneVerifiedAt = meta.isCustomer
-        ? booking.provider.phoneVerifiedAt
-        : booking.customer.phoneVerifiedAt;
       const actorLabel = meta.isAdmin
         ? 'idarəçi'
         : meta.isCustomer
@@ -841,8 +849,6 @@ export class BookingsService {
         }`,
         type: event,
         data: { bookingId: booking.id },
-        phone: recipientPhone,
-        phoneVerifiedAt: recipientPhoneVerifiedAt,
         serviceTitle: booking.service.title,
       });
       return;
@@ -868,8 +874,6 @@ export class BookingsService {
         body: channelCopy.body,
         type: event,
         data: { bookingId: booking.id },
-        phone: booking.customer.phone,
-        phoneVerifiedAt: booking.customer.phoneVerifiedAt,
         serviceTitle: booking.service.title,
         scheduledAtLabel: this.formatScheduledAt(booking.scheduledAt),
       });

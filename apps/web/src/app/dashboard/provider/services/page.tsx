@@ -209,13 +209,14 @@ export default function MyServicesPage() {
                   </p>
                 ) : null}
                 <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                  <span>{service.categoryName}</span>
+                  <span>Kateqoriya: {service.categoryName}</span>
                   <span>
+                    Qiymət:{' '}
                     {service.price > 0
                       ? `${formatPrice(service.price)} / ${getPriceUnitLabel(service.priceUnit)}`
                       : formatPrice(service.price)}
                   </span>
-                  <span>{formatDate(service.createdAt)}</span>
+                  <span>Yaradılıb: {formatDate(service.createdAt)}</span>
                 </div>
               </div>
 

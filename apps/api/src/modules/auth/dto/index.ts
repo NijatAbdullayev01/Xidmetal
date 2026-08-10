@@ -106,10 +106,10 @@ export class ResetPasswordDto {
   @IsEmail({}, { message: 'Düzgün e-poçt daxil edin' })
   email!: string;
 
-  @ApiProperty({ example: '123456' })
+  @ApiProperty({ example: '12345678' })
   @IsString()
-  @Length(6, 6, { message: 'Təsdiq kodu 6 rəqəm olmalıdır' })
-  @Matches(/^\d{6}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
+  @Length(8, 8, { message: 'Təsdiq kodu 8 rəqəm olmalıdır' })
+  @Matches(/^\d{8}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
   code!: string;
 
   @ApiProperty({ example: 'SecurePass1' })
@@ -124,6 +124,11 @@ export class RequestEmailVerificationDto {
   @ApiProperty({ example: 'user@example.com' })
   @IsEmail({}, { message: 'Düzgün e-poçt daxil edin' })
   email!: string;
+
+  @ApiPropertyOptional({ description: 'Cloudflare Turnstile token' })
+  @IsOptional()
+  @IsString()
+  captchaToken?: string;
 }
 
 export class ConfirmEmailVerificationDto {
@@ -131,9 +136,9 @@ export class ConfirmEmailVerificationDto {
   @IsEmail({}, { message: 'Düzgün e-poçt daxil edin' })
   email!: string;
 
-  @ApiProperty({ example: '123456' })
+  @ApiProperty({ example: '12345678' })
   @IsString()
-  @Length(6, 6, { message: 'Təsdiq kodu 6 rəqəm olmalıdır' })
-  @Matches(/^\d{6}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
+  @Length(8, 8, { message: 'Təsdiq kodu 8 rəqəm olmalıdır' })
+  @Matches(/^\d{8}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
   code!: string;
 }

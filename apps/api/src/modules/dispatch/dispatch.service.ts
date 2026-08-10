@@ -20,7 +20,6 @@ import {
   computeDispatchScore,
   providerRoom,
   rankDispatchCandidates,
-  selectNextDispatchCandidate,
   type DispatchCandidate,
   type DispatchOfferPayload,
   type DispatchOfferResultPayload,
@@ -59,9 +58,17 @@ const offerInclude = {
   },
 } as const;
 
+export interface DispatchStartPrefs {
+  minRating?: number;
+  minPrice?: number;
+  maxPrice?: number;
+}
+
 @Injectable()
 export class DispatchService implements OnModuleInit {
   private readonly logger = new Logger(DispatchService.name);
+  /** Booking-ə bağlı müvəqqəti dispatch filtrləri (restart-da itir; optional) */
+  private readonly dispatchPrefs = new Map<string, DispatchStartPrefs>();
 
   constructor(
     private prisma: PrismaService,
@@ -91,10 +98,45 @@ export class DispatchService implements OnModuleInit {
       : DISPATCH.OFFER_TIMEOUT_SEC;
   }
 
+  private clearPrefs(bookingId: string): void {
+    this.dispatchPrefs.delete(bookingId);
+  }
+
   /**
-   * INSTANT booking yaradıldıqdan sonra çağırılır — namizədləri tapıb ilk offer göndərir.
+   * INSTANT booking yaradıldıqdan sonra çağırılır — namizədləri tapıb eyni anda offer göndərir.
    */
-  async startForBooking(bookingId: string): Promise<void> {
+  async startForBooking(
+    bookingId: string,
+    prefs?: DispatchStartPrefs,
+  ): Promise<void> {
+    if (prefs) {
+      const cleaned: DispatchStartPrefs = {};
+      if (
+        prefs.minRating !== undefined &&
+        Number.isFinite(prefs.minRating) &&
+        prefs.minRating >= 0
+      ) {
+        cleaned.minRating = prefs.minRating;
+      }
+      if (
+        prefs.minPrice !== undefined &&
+        Number.isFinite(prefs.minPrice) &&
+        prefs.minPrice >= 0
+      ) {
+        cleaned.minPrice = prefs.minPrice;
+      }
+      if (
+        prefs.maxPrice !== undefined &&
+        Number.isFinite(prefs.maxPrice) &&
+        prefs.maxPrice >= 0
+      ) {
+        cleaned.maxPrice = prefs.maxPrice;
+      }
+      if (Object.keys(cleaned).length > 0) {
+        this.dispatchPrefs.set(bookingId, cleaned);
+      }
+    }
+
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
@@ -105,10 +147,17 @@ export class DispatchService implements OnModuleInit {
 
     if (!booking) {
       this.logger.warn(`Dispatch start: booking yoxdur ${bookingId}`);
+      this.clearPrefs(bookingId);
       return;
     }
-    if (booking.type !== BookingType.INSTANT) return;
-    if (booking.status !== BookingStatus.PENDING) return;
+    if (booking.type !== BookingType.INSTANT) {
+      this.clearPrefs(bookingId);
+      return;
+    }
+    if (booking.status !== BookingStatus.PENDING) {
+      this.clearPrefs(bookingId);
+      return;
+    }
 
     if (booking.destLat == null || booking.destLng == null) {
       await this.failDispatch(
@@ -184,14 +233,24 @@ export class DispatchService implements OnModuleInit {
         throw new ConflictException('Sifariş artıq təyin olunub və ya ləğv edilib');
       }
 
-      const matchingService = await tx.service.findFirst({
-        where: {
-          providerId,
-          categoryId: booking.service.categoryId,
-          status: ServiceStatus.ACTIVE,
-        },
-        orderBy: { updatedAt: 'desc' },
-      });
+      const matchingService =
+        (await tx.service.findFirst({
+          where: {
+            providerId,
+            categoryId: booking.service.categoryId,
+            title: booking.service.title,
+            status: ServiceStatus.ACTIVE,
+          },
+          orderBy: { updatedAt: 'desc' },
+        })) ??
+        (await tx.service.findFirst({
+          where: {
+            providerId,
+            categoryId: booking.service.categoryId,
+            status: ServiceStatus.ACTIVE,
+          },
+          orderBy: { updatedAt: 'desc' },
+        }));
 
       if (!matchingService) {
         throw new BadRequestException(
@@ -278,8 +337,6 @@ export class DispatchService implements OnModuleInit {
               firstName: true,
               lastName: true,
               email: true,
-              phone: true,
-              phoneVerifiedAt: true,
             },
           },
           provider: {
@@ -299,8 +356,6 @@ export class DispatchService implements OnModuleInit {
       body: `«${result.booking.service.title}» üçün ani sifarişiniz qəbul edildi.`,
       type: NotificationType.BOOKING_CONFIRMED,
       data: { bookingId: result.booking.id },
-      phone: result.booking.customer.phone,
-      phoneVerifiedAt: result.booking.customer.phoneVerifiedAt,
       serviceTitle: result.booking.service.title,
     });
 
@@ -336,6 +391,8 @@ export class DispatchService implements OnModuleInit {
       status: BookingStatus.CONFIRMED,
       timestamp: now.toISOString(),
     });
+
+    this.clearPrefs(result.booking.id);
 
     return this.mapOffer(
       await this.prisma.dispatchOffer.findUniqueOrThrow({
@@ -459,6 +516,10 @@ export class DispatchService implements OnModuleInit {
     });
   }
 
+  /**
+   * Uyğun namizədlərə eyni anda PENDING offer göndərir (fan-out).
+   * Aktiv offer qalanda namizəd tükənməsi sifarişi ləğv etmir.
+   */
   private async offerNext(bookingId: string): Promise<void> {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
@@ -480,7 +541,6 @@ export class DispatchService implements OnModuleInit {
       return;
     }
 
-    // Bir anda yalnız bir aktiv PENDING offer
     const active = await this.prisma.dispatchOffer.count({
       where: {
         bookingId,
@@ -506,34 +566,115 @@ export class DispatchService implements OnModuleInit {
       limit: DISPATCH.MAX_CANDIDATES,
     });
 
-    const candidates: DispatchCandidate[] = nearby.items.map((item) => ({
-      providerId: item.userId,
-      distanceM: item.distanceM,
-      rating: item.rating,
-    }));
+    const prefs = this.dispatchPrefs.get(bookingId);
+    const eligibleProviderIds = await this.findEligibleProviderIds({
+      providerIds: nearby.items.map((item) => item.userId),
+      categoryId: booking.service.categoryId,
+      serviceTitle: booking.service.title,
+      minPrice: prefs?.minPrice,
+      maxPrice: prefs?.maxPrice,
+    });
+
+    const candidates: DispatchCandidate[] = nearby.items
+      .filter((item) => {
+        if (!eligibleProviderIds.has(item.userId)) return false;
+        if (
+          prefs?.minRating !== undefined &&
+          item.rating < prefs.minRating
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .map((item) => ({
+        providerId: item.userId,
+        distanceM: item.distanceM,
+        rating: item.rating,
+      }));
 
     const ranked = rankDispatchCandidates(candidates);
-    const next = selectNextDispatchCandidate(ranked, exclude);
+    const available = ranked.filter((c) => !exclude.has(c.providerId));
 
-    if (!next) {
-      await this.failDispatch(
-        booking.id,
-        booking.customerId,
-        'Uyğun icraçı tapılmadı',
-      );
+    if (available.length === 0) {
+      if (active === 0) {
+        await this.failDispatch(
+          booking.id,
+          booking.customerId,
+          'Uyğun icraçı tapılmadı',
+        );
+      }
       return;
     }
 
+    const slots = DISPATCH.MAX_ACTIVE_OFFERS - active;
+    const batch = available.slice(0, slots);
     const timeoutSec = this.offerTimeoutSec();
+
+    for (const next of batch) {
+      await this.createAndEmitOffer({
+        booking: {
+          id: booking.id,
+          address: booking.address,
+          destLat: booking.destLat,
+          destLng: booking.destLng,
+          scheduledAt: booking.scheduledAt,
+          serviceTitle: booking.service.title,
+        },
+        candidate: next,
+        timeoutSec,
+      });
+    }
+  }
+
+  private async findEligibleProviderIds(input: {
+    providerIds: string[];
+    categoryId: string;
+    serviceTitle: string;
+    minPrice?: number;
+    maxPrice?: number;
+  }): Promise<Set<string>> {
+    if (input.providerIds.length === 0) return new Set();
+
+    const priceFilter: { gte?: number; lte?: number } = {};
+    if (input.minPrice !== undefined) priceFilter.gte = input.minPrice;
+    if (input.maxPrice !== undefined) priceFilter.lte = input.maxPrice;
+
+    const services = await this.prisma.service.findMany({
+      where: {
+        providerId: { in: input.providerIds },
+        categoryId: input.categoryId,
+        title: input.serviceTitle,
+        status: ServiceStatus.ACTIVE,
+        ...(Object.keys(priceFilter).length > 0 ? { price: priceFilter } : {}),
+      },
+      select: { providerId: true },
+    });
+
+    return new Set(services.map((s) => s.providerId));
+  }
+
+  private async createAndEmitOffer(input: {
+    booking: {
+      id: string;
+      address: string | null;
+      destLat: number;
+      destLng: number;
+      scheduledAt: Date;
+      serviceTitle: string;
+    };
+    candidate: DispatchCandidate;
+    timeoutSec: number;
+  }): Promise<void> {
+    const { booking, candidate, timeoutSec } = input;
     const expiresAt = new Date(Date.now() + timeoutSec * 1000);
-    const score = computeDispatchScore(next.distanceM, next.rating);
+    const score = computeDispatchScore(candidate.distanceM, candidate.rating);
 
     const offer = await this.prisma.dispatchOffer.create({
       data: {
         bookingId: booking.id,
-        providerId: next.providerId,
+        providerId: candidate.providerId,
         status: DispatchOfferStatus.PENDING,
-        distanceM: next.distanceM,
+        distanceM: candidate.distanceM,
         score,
         expiresAt,
       },
@@ -542,10 +683,10 @@ export class DispatchService implements OnModuleInit {
 
     const offerNotification = await this.prisma.notification.create({
       data: {
-        userId: next.providerId,
+        userId: candidate.providerId,
         type: NotificationType.BOOKING_CREATED,
         title: 'Ani sifariş təklifi',
-        body: `Yaxınlıqdakı «${booking.service.title}» sifarişi — ${timeoutSec} saniyə ərzində cavab verin.`,
+        body: `Yaxınlıqdakı «${booking.serviceTitle}» sifarişi — ${timeoutSec} saniyə ərzində cavab verin.`,
         data: {
           bookingId: booking.id,
           offerId: offer.id,
@@ -554,13 +695,13 @@ export class DispatchService implements OnModuleInit {
       },
     });
     this.channels?.deliverAfterInApp({
-      userId: next.providerId,
+      userId: candidate.providerId,
       notificationId: offerNotification.id,
       title: 'Ani sifariş təklifi',
-      body: `Yaxınlıqdakı «${booking.service.title}» sifarişi — ${timeoutSec} saniyə ərzində cavab verin.`,
+      body: `Yaxınlıqdakı «${booking.serviceTitle}» sifarişi — ${timeoutSec} saniyə ərzində cavab verin.`,
       type: NotificationType.BOOKING_CREATED,
       data: { bookingId: booking.id, offerId: offer.id, dispatch: true },
-      serviceTitle: booking.service.title,
+      serviceTitle: booking.serviceTitle,
     });
 
     await this.queue.scheduleOfferTimeout(
@@ -571,24 +712,24 @@ export class DispatchService implements OnModuleInit {
     const payload: DispatchOfferPayload = {
       offerId: offer.id,
       bookingId: booking.id,
-      serviceTitle: booking.service.title,
+      serviceTitle: booking.serviceTitle,
       address: booking.address,
       destLat: booking.destLat,
       destLng: booking.destLng,
-      distanceM: next.distanceM,
+      distanceM: candidate.distanceM,
       expiresAt: expiresAt.toISOString(),
       scheduledAt: booking.scheduledAt.toISOString(),
     };
 
     this.realtime?.emitToRoom(
-      providerRoom(next.providerId),
+      providerRoom(candidate.providerId),
       REALTIME_EVENTS.DISPATCH_OFFER,
       payload,
     );
     this.metrics.incDispatchOffer('created');
 
     this.logger.log(
-      `Dispatch offer → provider=${next.providerId} booking=${booking.id} dist=${Math.round(next.distanceM)}m`,
+      `Dispatch offer → provider=${candidate.providerId} booking=${booking.id} dist=${Math.round(candidate.distanceM)}m`,
     );
   }
 
@@ -624,6 +765,8 @@ export class DispatchService implements OnModuleInit {
         respondedAt: now,
       },
     });
+
+    this.clearPrefs(bookingId);
 
     const failNotification = await this.prisma.notification.create({
       data: {

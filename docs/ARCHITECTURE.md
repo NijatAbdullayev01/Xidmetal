@@ -66,12 +66,12 @@ Backend modulları (`apps/api/src/modules/`) — **cari status:**
 | `payments` | Intent/hold/capture/refund scaffolding; `PAYMENTS_ENABLED=false` default (501) | ✅ flag OFF |
 | `reviews` | Rəy yaratma + rating aggregate (PENDING → admin APPROVED) | ✅ |
 | `messages` | Müştəri↔provider söhbət (REST; TypingPresence DB) | ✅ |
-| `notifications` | In-app + best-effort push (FCM/noop); SMS opsional (`SMS_STATUS_ENABLED`) | ✅ |
+| `notifications` | In-app + best-effort push (FCM/noop) | ✅ |
 | `devices` | DeviceToken register/unregister (JWT) | ✅ |
 | `reports` | İstifadəçi şikayətləri + admin moderation | ✅ |
 | `contact` | İctimai əlaqə formu | ✅ |
 | `health` | Sağlamlıq yoxlaması | ✅ |
-| `metrics` (common) | Prometheus `/api/v1/metrics` — HTTP + business counters; opsional `METRICS_TOKEN` | ✅ |
+| `metrics` (common) | Prometheus `/api/v1/metrics` — HTTP + business counters; prod-da `METRICS_TOKEN` məcburi | ✅ |
 | `geo` | Geokodlaşdırma (mock/Nominatim), PostGIS `ST_DWithin` yaxınlıq, provider mövqe/availability | ✅ |
 | `realtime` | Socket.IO gateway, JWT handshake, otaqlar (`booking`/`user`/`provider`), Redis adapter | ✅ |
 | `tracking` | `location:push` → yayım + ETA + `LocationPing` sampling; REST pings | ✅ |
@@ -167,9 +167,9 @@ Keçidlər shared `booking-lifecycle` + `bookings.service` rol matrisi ilə yoxl
 - **Input validation** (class-validator + Zod); media URL yalnız öz storage host
 - **RBAC** (`@Roles` + service-layer yoxlamalar)
 - **Health:** `/health` liveness, `/health/ready` DB readiness
-- **Metrics:** `/api/v1/metrics` Prometheus exposition (lokal açıq; prod-da opsional `METRICS_TOKEN`)
+- **Metrics:** `/api/v1/metrics` Prometheus exposition (lokal açıq; prod-da `METRICS_TOKEN` məcburi)
 
-**Qeyd:** server-side logout/revoke, şifrə unutma və e-poçt verify mövcuddur. Login soft qalır (unverified user daxil ola bilir); **yazma** əməliyyatları (sifariş, mesaj, rəy, upload, xidmət yarat/yenilə/sil, təqvim yazıları, şikayət) `@RequireEmailVerified` ilə qorunur. Provider `providerProfile.isVerified` olmadan xidməti yoxlamaya göndərə, onlayn ola və ictimai siyahıda görünə bilməz. Xidmət paylaşımı: `DRAFT`/`NEEDS_REVISION` → `PENDING_REVIEW` → admin təsdiqi → `ACTIVE` (və ya düzəliş qeydi ilə `NEEDS_REVISION`). Admin təsdiqi ləğvində aktiv xidmətlər `PAUSED` olur. Şəkillər `POST /uploads` ilə saxlanır (local və ya S3/R2); DB-də yalnız URL. Soft-delete: `User.deletedAt`; provider hard-delete `Restrict` (xidmətləri gizli silmir).
+**Qeyd:** server-side logout/revoke, şifrə unutma və e-poçt verify mövcuddur. Qeydiyyat/girişdən sonra marketplace kabineti yalnız `isVerified` olduqda açılır (`RequireAuth` → `/verify-email`). **Yazma** əməliyyatları (sifariş, mesaj, rəy, upload, xidmət yarat/yenilə/sil, təqvim yazıları, şikayət) əlavə olaraq `@RequireEmailVerified` ilə qorunur. Provider `providerProfile.isVerified` olmadan xidməti yoxlamaya göndərə, onlayn ola və ictimai siyahıda görünə bilməz. Xidmət paylaşımı: `DRAFT`/`NEEDS_REVISION` → `PENDING_REVIEW` → admin təsdiqi → `ACTIVE` (və ya düzəliş qeydi ilə `NEEDS_REVISION`). Admin təsdiqi ləğvində aktiv xidmətlər `PAUSED` olur. Şəkillər `POST /uploads` ilə saxlanır (local və ya S3/R2); DB-də yalnız URL. Soft-delete: `User.deletedAt`; provider hard-delete `Restrict` (xidmətləri gizli silmir).
 
 ## Scalability planı
 
@@ -177,27 +177,33 @@ Keçidlər shared `booking-lifecycle` + `bookings.service` rol matrisi ilə yoxl
 - Monolith API + PostgreSQL (`prisma migrate deploy` + local `db:push` fallback)
 - Redis: Throttler storage (`REDIS_URL`); olmadıqda in-memory fallback
 - Next.js marketplace (**3020**) + ayrı admin (**3021**)
-- Real-time: Socket.IO (tracking/status) + HTTP polling fallback
+- Real-time: Socket.IO (tracking/status/dispatch/`message:new`) + HTTP polling fallback
 - CI: GitHub Actions (lint + typecheck + unit test + build)
 - Upload: throttle + per-user quota + orphan TTL təmizlik
 - Booking: `pg_advisory_xact_lock` + slot re-check (double-book race bağlı)
 - Logging: pino (prod JSON); Sentry opsional (`SENTRY_DSN` API; `NEXT_PUBLIC_SENTRY_DSN` web/admin)
 - Metrics: `prom-client` + Grafana/Prometheus ops (`ops/`, `docker-compose.monitoring.yml` profile)
-- Load: k6 (`pnpm load:smoke`) — əl ilə; CI ağır load default yox
+- Load: k6 (`pnpm load:smoke` / `load:capacity`) + Socket.IO smoke (`pnpm load:realtime`) — əl ilə; CI ağır load default yox
+- Tutum (5k concurrent): [CAPACITY.md](./CAPACITY.md) — Redis throttle/presence, API scale + nginx, deferred location DB
 - E2E: Playwright smoke + kritik UI (`pnpm --filter @xidmetal/web test:e2e`, `E2E_BASE_URL`)
-- Şikayət: `POST /reports` + admin moderation; sifariş statusları best-effort e-poçt + push/SMS (Faza 5)
-- Ödəniş: scaffolding (`PAYMENTS_ENABLED=false`); DeviceToken + FCM/SMS adapter
+- Şikayət: `POST /reports` + admin moderation; sifariş statusları best-effort e-poçt + push (Faza 5)
+- Ödəniş: scaffolding (`PAYMENTS_ENABLED=false`); DeviceToken + FCM adapter
 - Mobile: deferred — [MOBILE.md](./MOBILE.md); PWA örtür
+- Deploy: `docker-compose.prod.yml` + GHCR/SSH workflow
 
 ### Gələcək
-- **Search:** Elasticsearch/Meilisearch
-- **Payment:** real Stripe checkout / live charge (məhsul qərarı; flag ON)
-- **Email:** SMTP artıq opsional; production üçün SendGrid/Resend
-- **Mobile:** React Native (`apps/mobile`) — yalnız tam runnable app
-- **CI/CD:** deploy pipeline (E2E CI-də auth+smoke+critical-flows var)
-- **Deployment:** Docker + Kubernetes / Vercel + Railway
+- **Search:** Elasticsearch/Meilisearch (cari: Postgres `contains` / ilike filtrləri)
+- **Payment:** real Stripe checkout / live charge (məhsul qərarı; flag ON) — scaffolding mövcuddur
+- **Email:** managed provider (SendGrid/Resend); cari SMTP production-da işləyir
+- **Mobile:** React Native (`apps/mobile`) — yalnız tam runnable app; plan: [MOBILE.md](./MOBILE.md)
+- **Orchestration:** K8s/Vercel — compose + GHCR artıq var
 
-> **Qeyd:** Telefon SMS OTP (`phoneVerifiedAt`, `/users/me/phone/*`) və Turnstile captcha (env ilə) artıq mövcuddur. GDPR JSON ixrac: `GET /users/me/export`.
+### Deployment (cari)
+- Docker images: `apps/{api,web,admin}/Dockerfile` (web: `NEXT_PUBLIC_WS_URL` / Mapbox / Turnstile / FCM bake-in)
+- Lokal/full stack: `pnpm docker:prod` → `docker-compose.yml` + `docker-compose.prod.yml`
+- CD: `.github/workflows/deploy.yml` — GHCR push + opsional SSH compose deploy (`deploy_runtime`, `DEPLOY_*` secrets)
+
+> **Qeyd:** Turnstile captcha (env ilə) artıq mövcuddur.
 
 Ətraflı mərhələlər: [ROADMAP.md](./ROADMAP.md).
 

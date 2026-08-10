@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -11,13 +11,21 @@ import {
 } from '@xidmetal/shared';
 import { Loader2 } from 'lucide-react';
 import { AuthPageShell } from '@/components/auth/auth-page-shell';
+import {
+  TurnstileWidget,
+  isTurnstileConfigured,
+} from '@/components/auth/turnstile-widget';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api, ApiError } from '@/lib/api';
-import { getPostAuthRedirectPath } from '@/lib/auth';
+import { getPostAuthRedirectPath, takeDevEmailCode } from '@/lib/auth';
 import { useAuthStore } from '@/store/auth.store';
 import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
+
+function formatDevCodeMessage(message: string, previewCode?: string): string {
+  return previewCode ? `${message} (DEV kod: ${previewCode})` : message;
+}
 
 export function VerifyEmailView() {
   const router = useRouter();
@@ -27,7 +35,10 @@ export function VerifyEmailView() {
   const updateUser = useAuthStore((state) => state.updateUser);
   const [serverError, setServerError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [devCode, setDevCode] = useState<string | null>(null);
   const [isResending, setIsResending] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const autoRequestedRef = useRef(false);
 
   const {
     register,
@@ -49,6 +60,51 @@ export function VerifyEmailView() {
     }
   }, [user?.email, setValue]);
 
+  useEffect(() => {
+    if (!hydrated) return;
+
+    const stashed = takeDevEmailCode();
+    if (stashed) {
+      setDevCode(stashed);
+      setValue('code', stashed);
+      return;
+    }
+
+    // Login sonrası / stashed yoxdursa — test rejimində kodu avtomatik yenilə
+    if (
+      autoRequestedRef.current ||
+      !user?.email ||
+      user.isVerified ||
+      isTurnstileConfigured()
+    ) {
+      return;
+    }
+
+    autoRequestedRef.current = true;
+    void (async () => {
+      try {
+        const response = await api.auth.requestEmailVerification({
+          email: user.email,
+        });
+        setInfoMessage(formatDevCodeMessage(response.message, response.previewCode));
+        if (response.previewCode) {
+          setDevCode(response.previewCode);
+          setValue('code', response.previewCode);
+        }
+      } catch {
+        // İstifadəçi «Kodu yenidən göndər» ilə davam edə bilər
+      }
+    })();
+  }, [hydrated, user?.email, user?.isVerified, setValue]);
+
+  const applyPreviewCode = (previewCode: string | undefined, message: string) => {
+    setInfoMessage(formatDevCodeMessage(message, previewCode));
+    if (previewCode) {
+      setDevCode(previewCode);
+      setValue('code', previewCode);
+    }
+  };
+
   const goToDashboard = () => {
     if (user) {
       router.replace(getPostAuthRedirectPath(user.role));
@@ -68,6 +124,7 @@ export function VerifyEmailView() {
       } else {
         updateUser(response.user);
       }
+      setDevCode(null);
       setInfoMessage(response.message);
       window.setTimeout(goToDashboard, 1200);
     } catch (error) {
@@ -83,17 +140,21 @@ export function VerifyEmailView() {
     const email = getValues('email') || user?.email;
     if (!email) return;
 
+    if (isTurnstileConfigured() && !captchaToken) {
+      setServerError('Zəhmət olmasa captcha-nı tamamlayın');
+      return;
+    }
+
     setIsResending(true);
     setServerError(null);
     setInfoMessage(null);
 
     try {
-      const response = await api.auth.requestEmailVerification({ email });
-      setInfoMessage(
-        response.previewCode
-          ? `${response.message} (DEV kod: ${response.previewCode})`
-          : response.message,
-      );
+      const response = await api.auth.requestEmailVerification({
+        email,
+        captchaToken: captchaToken ?? undefined,
+      });
+      applyPreviewCode(response.previewCode, response.message);
     } catch (error) {
       if (error instanceof ApiError) {
         setServerError(error.message);
@@ -132,10 +193,25 @@ export function VerifyEmailView() {
   return (
     <AuthPageShell
       title="E-poçt təsdiqi"
-      description="E-poçtunuza göndərilən 6 rəqəmli kodu daxil edin"
+      description="Hesaba daxil olmaq üçün e-poçtunuza göndərilən 8 rəqəmli kodu daxil edin"
       maxWidth="md"
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+        {devCode && (
+          <div
+            className="rounded-lg border border-brand/40 bg-brand/15 px-4 py-3 text-sm"
+            role="status"
+          >
+            <p className="font-medium text-foreground">Test rejimi</p>
+            <p className="mt-1 text-muted-foreground">
+              Təsdiq kodu:{' '}
+              <span className="font-mono text-base font-semibold tracking-widest text-foreground">
+                {devCode}
+              </span>
+            </p>
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="email">E-poçt</Label>
           <Input
@@ -159,8 +235,8 @@ export function VerifyEmailView() {
             id="code"
             inputMode="numeric"
             autoComplete="one-time-code"
-            placeholder="123456"
-            maxLength={6}
+            placeholder="12345678"
+            maxLength={8}
             error={!!errors.code}
             disabled={isSubmitting}
             {...register('code')}
@@ -201,6 +277,8 @@ export function VerifyEmailView() {
           )}
         </Button>
 
+        <TurnstileWidget onToken={setCaptchaToken} />
+
         <Button
           type="button"
           variant="outline"
@@ -218,18 +296,6 @@ export function VerifyEmailView() {
             'Kodu yenidən göndər'
           )}
         </Button>
-
-        {user && (
-          <p className="text-center text-sm text-muted-foreground">
-            <button
-              type="button"
-              onClick={goToDashboard}
-              className="font-medium text-brand-dark hover:underline"
-            >
-              Daha sonra
-            </button>
-          </p>
-        )}
 
         {!user && (
           <p className="text-center text-sm text-muted-foreground">

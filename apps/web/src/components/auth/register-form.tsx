@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { AZ_PHONE_PREFIX, azPhoneLocalPart, toAzPhoneValue } from '@/lib/phone';
 import { api, ApiError } from '@/lib/api';
+import { stashDevEmailCode } from '@/lib/auth';
 import { useAuthStore } from '@/store/auth.store';
 import {
   TurnstileWidget,
@@ -69,6 +70,7 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
       };
       const response = await api.auth.register(payload);
 
+      stashDevEmailCode(response.previewCode);
       setAuth(response.user);
       queryClient.setQueryData(['users', 'me'], response.user);
     } catch (error) {

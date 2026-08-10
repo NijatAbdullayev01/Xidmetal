@@ -26,8 +26,10 @@ import type {
   PaginatedResponse,
   ServiceSummary,
 } from '@xidmetal/shared';
+import { sanitizeInternalPath } from '@xidmetal/shared';
 import { PrismaService } from '../../common/database/prisma.service';
 import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
+import { StorageService } from '../../common/storage/storage.service';
 import {
   AdminBookingsQueryDto,
   AdminReportsQueryDto,
@@ -76,6 +78,7 @@ function slugify(input: string): string {
 export class AdminService {
   constructor(
     private prisma: PrismaService,
+    private storageService: StorageService,
     @Optional() private channels?: NotificationChannelsService,
   ) {}
 
@@ -169,7 +172,7 @@ export class AdminService {
     ]);
 
     return {
-      items: rows.map((u) => this.mapUser(u)),
+      items: await Promise.all(rows.map((u) => this.mapUser(u))),
       total,
       page,
       limit,
@@ -419,7 +422,7 @@ export class AdminService {
     ]);
 
     return {
-      items: rows.map((s) => ({
+      items: await Promise.all(rows.map(async (s) => ({
         id: s.id,
         title: s.title,
         description: s.description,
@@ -429,7 +432,7 @@ export class AdminService {
         categoryName: s.category.name,
         providerId: s.providerId,
         providerName: `${s.provider.firstName} ${s.provider.lastName}`,
-        providerAvatarUrl: s.provider.avatarUrl ?? undefined,
+        providerAvatarUrl: await this.storageService.toReadableMediaUrl(s.provider.avatarUrl),
         providerExperience: s.provider.providerProfile?.experience ?? undefined,
         averageRating: s.provider.providerProfile?.rating ?? 0,
         reviewCount: s.provider.providerProfile?.reviewCount ?? 0,
@@ -446,13 +449,15 @@ export class AdminService {
         cargoRouteScope: s.cargoRouteScope ?? undefined,
         createdAt: s.createdAt.toISOString(),
         bookingCount: s._count.bookings,
-        images: s.images.map((img) => ({
-          id: img.id,
-          url: img.url,
-          alt: img.alt ?? undefined,
-          sortOrder: img.sortOrder,
-        })),
-      })),
+        images: await Promise.all(
+          s.images.map(async (img) => ({
+            id: img.id,
+            url: (await this.storageService.toReadableMediaUrl(img.url)) ?? img.url,
+            alt: img.alt ?? undefined,
+            sortOrder: img.sortOrder,
+          })),
+        ),
+      }))),
       total,
       page,
       limit,
@@ -608,7 +613,7 @@ export class AdminService {
     };
   }
 
-  private mapAdminService(updated: {
+  private async mapAdminService(updated: {
     id: string;
     title: string;
     description: string;
@@ -641,7 +646,7 @@ export class AdminService {
     };
     images: Array<{ id: string; url: string; alt: string | null; sortOrder: number }>;
     _count: { bookings: number };
-  }): ServiceSummary {
+  }): Promise<ServiceSummary> {
     return {
       id: updated.id,
       title: updated.title,
@@ -652,7 +657,9 @@ export class AdminService {
       categoryName: updated.category.name,
       providerId: updated.providerId,
       providerName: `${updated.provider.firstName} ${updated.provider.lastName}`,
-      providerAvatarUrl: updated.provider.avatarUrl ?? undefined,
+      providerAvatarUrl: await this.storageService.toReadableMediaUrl(
+        updated.provider.avatarUrl,
+      ),
       providerExperience: updated.provider.providerProfile?.experience ?? undefined,
       averageRating: updated.provider.providerProfile?.rating ?? 0,
       reviewCount: updated.provider.providerProfile?.reviewCount ?? 0,
@@ -669,12 +676,14 @@ export class AdminService {
       cargoRouteScope: updated.cargoRouteScope ?? undefined,
       createdAt: updated.createdAt.toISOString(),
       bookingCount: updated._count.bookings,
-      images: updated.images.map((img) => ({
-        id: img.id,
-        url: img.url,
-        alt: img.alt ?? undefined,
-        sortOrder: img.sortOrder,
-      })),
+      images: await Promise.all(
+        updated.images.map(async (img) => ({
+          id: img.id,
+          url: (await this.storageService.toReadableMediaUrl(img.url)) ?? img.url,
+          alt: img.alt ?? undefined,
+          sortOrder: img.sortOrder,
+        })),
+      ),
     };
   }
 
@@ -706,7 +715,7 @@ export class AdminService {
     ]);
 
     return {
-      items: rows.map((b) => ({
+      items: await Promise.all(rows.map(async (b) => ({
         id: b.id,
         serviceId: b.serviceId,
         serviceTitle: b.service.title,
@@ -721,7 +730,7 @@ export class AdminService {
         totalPrice: Number(b.totalPrice),
         notes: b.notes ?? undefined,
         address: b.address ?? undefined,
-        imageUrl: b.imageUrl ?? undefined,
+        imageUrl: await this.storageService.toReadableMediaUrl(b.imageUrl),
         cancelReason: b.cancelReason ?? undefined,
         cancelledBy: b.cancelledBy ?? undefined,
         cancelledAt: b.cancelledAt?.toISOString(),
@@ -732,7 +741,7 @@ export class AdminService {
         completedAt: b.completedAt?.toISOString(),
         hasReview: Boolean(b.review),
         createdAt: b.createdAt.toISOString(),
-      })),
+      }))),
       total,
       page,
       limit,
@@ -1017,43 +1026,45 @@ export class AdminService {
 
     const title = dto.title.trim();
     const body = dto.body.trim();
-    const href = dto.href?.trim();
-    const safeHref =
-      href && href.startsWith('/') && !href.startsWith('//') && !href.includes('://')
-        ? href
-        : undefined;
+    const safeHref = sanitizeInternalPath(dto.href?.trim()) ?? undefined;
 
-    await this.prisma.notification.createMany({
-      data: users.map((u) => ({
-        userId: u.id,
-        type: NotificationType.ADMIN_ANNOUNCEMENT,
-        title,
-        body,
-        data: {
-          source: 'admin',
-          ...(safeHref ? { href: safeHref } : {}),
-        } as Prisma.InputJsonValue,
-      })),
-    });
+    const ANNOUNCE_BATCH = 500;
+    const notificationData = {
+      source: 'admin',
+      ...(safeHref ? { href: safeHref } : {}),
+    } as Prisma.InputJsonValue;
 
-    // createMany id qaytarmır — WS invalidate üçün best-effort emit
-    for (const u of users) {
-      this.channels?.deliverAfterInApp({
-        userId: u.id,
-        title,
-        body,
-        type: NotificationType.ADMIN_ANNOUNCEMENT,
-        data: {
-          source: 'admin',
-          ...(safeHref ? { href: safeHref } : {}),
-        },
+    for (let i = 0; i < users.length; i += ANNOUNCE_BATCH) {
+      const batch = users.slice(i, i + ANNOUNCE_BATCH);
+      await this.prisma.notification.createMany({
+        data: batch.map((u) => ({
+          userId: u.id,
+          type: NotificationType.ADMIN_ANNOUNCEMENT,
+          title,
+          body,
+          data: notificationData,
+        })),
       });
+
+      // createMany id qaytarmır — WS invalidate üçün best-effort emit
+      for (const u of batch) {
+        this.channels?.deliverAfterInApp({
+          userId: u.id,
+          title,
+          body,
+          type: NotificationType.ADMIN_ANNOUNCEMENT,
+          data: {
+            source: 'admin',
+            ...(safeHref ? { href: safeHref } : {}),
+          },
+        });
+      }
     }
 
     return { sentCount: users.length };
   }
 
-  private mapUser(user: {
+  private async mapUser(user: {
     id: string;
     email: string;
     firstName: string;
@@ -1078,14 +1089,14 @@ export class AdminService {
       bookingsAsCustomer: number;
       bookingsAsProvider: number;
     };
-  }): AdminUserSummary {
+  }): Promise<AdminUserSummary> {
     return {
       id: user.id,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
       phone: user.phone ?? undefined,
-      avatarUrl: user.avatarUrl ?? undefined,
+      avatarUrl: await this.storageService.toReadableMediaUrl(user.avatarUrl),
       role: user.role as AdminUserSummary['role'],
       isVerified: user.isVerified,
       isActive: user.isActive,
