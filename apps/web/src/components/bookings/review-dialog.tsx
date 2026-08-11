@@ -113,6 +113,9 @@ export function ReviewDialog({
         <div className="min-w-0">
           <h2 className="text-lg font-semibold tracking-tight">İşi təsdiqlə və rəy yaz</h2>
           <p className="mt-1 truncate text-sm text-muted-foreground">{serviceTitle}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Rəy göndərildikdən sonra dərhal dərc olunur.
+          </p>
         </div>
         <button
           type="button"

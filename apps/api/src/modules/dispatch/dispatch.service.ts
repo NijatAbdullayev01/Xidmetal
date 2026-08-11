@@ -18,20 +18,27 @@ import {
   ProviderAvailability,
   REALTIME_EVENTS,
   computeDispatchScore,
+  haversineDistanceMeters,
+  isDispatchSearchWindowOpen,
+  isValidCoordinates,
+  locationLabelsForCity,
   providerRoom,
+  providersExcludedFromRedispatch,
   rankDispatchCandidates,
+  resolveServiceCity,
   type DispatchCandidate,
   type DispatchOfferPayload,
   type DispatchOfferResultPayload,
 } from '@xidmetal/shared';
 import { ServiceStatus } from '@prisma/client';
 import { PrismaService } from '../../common/database/prisma.service';
-import { GeoService } from '../geo/geo.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
 import {
   DispatchQueueService,
-  type OfferTimeoutJobData,
+  type DeclineReofferJobData,
+  type RediscoveryJobData,
+  type SearchWindowJobData,
 } from './dispatch-queue.service';
 import { MetricsService } from '../../common/metrics/metrics.service';
 import { assertDispatchAdminList } from './dispatch-access';
@@ -62,6 +69,8 @@ export interface DispatchStartPrefs {
   minRating?: number;
   minPrice?: number;
   maxPrice?: number;
+  /** resolveServiceCity nəticəsi — Bakı daxili rayonlar birləşir */
+  serviceCity?: string;
 }
 
 @Injectable()
@@ -72,7 +81,6 @@ export class DispatchService implements OnModuleInit {
 
   constructor(
     private prisma: PrismaService,
-    private geo: GeoService,
     private queue: DispatchQueueService,
     private config: ConfigService,
     private metrics: MetricsService,
@@ -81,25 +89,49 @@ export class DispatchService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.queue.setTimeoutHandler((data) => this.handleOfferTimeout(data));
+    this.queue.setSearchWindowHandler((data) =>
+      this.handleSearchWindowEnd(data),
+    );
+    this.queue.setRediscoveryHandler((data) => this.handleRediscovery(data));
+    this.queue.setDeclineReofferHandler((data) =>
+      this.handleDeclineReoffer(data),
+    );
   }
 
-  private radiusMeters(): number {
-    const raw = this.config.get<string>('DISPATCH_RADIUS_M')?.trim();
-    const parsed = raw ? Number(raw) : NaN;
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : DISPATCH.RADIUS_M;
-  }
-
-  private offerTimeoutSec(): number {
-    const raw = this.config.get<string>('DISPATCH_OFFER_TIMEOUT_SEC')?.trim();
+  private searchWindowSec(): number {
+    const raw = this.config.get<string>('DISPATCH_SEARCH_WINDOW_SEC')?.trim();
     const parsed = raw ? Number(raw) : NaN;
     return Number.isFinite(parsed) && parsed > 0
       ? parsed
-      : DISPATCH.OFFER_TIMEOUT_SEC;
+      : DISPATCH.SEARCH_WINDOW_SEC;
+  }
+
+  private rediscoveryIntervalSec(): number {
+    const raw = this.config
+      .get<string>('DISPATCH_REDISCOVERY_INTERVAL_SEC')
+      ?.trim();
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) && parsed > 0
+      ? parsed
+      : DISPATCH.REDISCOVERY_INTERVAL_SEC;
+  }
+
+  private declineReofferCooldownSec(): number {
+    const raw = this.config
+      .get<string>('DISPATCH_DECLINE_REOFFER_COOLDOWN_SEC')
+      ?.trim();
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) && parsed > 0
+      ? parsed
+      : DISPATCH.DECLINE_REOFFER_COOLDOWN_SEC;
   }
 
   private clearPrefs(bookingId: string): void {
     this.dispatchPrefs.delete(bookingId);
+  }
+
+  private searchWindowExpiresAt(createdAt: Date): Date {
+    return new Date(createdAt.getTime() + this.searchWindowSec() * 1000);
   }
 
   /**
@@ -131,6 +163,9 @@ export class DispatchService implements OnModuleInit {
         prefs.maxPrice >= 0
       ) {
         cleaned.maxPrice = prefs.maxPrice;
+      }
+      if (prefs.serviceCity?.trim()) {
+        cleaned.serviceCity = resolveServiceCity(prefs.serviceCity);
       }
       if (Object.keys(cleaned).length > 0) {
         this.dispatchPrefs.set(bookingId, cleaned);
@@ -168,6 +203,17 @@ export class DispatchService implements OnModuleInit {
       return;
     }
 
+    const delayMs = Math.max(
+      0,
+      this.searchWindowExpiresAt(booking.createdAt).getTime() - Date.now(),
+    );
+    try {
+      await this.queue.scheduleSearchWindowEnd({ bookingId }, delayMs);
+    } catch (err) {
+      this.logger.warn(
+        `Search-window schedule uğursuz booking=${bookingId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
     await this.offerNext(booking.id);
   }
 
@@ -205,7 +251,7 @@ export class DispatchService implements OnModuleInit {
         include: {
           booking: {
             include: {
-              service: { select: { categoryId: true, title: true } },
+              service: { select: { categoryId: true, title: true, location: true } },
               customer: {
                 select: { id: true, firstName: true, lastName: true, email: true },
               },
@@ -233,7 +279,26 @@ export class DispatchService implements OnModuleInit {
         throw new ConflictException('Sifariş artıq təyin olunub və ya ləğv edilib');
       }
 
+      const prefs = this.dispatchPrefs.get(booking.id);
+      const serviceCityRaw =
+        prefs?.serviceCity?.trim() || booking.service.location?.trim() || '';
+      const locationLabels = serviceCityRaw
+        ? locationLabelsForCity(resolveServiceCity(serviceCityRaw))
+        : null;
+
       const matchingService =
+        (locationLabels && locationLabels.length > 0
+          ? await tx.service.findFirst({
+              where: {
+                providerId,
+                categoryId: booking.service.categoryId,
+                title: booking.service.title,
+                status: ServiceStatus.ACTIVE,
+                location: { in: [...locationLabels] },
+              },
+              orderBy: { updatedAt: 'desc' },
+            })
+          : null) ??
         (await tx.service.findFirst({
           where: {
             providerId,
@@ -348,8 +413,6 @@ export class DispatchService implements OnModuleInit {
       return { booking: updated, offerId };
     });
 
-    await this.queue.cancelOfferTimeout(offerId);
-
     this.channels?.deliverAfterInApp({
       userId: result.booking.customerId,
       title: 'Sifariş təsdiqləndi',
@@ -368,7 +431,6 @@ export class DispatchService implements OnModuleInit {
       select: { id: true, providerId: true },
     });
     for (const other of otherPending) {
-      await this.queue.cancelOfferTimeout(other.id);
       this.emitOfferResult(other.providerId, {
         offerId: other.id,
         bookingId: result.booking.id,
@@ -390,8 +452,11 @@ export class DispatchService implements OnModuleInit {
       bookingId: result.booking.id,
       status: BookingStatus.CONFIRMED,
       timestamp: now.toISOString(),
-    });
+    }, [result.booking.customerId, result.booking.providerId]);
 
+    await this.queue.cancelSearchWindowEnd(result.booking.id);
+    await this.queue.cancelRediscovery(result.booking.id);
+    await this.queue.cancelDeclineReoffers(result.booking.id);
     this.clearPrefs(result.booking.id);
 
     return this.mapOffer(
@@ -435,8 +500,6 @@ export class DispatchService implements OnModuleInit {
       return tx.dispatchOffer.findUniqueOrThrow({ where: { id: offerId } });
     });
 
-    await this.queue.cancelOfferTimeout(offerId);
-
     this.emitOfferResult(providerId, {
       offerId,
       bookingId: offer.bookingId,
@@ -445,7 +508,19 @@ export class DispatchService implements OnModuleInit {
     });
     this.metrics.incDispatchOffer('rejected');
 
-    // Növbəti namizəd
+    // 2 dəq sonra eyni xidmət verənə yenidən təklif (pəncərə açıq qaldıqca)
+    void this.queue
+      .scheduleDeclineReoffer(
+        { bookingId: offer.bookingId, providerId },
+        this.declineReofferCooldownSec() * 1000,
+      )
+      .catch((err) => {
+        this.logger.warn(
+          `Decline-reoffer schedule uğursuz: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+
+    // Digər heç vaxt təklif almayan namizədlər
     void this.offerNext(offer.bookingId).catch((err) => {
       this.logger.warn(
         `Reject sonrası növbəti offer: ${err instanceof Error ? err.message : String(err)}`,
@@ -461,70 +536,203 @@ export class DispatchService implements OnModuleInit {
   }
 
   /**
-   * BullMQ / fallback timeout — PENDING offer → EXPIRED, sonra növbəti.
+   * Müştəri/admin PENDING ani sifarişi ləğv edəndə — növbəni dayandırır,
+   * açıq təklifləri geri çəkir. Ləğv bildirişi göndərilmir (heç kim qəbul etməyib).
    */
-  async handleOfferTimeout(data: OfferTimeoutJobData): Promise<void> {
+  async abortForBooking(bookingId: string): Promise<void> {
     const now = new Date();
-    const updated = await this.prisma.dispatchOffer.updateMany({
-      where: {
-        id: data.offerId,
-        status: DispatchOfferStatus.PENDING,
-      },
-      data: {
-        status: DispatchOfferStatus.EXPIRED,
-        respondedAt: now,
-      },
+
+    await this.queue.cancelSearchWindowEnd(bookingId);
+    await this.queue.cancelRediscovery(bookingId);
+    await this.queue.cancelDeclineReoffers(bookingId);
+
+    const pending = await this.prisma.dispatchOffer.findMany({
+      where: { bookingId, status: DispatchOfferStatus.PENDING },
+      select: { id: true, providerId: true },
     });
 
-    if (updated.count !== 1) return;
+    if (pending.length > 0) {
+      await this.prisma.dispatchOffer.updateMany({
+        where: {
+          bookingId,
+          status: DispatchOfferStatus.PENDING,
+        },
+        data: {
+          status: DispatchOfferStatus.CANCELLED,
+          respondedAt: now,
+        },
+      });
 
-    const offer = await this.prisma.dispatchOffer.findUnique({
-      where: { id: data.offerId },
-    });
-    if (!offer) return;
+      for (const offer of pending) {
+        this.emitOfferResult(offer.providerId, {
+          offerId: offer.id,
+          bookingId,
+          status: 'CANCELLED',
+        });
+        this.metrics.incDispatchOffer('cancelled');
+      }
+    }
 
-    this.realtime?.emitToRoom(
-      providerRoom(offer.providerId),
-      REALTIME_EVENTS.DISPATCH_OFFER_EXPIRED,
-      {
-        offerId: offer.id,
-        bookingId: offer.bookingId,
-      },
+    this.clearPrefs(bookingId);
+    this.logger.log(
+      `Dispatch aborted booking=${bookingId} withdrawnOffers=${pending.length}`,
     );
+  }
 
-    this.emitOfferResult(offer.providerId, {
-      offerId: offer.id,
-      bookingId: offer.bookingId,
-      status: 'EXPIRED',
-      providerId: offer.providerId,
+  /**
+   * Axtarış pəncərəsi bitdi — hələ PENDING-dirsə auto-cancel.
+   */
+  async handleSearchWindowEnd(data: SearchWindowJobData): Promise<void> {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: data.bookingId },
+      select: {
+        id: true,
+        customerId: true,
+        status: true,
+        type: true,
+      },
     });
-    this.metrics.incDispatchOffer('expired');
+    if (!booking) return;
+    if (booking.type !== BookingType.INSTANT) return;
+    if (booking.status !== BookingStatus.PENDING) return;
 
-    await this.offerNext(offer.bookingId);
+    await this.failDispatch(
+      booking.id,
+      booking.customerId,
+      'Uyğun icraçı tapılmadı',
+    );
+  }
+
+  /**
+   * Axtarış pəncərəsi içində yeni ONLINE xidmət verənlərə təklif.
+   */
+  async handleRediscovery(data: RediscoveryJobData): Promise<void> {
+    await this.offerNext(data.bookingId);
+  }
+
+  /**
+   * İmtina cooldown bitəndə — eyni xidmət verənə yenidən təklif (pəncərə açıqdursa).
+   */
+  async handleDeclineReoffer(data: DeclineReofferJobData): Promise<void> {
+    this.logger.log(
+      `Decline-reoffer işə düşdü: booking=${data.bookingId} provider=${data.providerId}`,
+    );
+    await this.offerNext(data.bookingId);
+  }
+
+  /**
+   * Xidmət verən ONLINE olduqda (sayta giriş / əl ilə / WS presence / BUSY bitməsi)
+   * açıq axtarış pəncərəsindəki eyni xidmət növü üzrə təcili sifarişlərə dərhal təklif göndər.
+   * Fire-and-forget — çağıran API cavabını gözləməsin.
+   */
+  notifyProviderOnline(providerId: string): void {
+    void this.offerOpenInstantBookingsToProvider(providerId).catch((err) => {
+      this.logger.warn(
+        `Provider ONLINE rediscovery: ${providerId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    });
   }
 
   /**
    * Provider BUSY → ONLINE (sifariş bitəndə / ləğv).
    */
   async releaseProviderIfBusy(providerId: string): Promise<void> {
-    await this.prisma.providerProfile.updateMany({
+    const result = await this.prisma.providerProfile.updateMany({
       where: {
         userId: providerId,
         availability: ProviderAvailability.BUSY,
       },
       data: { availability: ProviderAvailability.ONLINE },
     });
+    if (result.count > 0) {
+      this.notifyProviderOnline(providerId);
+    }
   }
 
   /**
-   * Uyğun namizədlərə eyni anda PENDING offer göndərir (fan-out).
-   * Aktiv offer qalanda namizəd tükənməsi sifarişi ləğv etmir.
+   * Yeni ONLINE xidmət verənə uyğun açıq INSTANT sifarişləri təklif et.
+   */
+  private async offerOpenInstantBookingsToProvider(
+    providerId: string,
+  ): Promise<void> {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId: providerId },
+      select: { availability: true, isVerified: true },
+    });
+    if (
+      !profile?.isVerified ||
+      profile.availability !== ProviderAvailability.ONLINE
+    ) {
+      return;
+    }
+
+    const services = await this.prisma.service.findMany({
+      where: {
+        providerId,
+        status: ServiceStatus.ACTIVE,
+      },
+      select: { categoryId: true, title: true },
+    });
+    if (services.length === 0) return;
+
+    const servicePairs = [
+      ...new Map(
+        services.map((s) => [`${s.categoryId}\0${s.title}`, s] as const),
+      ).values(),
+    ];
+
+    const now = new Date();
+    const createdAfter = new Date(now.getTime() - this.searchWindowSec() * 1000);
+
+    const openBookings = await this.prisma.booking.findMany({
+      where: {
+        type: BookingType.INSTANT,
+        status: BookingStatus.PENDING,
+        createdAt: { gte: createdAfter },
+        customerId: { not: providerId },
+        service: {
+          OR: servicePairs.map((s) => ({
+            categoryId: s.categoryId,
+            title: s.title,
+          })),
+        },
+        // PENDING təklifi olmayanlar — imtina cooldown-u bitənlər də yenidən uyğundur
+        dispatchOffers: {
+          none: {
+            providerId,
+            status: DispatchOfferStatus.PENDING,
+          },
+        },
+      },
+      select: { id: true },
+      take: 50,
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (openBookings.length === 0) return;
+
+    this.logger.debug(
+      `Provider ONLINE → ${openBookings.length} açıq ani sifariş: ${providerId}`,
+    );
+
+    for (const booking of openBookings) {
+      await this.offerNext(booking.id);
+    }
+  }
+
+  /**
+   * Xidmət növü + şəhər üzrə bütün ONLINE uyğun xidmət verənlərə fan-out.
+   * Tək təklif timeout yoxdur — təklif axtarış pəncərəsi bitənə qədər qalır.
    */
   private async offerNext(bookingId: string): Promise<void> {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
-        service: { select: { id: true, title: true, categoryId: true } },
+        service: {
+          select: { id: true, title: true, categoryId: true, location: true },
+        },
         customer: { select: { id: true, firstName: true, lastName: true } },
       },
     });
@@ -541,74 +749,89 @@ export class DispatchService implements OnModuleInit {
       return;
     }
 
+    const prefs = this.dispatchPrefs.get(bookingId);
+    const serviceCityRaw =
+      prefs?.serviceCity?.trim() || booking.service.location?.trim() || '';
+    if (!serviceCityRaw) {
+      await this.failDispatch(
+        booking.id,
+        booking.customerId,
+        'Xidmət ərazisi təyin olunmayıb',
+      );
+      return;
+    }
+
+    const serviceCity = resolveServiceCity(serviceCityRaw);
+    const locationLabels = locationLabelsForCity(serviceCity);
+    const now = new Date();
+    const searchOpen = isDispatchSearchWindowOpen(
+      booking.createdAt,
+      now,
+      this.searchWindowSec(),
+    );
+
+    if (!searchOpen) {
+      await this.failDispatch(
+        booking.id,
+        booking.customerId,
+        'Uyğun icraçı tapılmadı',
+      );
+      return;
+    }
+
     const active = await this.prisma.dispatchOffer.count({
       where: {
         bookingId,
         status: DispatchOfferStatus.PENDING,
-        expiresAt: { gt: new Date() },
+        expiresAt: { gt: now },
       },
     });
-    if (active >= DISPATCH.MAX_ACTIVE_OFFERS) return;
+    if (active >= DISPATCH.MAX_ACTIVE_OFFERS) {
+      await this.queue.scheduleRediscovery(
+        { bookingId },
+        this.rediscoveryIntervalSec() * 1000,
+      );
+      return;
+    }
 
     const previousOffers = await this.prisma.dispatchOffer.findMany({
       where: { bookingId },
-      select: { providerId: true },
+      select: { providerId: true, status: true, respondedAt: true },
     });
-    const exclude = new Set(previousOffers.map((o) => o.providerId));
+    const exclude = providersExcludedFromRedispatch(previousOffers, {
+      now,
+      declineReofferCooldownSec: this.declineReofferCooldownSec(),
+    });
     exclude.add(booking.customerId);
 
-    const radiusM = this.radiusMeters();
-    const nearby = await this.geo.findNearby({
-      lat: booking.destLat,
-      lng: booking.destLng,
-      radiusKm: metersToKm(radiusM),
-      categoryId: booking.service.categoryId,
-      limit: DISPATCH.MAX_CANDIDATES,
-    });
-
-    const prefs = this.dispatchPrefs.get(bookingId);
-    const eligibleProviderIds = await this.findEligibleProviderIds({
-      providerIds: nearby.items.map((item) => item.userId),
+    const candidates = await this.findServiceTypeCandidates({
       categoryId: booking.service.categoryId,
       serviceTitle: booking.service.title,
+      locationLabels,
+      destLat: booking.destLat,
+      destLng: booking.destLng,
       minPrice: prefs?.minPrice,
       maxPrice: prefs?.maxPrice,
+      minRating: prefs?.minRating,
     });
-
-    const candidates: DispatchCandidate[] = nearby.items
-      .filter((item) => {
-        if (!eligibleProviderIds.has(item.userId)) return false;
-        if (
-          prefs?.minRating !== undefined &&
-          item.rating < prefs.minRating
-        ) {
-          return false;
-        }
-        return true;
-      })
-      .map((item) => ({
-        providerId: item.userId,
-        distanceM: item.distanceM,
-        rating: item.rating,
-      }));
 
     const ranked = rankDispatchCandidates(candidates);
     const available = ranked.filter((c) => !exclude.has(c.providerId));
+    const expiresAt = this.searchWindowExpiresAt(booking.createdAt);
 
     if (available.length === 0) {
-      if (active === 0) {
-        await this.failDispatch(
-          booking.id,
-          booking.customerId,
-          'Uyğun icraçı tapılmadı',
-        );
-      }
+      await this.queue.scheduleRediscovery(
+        { bookingId },
+        this.rediscoveryIntervalSec() * 1000,
+      );
+      this.logger.debug(
+        `Dispatch gözləyir (axtarış pəncərəsi açıq): booking=${bookingId} active=${active}`,
+      );
       return;
     }
 
     const slots = DISPATCH.MAX_ACTIVE_OFFERS - active;
     const batch = available.slice(0, slots);
-    const timeoutSec = this.offerTimeoutSec();
 
     for (const next of batch) {
       await this.createAndEmitOffer({
@@ -621,19 +844,30 @@ export class DispatchService implements OnModuleInit {
           serviceTitle: booking.service.title,
         },
         candidate: next,
-        timeoutSec,
+        expiresAt,
       });
     }
+
+    await this.queue.scheduleRediscovery(
+      { bookingId },
+      this.rediscoveryIntervalSec() * 1000,
+    );
   }
 
-  private async findEligibleProviderIds(input: {
-    providerIds: string[];
+  /**
+   * Eyni xidmət növü (kateqoriya + başlıq) + şəhər + ONLINE — radius məhdudiyyəti yox.
+   */
+  private async findServiceTypeCandidates(input: {
     categoryId: string;
     serviceTitle: string;
+    locationLabels: readonly string[];
+    destLat: number;
+    destLng: number;
     minPrice?: number;
     maxPrice?: number;
-  }): Promise<Set<string>> {
-    if (input.providerIds.length === 0) return new Set();
+    minRating?: number;
+  }): Promise<DispatchCandidate[]> {
+    if (input.locationLabels.length === 0) return [];
 
     const priceFilter: { gte?: number; lte?: number } = {};
     if (input.minPrice !== undefined) priceFilter.gte = input.minPrice;
@@ -641,16 +875,63 @@ export class DispatchService implements OnModuleInit {
 
     const services = await this.prisma.service.findMany({
       where: {
-        providerId: { in: input.providerIds },
         categoryId: input.categoryId,
         title: input.serviceTitle,
         status: ServiceStatus.ACTIVE,
+        location: { in: [...input.locationLabels] },
         ...(Object.keys(priceFilter).length > 0 ? { price: priceFilter } : {}),
+        provider: {
+          deletedAt: null,
+          providerProfile: {
+            isVerified: true,
+            availability: ProviderAvailability.ONLINE,
+            ...(input.minRating !== undefined
+              ? { rating: { gte: input.minRating } }
+              : {}),
+          },
+        },
       },
-      select: { providerId: true },
+      take: DISPATCH.MAX_CANDIDATES,
+      select: {
+        providerId: true,
+        provider: {
+          select: {
+            providerProfile: {
+              select: {
+                rating: true,
+                lastLat: true,
+                lastLng: true,
+              },
+            },
+          },
+        },
+      },
     });
 
-    return new Set(services.map((s) => s.providerId));
+    const byProvider = new Map<string, DispatchCandidate>();
+    for (const service of services) {
+      if (byProvider.has(service.providerId)) continue;
+      const profile = service.provider.providerProfile;
+      const rating = profile?.rating ?? 0;
+      let distanceM = Number.POSITIVE_INFINITY;
+      if (
+        profile?.lastLat != null &&
+        profile?.lastLng != null &&
+        isValidCoordinates(profile.lastLat, profile.lastLng)
+      ) {
+        distanceM = haversineDistanceMeters(
+          { lat: input.destLat, lng: input.destLng },
+          { lat: profile.lastLat, lng: profile.lastLng },
+        );
+      }
+      byProvider.set(service.providerId, {
+        providerId: service.providerId,
+        distanceM,
+        rating,
+      });
+    }
+
+    return [...byProvider.values()];
   }
 
   private async createAndEmitOffer(input: {
@@ -663,30 +944,58 @@ export class DispatchService implements OnModuleInit {
       serviceTitle: string;
     };
     candidate: DispatchCandidate;
-    timeoutSec: number;
+    expiresAt: Date;
   }): Promise<void> {
-    const { booking, candidate, timeoutSec } = input;
-    const expiresAt = new Date(Date.now() + timeoutSec * 1000);
+    const { booking, candidate, expiresAt } = input;
     const score = computeDispatchScore(candidate.distanceM, candidate.rating);
 
-    const offer = await this.prisma.dispatchOffer.create({
-      data: {
+    const existingPending = await this.prisma.dispatchOffer.findFirst({
+      where: {
         bookingId: booking.id,
         providerId: candidate.providerId,
         status: DispatchOfferStatus.PENDING,
-        distanceM: candidate.distanceM,
-        score,
-        expiresAt,
+        expiresAt: { gt: new Date() },
       },
-      include: offerInclude,
+      select: { id: true },
     });
+    if (existingPending) return;
+
+    let offer;
+    try {
+      offer = await this.prisma.dispatchOffer.create({
+        data: {
+          bookingId: booking.id,
+          providerId: candidate.providerId,
+          status: DispatchOfferStatus.PENDING,
+          distanceM: Number.isFinite(candidate.distanceM)
+            ? candidate.distanceM
+            : null,
+          score,
+          expiresAt,
+        },
+        include: offerInclude,
+      });
+    } catch (error) {
+      // Parallel decline-reoffer / rediscovery — artıq PENDING yaradıbsa keç
+      const again = await this.prisma.dispatchOffer.findFirst({
+        where: {
+          bookingId: booking.id,
+          providerId: candidate.providerId,
+          status: DispatchOfferStatus.PENDING,
+          expiresAt: { gt: new Date() },
+        },
+        select: { id: true },
+      });
+      if (again) return;
+      throw error;
+    }
 
     const offerNotification = await this.prisma.notification.create({
       data: {
         userId: candidate.providerId,
         type: NotificationType.BOOKING_CREATED,
         title: 'Ani sifariş təklifi',
-        body: `Yaxınlıqdakı «${booking.serviceTitle}» sifarişi — ${timeoutSec} saniyə ərzində cavab verin.`,
+        body: `«${booking.serviceTitle}» üzrə təcili sifariş — qəbul və ya rədd edin.`,
         data: {
           bookingId: booking.id,
           offerId: offer.id,
@@ -698,16 +1007,11 @@ export class DispatchService implements OnModuleInit {
       userId: candidate.providerId,
       notificationId: offerNotification.id,
       title: 'Ani sifariş təklifi',
-      body: `Yaxınlıqdakı «${booking.serviceTitle}» sifarişi — ${timeoutSec} saniyə ərzində cavab verin.`,
+      body: `«${booking.serviceTitle}» üzrə təcili sifariş — qəbul və ya rədd edin.`,
       type: NotificationType.BOOKING_CREATED,
       data: { bookingId: booking.id, offerId: offer.id, dispatch: true },
       serviceTitle: booking.serviceTitle,
     });
-
-    await this.queue.scheduleOfferTimeout(
-      { offerId: offer.id, bookingId: booking.id },
-      timeoutSec * 1000,
-    );
 
     const payload: DispatchOfferPayload = {
       offerId: offer.id,
@@ -716,7 +1020,9 @@ export class DispatchService implements OnModuleInit {
       address: booking.address,
       destLat: booking.destLat,
       destLng: booking.destLng,
-      distanceM: candidate.distanceM,
+      distanceM: Number.isFinite(candidate.distanceM)
+        ? candidate.distanceM
+        : null,
       expiresAt: expiresAt.toISOString(),
       scheduledAt: booking.scheduledAt.toISOString(),
     };
@@ -729,7 +1035,7 @@ export class DispatchService implements OnModuleInit {
     this.metrics.incDispatchOffer('created');
 
     this.logger.log(
-      `Dispatch offer → provider=${candidate.providerId} booking=${booking.id} dist=${Math.round(candidate.distanceM)}m`,
+      `Dispatch offer → provider=${candidate.providerId} booking=${booking.id} dist=${Number.isFinite(candidate.distanceM) ? Math.round(candidate.distanceM) : '?'}m`,
     );
   }
 
@@ -757,6 +1063,10 @@ export class DispatchService implements OnModuleInit {
     });
 
     if (updated.count !== 1) return;
+
+    await this.queue.cancelSearchWindowEnd(bookingId);
+    await this.queue.cancelRediscovery(bookingId);
+    await this.queue.cancelDeclineReoffers(bookingId);
 
     await this.prisma.dispatchOffer.updateMany({
       where: { bookingId, status: DispatchOfferStatus.PENDING },
@@ -790,7 +1100,7 @@ export class DispatchService implements OnModuleInit {
       bookingId,
       status: BookingStatus.CANCELLED,
       timestamp: now.toISOString(),
-    });
+    }, [customerId]);
 
     this.logger.log(`Dispatch failed booking=${bookingId}: ${reason}`);
   }
@@ -866,9 +1176,4 @@ export class DispatchService implements OnModuleInit {
         : undefined,
     };
   }
-}
-
-/** meters → km (geo findNearby radiusKm gözləyir) */
-function metersToKm(meters: number): number {
-  return meters / 1000;
 }

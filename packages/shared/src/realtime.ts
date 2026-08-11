@@ -40,6 +40,11 @@ export interface LocationUpdatePayload {
   /** Təxmini ETA (saniyə); Directions və ya haversine fallback */
   etaSeconds?: number | null;
   distanceMeters?: number | null;
+  /**
+   * Yol marşrutu (Google encoded polyline) — Bolt üslubu xəritə xətti.
+   * Yalnız Directions mənbəyindən gəlir; haversine-də yoxdur.
+   */
+  routePolyline?: string | null;
   recordedAt: string;
 }
 
@@ -128,7 +133,11 @@ export const LOCATION_PING_SAMPLE_INTERVAL_MS = 15_000;
 export const LOCATION_GEO_SYNC_INTERVAL_MS = 15_000;
 
 /** Şəhər daxili orta sürət fallback (~30 km/s → m/s) */
-export const DEFAULT_ETA_SPEED_MPS = 30_000 / 3_600;
+/** Orta şəhər sürəti ~25 km/s — Directions yoxdursa Bolt-a yaxın ETA */
+export const DEFAULT_ETA_SPEED_MPS = 25_000 / 3_600;
+
+/** Düz xətt → yol məsafəsi əmsalı (şəhər şəbəkəsi) */
+export const ETA_ROAD_FACTOR = 1.35;
 
 export function bookingRoom(bookingId: string): string {
   return `booking:${bookingId}`;
@@ -174,13 +183,14 @@ export function shouldSampleLocationPing(
   return nowMs - lastSampledAtMs >= intervalMs;
 }
 
-/** Haversine + orta sürət ilə ETA (saniyə) */
+/** Haversine × yol əmsalı + orta şəhər sürəti ilə ETA (saniyə) */
 export function estimateEtaSeconds(
   from: GeoPoint,
   to: GeoPoint,
   speedMps: number = DEFAULT_ETA_SPEED_MPS,
 ): { distanceMeters: number; etaSeconds: number } {
-  const distanceMeters = haversineDistanceMeters(from, to);
+  const straight = haversineDistanceMeters(from, to);
+  const distanceMeters = Math.round(straight * ETA_ROAD_FACTOR);
   const safeSpeed = speedMps > 0.5 ? speedMps : DEFAULT_ETA_SPEED_MPS;
   const etaSeconds = Math.max(0, Math.round(distanceMeters / safeSpeed));
   return { distanceMeters, etaSeconds };

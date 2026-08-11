@@ -4,14 +4,17 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, MessageSquare, CalendarClock, Star } from 'lucide-react';
-import { BookingStatus, BookingType, isCancellableBookingStatus } from '@xidmetal/shared';
+import {
+  BookingStatus,
+  BookingType,
+  isCancellableBookingStatus,
+} from '@xidmetal/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ReviewDialog } from '@/components/bookings/review-dialog';
 import { CancelBookingDialog } from '@/components/bookings/cancel-booking-dialog';
 import { InstantWaitingCard } from '@/components/bookings/instant-waiting-card';
-import { BookingLiveTracking } from '@/components/tracking/booking-live-tracking';
 import { useBookingsRealtimeInvalidation } from '@/hooks/use-booking-tracking';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
@@ -20,33 +23,17 @@ import { BOOKING_ATTENTION_QUERY_KEY } from '@/hooks/use-booking-notifications';
 import { formatPrice, formatDateTime, cn } from '@/lib/utils';
 import {
   BOOKING_STATUS_LABELS,
-  BOOKING_STATUS_VARIANTS,
+  BOOKING_STATUS_TEXT_CLASSES,
   BOOKING_TYPE_LABELS,
-  ACTIVE_BOOKING_TAB_STATUSES,
 } from '@/lib/provider-labels';
+import {
+  BookingStatusFilters,
+  buildBookingStatusTabs,
+  getBookingStatusQueryParams,
+  type BookingStatusTabKey,
+} from '@/components/bookings/booking-status-filters';
 
-type TabKey = 'all' | 'pending' | 'active' | 'completed' | 'cancelled';
-
-const TABS: {
-  key: TabKey;
-  label: string;
-  status?: BookingStatus;
-  statuses?: BookingStatus[];
-}[] = [
-  { key: 'all', label: 'Hamısı' },
-  { key: 'pending', label: 'Gözləyən', status: BookingStatus.PENDING },
-  {
-    key: 'active',
-    label: 'Aktiv',
-    statuses: ACTIVE_BOOKING_TAB_STATUSES,
-  },
-  { key: 'completed', label: 'Tamamlanan', status: BookingStatus.COMPLETED },
-  {
-    key: 'cancelled',
-    label: 'Ləğv / rədd',
-    statuses: [BookingStatus.CANCELLED, BookingStatus.REJECTED],
-  },
-];
+const TABS = buildBookingStatusTabs('Ləğv / rədd');
 
 export default function CustomerBookingsPage() {
   const token = useAuthToken();
@@ -56,7 +43,8 @@ export default function CustomerBookingsPage() {
   const queryClient = useQueryClient();
   useAckBookingNotifications(!!token);
   useBookingsRealtimeInvalidation(!!token);
-  const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const [activeTab, setActiveTab] = useState<BookingStatusTabKey>('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [actionId, setActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [messageLoadingId, setMessageLoadingId] = useState<string | null>(null);
@@ -69,18 +57,14 @@ export default function CustomerBookingsPage() {
     serviceTitle: string;
   } | null>(null);
 
-  const currentTab = TABS.find((t) => t.key === activeTab)!;
+  const statusParams = getBookingStatusQueryParams(activeTab, statusFilter, TABS);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['bookings', activeTab],
+    queryKey: ['bookings', activeTab, statusFilter],
     queryFn: () =>
       api.bookings(token!, {
         limit: '50',
-        ...(currentTab.statuses
-          ? { statuses: currentTab.statuses.join(',') }
-          : currentTab.status
-            ? { status: currentTab.status }
-            : {}),
+        ...statusParams,
       }),
     enabled: !!token,
     refetchInterval: 20_000,
@@ -220,7 +204,8 @@ export default function CustomerBookingsPage() {
   };
 
   const handleReviewSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    void queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    void queryClient.invalidateQueries({ queryKey: ['reviews'] });
     setReviewBooking(null);
   };
 
@@ -239,22 +224,13 @@ export default function CustomerBookingsPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={cn(
-              'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-              activeTab === tab.key
-                ? 'bg-brand text-brand-foreground'
-                : 'bg-muted text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <BookingStatusFilters
+        tabs={TABS}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+      />
 
       {isLoading && (
         <div className="flex justify-center py-16">
@@ -275,120 +251,21 @@ export default function CustomerBookingsPage() {
           const isInstantPending =
             booking.type === BookingType.INSTANT &&
             booking.status === BookingStatus.PENDING;
-          const showCancelReason =
-            Boolean(booking.cancelReason) &&
-            (booking.status === BookingStatus.CANCELLED ||
-              booking.status === BookingStatus.REJECTED);
-          const isHighlighted = highlightId === booking.id;
+          const isPending = booking.status === BookingStatus.PENDING;
 
           return (
             <Card
               key={booking.id}
               id={`booking-${booking.id}`}
               className={cn(
-                isHighlighted && 'ring-2 ring-brand ring-offset-2 ring-offset-background',
+                isPending &&
+                  'border-brand ring-2 ring-brand ring-offset-2 ring-offset-background',
               )}
             >
               <CardContent className="p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold">{booking.serviceTitle}</h3>
-                      <Badge variant={BOOKING_STATUS_VARIANTS[booking.status]}>
-                        {BOOKING_STATUS_LABELS[booking.status]}
-                      </Badge>
-                      {booking.type === BookingType.INSTANT && (
-                        <Badge variant="default">
-                          {BOOKING_TYPE_LABELS[BookingType.INSTANT]}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Xidmət verən: {booking.providerName}
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                      {booking.type === BookingType.INSTANT ? (
-                        <span>Təcili çağırış</span>
-                      ) : (
-                        <span>Tarix: {formatDateTime(booking.scheduledAt)}</span>
-                      )}
-                      <span>Qiymət: {formatPrice(booking.totalPrice)}</span>
-                    </div>
-                    {booking.address && (
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Ünvan: <span className="text-foreground">{booking.address}</span>
-                      </p>
-                    )}
-                    {isInstantPending && (
-                      <InstantWaitingCard
-                        onCancel={() =>
-                          handleCancel({
-                            id: booking.id,
-                            serviceTitle: booking.serviceTitle,
-                          })
-                        }
-                        cancelDisabled={actionId === booking.id}
-                        cancelPending={
-                          actionId === booking.id && updateMutation.isPending
-                        }
-                      />
-                    )}
-                    {showCancelReason && (
-                      <div className="mt-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3">
-                        <p className="text-sm font-medium text-destructive">
-                          {booking.status === BookingStatus.REJECTED
-                            ? 'Sifariş rədd edildi'
-                            : 'Sifariş ləğv edildi'}
-                        </p>
-                        <p className="mt-1 text-sm text-destructive/90">
-                          Səbəb: {booking.cancelReason}
-                        </p>
-                      </div>
-                    )}
-                    {booking.proposedScheduledAt &&
-                      booking.status === BookingStatus.PENDING && (
-                        <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 dark:border-amber-700/50 dark:bg-amber-950/30">
-                          <div className="flex items-start gap-2">
-                            <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                                Xidmət verən yeni tarix təklif edib
-                              </p>
-                              <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
-                                Təklif olunan tarix:{' '}
-                                <strong>
-                                  {formatDateTime(booking.proposedScheduledAt)}
-                                </strong>
-                              </p>
-                              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                                Mesajı oxumaq üçün «Mesaj yaz» düyməsindən istifadə edin.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    {booking.notes && (
-                      <p className="mt-2 rounded-lg bg-muted px-3 py-2 text-sm">
-                        {booking.notes}
-                      </p>
-                    )}
-                    <BookingLiveTracking booking={booking} />
-                    {booking.imageUrl && (
-                      <div className="mt-3">
-                        <p className="mb-1.5 text-xs font-medium text-muted-foreground">
-                          İşin şəkli
-                        </p>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={booking.imageUrl}
-                          alt="Görüləcək işin şəkli"
-                          className="max-h-48 max-w-full rounded-xl border border-border object-contain"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <h3 className="min-w-0 font-semibold">{booking.serviceTitle}</h3>
+                  <div className="flex shrink-0 flex-wrap gap-2">
                     {booking.proposedScheduledAt &&
                       booking.status === BookingStatus.PENDING && (
                         <>
@@ -472,6 +349,122 @@ export default function CustomerBookingsPage() {
                     </Button>
                   </div>
                 </div>
+
+                <div className="mt-1.5 space-y-1.5 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-foreground">Sifariş növü:</span>
+                    {booking.type === BookingType.INSTANT ? (
+                      <Badge className="bg-brand text-sm text-brand-foreground">
+                        {BOOKING_TYPE_LABELS[BookingType.INSTANT]}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {BOOKING_TYPE_LABELS[booking.type]}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-foreground">Sifarişin statusu:</span>
+                    <span className={BOOKING_STATUS_TEXT_CLASSES[booking.status]}>
+                      {BOOKING_STATUS_LABELS[booking.status]}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-foreground">Xidmət verən:</span>
+                    <span className="text-muted-foreground">{booking.providerName}</span>
+                  </div>
+                  {booking.type !== BookingType.INSTANT && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-foreground">Tarix:</span>
+                      <span className="text-muted-foreground">
+                        {formatDateTime(booking.scheduledAt)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-foreground">Qiymət:</span>
+                    <span className="text-muted-foreground">
+                      {formatPrice(booking.totalPrice)}
+                    </span>
+                  </div>
+                  {booking.address && (
+                    <div className="flex items-start gap-2">
+                      <span className="shrink-0 text-foreground">Ünvan:</span>
+                      <span className="min-w-0 flex-1 break-words text-muted-foreground">
+                        {booking.address}
+                      </span>
+                    </div>
+                  )}
+                  {booking.notes && (
+                    <div className="flex items-start gap-2">
+                      <span className="shrink-0 text-foreground">Qeyd:</span>
+                      <span className="min-w-0 flex-1 break-words text-muted-foreground">
+                        {booking.notes}
+                      </span>
+                    </div>
+                  )}
+                  {Boolean(booking.cancelReason) &&
+                    (booking.status === BookingStatus.CANCELLED ||
+                      booking.status === BookingStatus.REJECTED) && (
+                      <div className="flex items-start gap-2">
+                        <span className="shrink-0 text-foreground">Səbəb:</span>
+                        <span className="min-w-0 flex-1 break-words text-muted-foreground">
+                          {booking.cancelReason}
+                        </span>
+                      </div>
+                    )}
+                </div>
+
+                {isInstantPending && (
+                  <InstantWaitingCard
+                    createdAt={booking.createdAt}
+                    onCancel={() =>
+                      handleCancel({
+                        id: booking.id,
+                        serviceTitle: booking.serviceTitle,
+                      })
+                    }
+                    cancelDisabled={actionId === booking.id}
+                    cancelPending={
+                      actionId === booking.id && updateMutation.isPending
+                    }
+                  />
+                )}
+                {booking.proposedScheduledAt &&
+                  booking.status === BookingStatus.PENDING && (
+                    <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 dark:border-amber-700/50 dark:bg-amber-950/30">
+                      <div className="flex items-start gap-2">
+                        <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                            Xidmət verən yeni tarix təklif edib
+                          </p>
+                          <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
+                            Təklif olunan tarix:{' '}
+                            <strong>
+                              {formatDateTime(booking.proposedScheduledAt)}
+                            </strong>
+                          </p>
+                          <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                            Mesajı oxumaq üçün «Mesaj yaz» düyməsindən istifadə edin.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                {booking.imageUrl && (
+                  <div className="mt-3">
+                    <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                      İşin şəkli
+                    </p>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={booking.imageUrl}
+                      alt="Görüləcək işin şəkli"
+                      className="max-h-48 max-w-full rounded-xl border border-border object-contain"
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           );

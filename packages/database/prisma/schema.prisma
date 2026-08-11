@@ -520,7 +520,7 @@ model Review {
   authorId   String       @map("author_id")
   rating     Int
   comment    String?
-  status     ReviewStatus @default(PENDING)
+  status     ReviewStatus @default(APPROVED)
   createdAt  DateTime     @default(now()) @map("created_at")
   updatedAt  DateTime     @updatedAt @map("updated_at")
 
@@ -639,4 +639,58 @@ model TypingPresence {
 
   @@index([expiresAt])
   @@map("typing_presences")
+}
+
+// ─── Sayt analitika (page view / click / sessiya) ─────────────────────────────
+
+enum AnalyticsEventType {
+  PAGE_VIEW
+  CLICK
+  HEARTBEAT
+  SESSION_END
+}
+
+/// Brauzer sessiyası — anonymousId cookie/localStorage; PII saxlanılmır
+model AnalyticsSession {
+  id          String   @id @default(uuid())
+  anonymousId String   @map("anonymous_id")
+  userId      String?  @map("user_id")
+  startedAt   DateTime @default(now()) @map("started_at")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+  durationMs  Int      @default(0) @map("duration_ms")
+  landingPath String?  @map("landing_path") @db.VarChar(500)
+  exitPath    String?  @map("exit_path") @db.VarChar(500)
+  referrer    String?  @db.VarChar(1000)
+  userAgent   String?  @map("user_agent") @db.VarChar(500)
+  language    String?  @db.VarChar(32)
+  screenWidth Int?     @map("screen_width")
+  pageViews   Int      @default(0) @map("page_views")
+  isBounce    Boolean  @default(true) @map("is_bounce")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  events AnalyticsEvent[]
+
+  @@index([anonymousId, startedAt])
+  @@index([startedAt])
+  @@index([lastSeenAt])
+  @@map("analytics_sessions")
+}
+
+model AnalyticsEvent {
+  id        String             @id @default(uuid())
+  sessionId String             @map("session_id")
+  type      AnalyticsEventType
+  path      String?            @db.VarChar(500)
+  name      String?            @db.VarChar(200)
+  meta      Json?
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  session AnalyticsSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([type, createdAt])
+  @@index([path, createdAt])
+  @@index([name, createdAt])
+  @@index([sessionId, createdAt])
+  @@map("analytics_events")
 }

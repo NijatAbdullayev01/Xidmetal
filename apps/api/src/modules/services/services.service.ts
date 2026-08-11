@@ -129,7 +129,7 @@ export class ServicesService {
               lastName: true,
               avatarUrl: true,
               providerProfile: {
-                select: { experience: true },
+                select: { experience: true, availability: true },
               },
             },
           },
@@ -845,6 +845,7 @@ export class ServicesService {
       avatarUrl: string | null;
       providerProfile?: {
         experience: number | null;
+        availability?: string | null;
       } | null;
     };
     images?: Array<{
@@ -871,6 +872,7 @@ export class ServicesService {
         service.provider?.avatarUrl,
       ),
       providerExperience: service.provider?.providerProfile?.experience ?? undefined,
+      providerAvailability: service.provider?.providerProfile?.availability ?? undefined,
       averageRating: service.averageRating ?? 0,
       reviewCount: service.reviewCount ?? 0,
       status: service.status,

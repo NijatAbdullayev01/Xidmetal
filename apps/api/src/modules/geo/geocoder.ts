@@ -26,7 +26,8 @@ export class MockGeocoder implements GeocoderAdapter {
     return {
       lat,
       lng,
-      displayName: `${lat.toFixed(5)}, ${lng.toFixed(5)} (mock)`,
+      // Koordinat yox — oxuna bilən stub (prod-da mock qadağandır)
+      displayName: 'Bakı, Azərbaycan',
       provider: 'mock',
     };
   }
@@ -55,6 +56,9 @@ export class NominatimGeocoder implements GeocoderAdapter {
     url.searchParams.set('q', query);
     url.searchParams.set('format', 'json');
     url.searchParams.set('limit', '5');
+    // Azərbaycan nəticələrini prioritetləşdir (OSM Nominatim)
+    url.searchParams.set('countrycodes', 'az');
+    url.searchParams.set('accept-language', 'az');
 
     const rows = await this.fetchJson<NominatimSearchRow[]>(url);
     return rows.map((row) => ({
@@ -70,6 +74,7 @@ export class NominatimGeocoder implements GeocoderAdapter {
     url.searchParams.set('lat', String(lat));
     url.searchParams.set('lon', String(lng));
     url.searchParams.set('format', 'json');
+    url.searchParams.set('accept-language', 'az');
 
     const row = await this.fetchJson<NominatimSearchRow | { error?: string }>(url);
     if ('error' in row && row.error) return null;
@@ -78,7 +83,7 @@ export class NominatimGeocoder implements GeocoderAdapter {
     return {
       lat: Number(row.lat),
       lng: Number(row.lon),
-      displayName: row.display_name ?? `${lat}, ${lng}`,
+      displayName: row.display_name?.trim() || 'Naməlum ünvan',
       provider: 'nominatim',
     };
   }

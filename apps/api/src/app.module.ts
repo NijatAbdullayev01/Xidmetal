@@ -23,6 +23,7 @@ import { TrackingModule } from './modules/tracking/tracking.module';
 import { DispatchModule } from './modules/dispatch/dispatch.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { DevicesModule } from './modules/devices/devices.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { DatabaseModule } from './common/database/database.module';
 import { RedisModule } from './common/redis/redis.module';
 import { MailModule } from './common/mail/mail.module';
@@ -92,6 +93,7 @@ import { RedisThrottlerStorage } from './common/throttler/redis-throttler.storag
     DispatchModule,
     PaymentsModule,
     DevicesModule,
+    AnalyticsModule,
     AuthModule,
     UsersModule,
     CategoriesModule,

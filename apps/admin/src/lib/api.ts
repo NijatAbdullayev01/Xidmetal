@@ -13,6 +13,7 @@ import type {
   AdminReviewSummary,
   AdminReportSummary,
   AdminAnnouncementResult,
+  AdminAnalyticsOverview,
   CreateCategoryInput,
   UpdateCategoryInput,
   AdminSetUserActiveInput,
@@ -182,6 +183,17 @@ export const api = {
 
   admin: {
     stats: (token: string) => apiClient<AdminDashboardStats>('/admin/stats', { token }),
+    analytics: (token: string, params?: { from?: string; to?: string }) => {
+      const query =
+        params && (params.from || params.to)
+          ? `?${new URLSearchParams(
+              Object.entries(params).filter(
+                (entry): entry is [string, string] => Boolean(entry[1]),
+              ),
+            )}`
+          : '';
+      return apiClient<AdminAnalyticsOverview>(`/admin/analytics${query}`, { token });
+    },
     users: (token: string, params?: Record<string, string>) => {
       const query = params ? `?${new URLSearchParams(params)}` : '';
       return apiClient<PaginatedResponse<AdminUserSummary>>(`/admin/users${query}`, { token });

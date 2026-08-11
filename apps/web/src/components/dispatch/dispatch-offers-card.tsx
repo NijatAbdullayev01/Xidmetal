@@ -14,9 +14,10 @@ function formatDistance(meters: number | null | undefined): string {
 
 function formatExpires(iso: string): string {
   const ms = new Date(iso).getTime() - Date.now();
-  if (ms <= 0) return 'vaxt bitib';
-  const sec = Math.ceil(ms / 1000);
-  return `${sec} san`;
+  if (ms <= 0) return 'axtarış bitib';
+  const min = Math.ceil(ms / 60_000);
+  if (min <= 1) return '1 dəq-ə qədər';
+  return `${min} dəq-ə qədər`;
 }
 
 /**
@@ -48,7 +49,7 @@ export function DispatchOffersCard() {
           <div>
             <CardTitle className="text-base sm:text-lg">Ani sifariş təklifləri</CardTitle>
             <CardDescription className="mt-1">
-              Yaxınlıqdakı çağırışlar — qəbul və ya rədd edin
+              Eyni xidmət növü üzrə təcili sifarişlər — qəbul və ya rədd edin
               {wsConnected ? ' · canlı' : ' · yeniləmə'}
             </CardDescription>
           </div>
@@ -120,8 +121,10 @@ export function DispatchOffersCard() {
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Məsafə: {formatDistance(offer.distanceM)} · Qalan:{' '}
-                    {formatExpires(offer.expiresAt)}
+                    {offer.distanceM != null && Number.isFinite(offer.distanceM)
+                      ? `Məsafə: ${formatDistance(offer.distanceM)} · `
+                      : ''}
+                    Axtarış: {formatExpires(offer.expiresAt)}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">

@@ -94,14 +94,17 @@ Hər keçiddə müvafiq `Booking` sahəsi doldurulur:
 ```
 1. Booking (INSTANT) → PENDING (destLat/destLng məcburi; slot lock YOX)
    scheduledAt = now + DISPATCH_INSTANT_SCHEDULED_OFFSET_MIN (display window)
-2. geo.findNearby: ST_DWithin + ONLINE + eyni category ACTIVE service
-3. Sıralama: məsafə ASC, rating DESC (`rankDispatchCandidates`)
-4. Bir anda bir DispatchOffer (PENDING) → provider:{id} `dispatch:offer`
-5. BullMQ delayed job → expiresAt (default 30s) → EXPIRED → növbəti
-6. Accept (race-safe updateMany): booking CONFIRMED + providerId/serviceId yenilənir,
+2. Eyni xidmət növü (kateqoriya + başlıq) + şəhər + ONLINE + verified
+3. Sıralama: məsafə ASC (mövqe varsa), rating DESC
+4. Bütün uyğun namizədlərə fan-out DispatchOffer (PENDING) — tək təklif timeout YOX
+   expiresAt = booking.createdAt + DISPATCH_SEARCH_WINDOW_SEC
+5. Accept (race-safe): booking CONFIRMED + providerId/serviceId yenilənir,
    digər PENDING → CANCELLED, provider BUSY
-7. Reject → növbəti namizəd
-8. Namizəd yox / tükənib → auto-CANCELLED (cancelReason, cancelledBy=SYSTEM) + müştəri bildirişi
+6. Reject → digər namizədlər gözləməyə davam edir; imtina edən xidmət verənə
+   `DISPATCH_DECLINE_REOFFER_COOLDOWN_SEC` (default 2 dəq) sonra yenidən təklif
+   (axtarış pəncərəsi açıq qaldıqca və sifariş qəbul olunmayana qədər təkrarlanır).
+   Rediscovery yeni ONLINE tutur.
+7. Axtarış pəncərəsi bitib + hələ PENDING → auto-CANCELLED + müştəri bildirişi
 ```
 
 **SCHEDULED toxunulmur:** advisory lock + `assertSlotIsFree` yalnız SCHEDULED create/reschedule-də.

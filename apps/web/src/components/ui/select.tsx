@@ -438,7 +438,7 @@ export function Select({
 
         <div
           ref={listRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5 sm:p-2"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5 sm:p-2 scrollbar-thin"
         >
           {clearable ? (
             <button
@@ -535,7 +535,7 @@ export function Select({
 
                             {isSelected ? (
                               <Check
-                                className="h-4 w-4 shrink-0 text-brand-dark"
+                                className="h-4 w-4 shrink-0 text-success"
                                 aria-hidden
                               />
                             ) : null}

@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { AttentionProvider } from '@/components/providers/attention-provider';
+import { AnalyticsProvider } from '@/components/analytics/analytics-provider';
 import { NavigationProgress } from '@/components/layout/navigation-progress';
 import { PwaRegister } from '@/components/pwa/pwa-register';
 import { APP } from '@xidmetal/shared';
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <QueryProvider>
             <AttentionProvider>
+              <AnalyticsProvider />
               <Suspense fallback={null}>
                 <NavigationProgress />
               </Suspense>

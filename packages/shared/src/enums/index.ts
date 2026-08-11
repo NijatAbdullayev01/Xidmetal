@@ -173,3 +173,11 @@ export enum AvailabilitySlotStatus {
   FREE = 'FREE',
   BUSY = 'BUSY',
 }
+
+/** Sayt analitika hadisə tipi (web beacon) */
+export enum AnalyticsEventType {
+  PAGE_VIEW = 'PAGE_VIEW',
+  CLICK = 'CLICK',
+  HEARTBEAT = 'HEARTBEAT',
+  SESSION_END = 'SESSION_END',
+}

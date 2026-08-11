@@ -20,13 +20,13 @@ const STATUS_OPTIONS = [
   { value: '', label: 'Bütün statuslar' },
   { value: ReportStatus.PENDING, label: 'Gözləyir' },
   { value: ReportStatus.RESOLVED, label: 'Həll olunub' },
-  { value: ReportStatus.DISMISSED, label: 'Rədd edilib' },
+  { value: ReportStatus.DISMISSED, label: 'İmtina edilib' },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Gözləyir',
   RESOLVED: 'Həll olunub',
-  DISMISSED: 'Rədd edilib',
+  DISMISSED: 'İmtina edilib',
 };
 
 const STATUS_BADGE: Record<string, 'warning' | 'success' | 'destructive' | 'muted'> = {

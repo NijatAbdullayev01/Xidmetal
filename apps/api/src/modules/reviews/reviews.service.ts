@@ -72,7 +72,8 @@ export class ReviewsService {
           authorId,
           rating: dto.rating,
           comment,
-          status: ReviewStatus.PENDING,
+          // Dərhal ictimai görünür; admin sonradan REJECTED edə bilər
+          status: ReviewStatus.APPROVED,
         },
         include: {
           author: { select: { firstName: true, lastName: true } },
@@ -84,12 +85,26 @@ export class ReviewsService {
         },
       });
 
+      const newCount = profile.reviewCount + 1;
+      const newRating =
+        profile.reviewCount === 0
+          ? dto.rating
+          : (profile.rating * profile.reviewCount + dto.rating) / newCount;
+
+      await tx.providerProfile.update({
+        where: { userId: booking.providerId },
+        data: {
+          rating: Math.round(newRating * 100) / 100,
+          reviewCount: newCount,
+        },
+      });
+
       await tx.notification.create({
         data: {
           userId: booking.providerId,
           type: NotificationType.REVIEW_RECEIVED,
           title: 'Yeni rəy alındı',
-          body: `«${booking.service.title}» sifarişi üçün ${dto.rating} ulduzlu rəy yazıldı. Moderasiyadan sonra görünəcək.`,
+          body: `«${booking.service.title}» sifarişi üçün ${dto.rating} ulduzlu rəy yazıldı.`,
           data: { bookingId: booking.id, reviewId: created.id },
         },
       });

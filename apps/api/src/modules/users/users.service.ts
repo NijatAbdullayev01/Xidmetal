@@ -7,7 +7,14 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
-import { EmailVerificationPurpose, UserRole, ServiceStatus, BookingStatus } from '@prisma/client';
+import {
+  EmailVerificationPurpose,
+  UserRole,
+  ServiceStatus,
+  BookingStatus,
+  BookingType,
+  DispatchOfferStatus,
+} from '@prisma/client';
 import { ACTIVE_BOOKING_STATUSES, ProviderAvailability } from '@xidmetal/shared';
 import { PrismaService } from '../../common/database/prisma.service';
 import { MailService } from '../../common/mail/mail.service';
@@ -66,19 +73,38 @@ export class UsersService {
       throw new BadRequestException('Bu endpoint yalnız xidmət verənlər üçündür');
     }
 
-    const [totalServices, activeServices, pendingBookings, completedBookings] =
+    const now = new Date();
+    const [totalServices, activeServices, scheduledPending, offerPending, completedBookings] =
       await Promise.all([
         this.prisma.service.count({ where: { providerId: userId } }),
         this.prisma.service.count({
           where: { providerId: userId, status: ServiceStatus.ACTIVE },
         }),
+        // Seed PENDING INSTANT sayılmır — yalnız planlı gözləyənlər
         this.prisma.booking.count({
-          where: { providerId: userId, status: BookingStatus.PENDING },
+          where: {
+            providerId: userId,
+            status: BookingStatus.PENDING,
+            NOT: { type: BookingType.INSTANT },
+          },
+        }),
+        // Forma filtrlərinə uyğun aktiv təcili təkliflər
+        this.prisma.dispatchOffer.count({
+          where: {
+            providerId: userId,
+            status: DispatchOfferStatus.PENDING,
+            expiresAt: { gt: now },
+            booking: {
+              type: BookingType.INSTANT,
+              status: BookingStatus.PENDING,
+            },
+          },
         }),
         this.prisma.booking.count({
           where: { providerId: userId, status: BookingStatus.COMPLETED },
         }),
       ]);
+    const pendingBookings = scheduledPending + offerPending;
 
     return {
       activeServices,

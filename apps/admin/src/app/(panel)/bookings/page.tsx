@@ -22,7 +22,7 @@ const STATUS_OPTIONS = [
   { value: BookingStatus.IN_PROGRESS, label: 'Davam edir' },
   { value: BookingStatus.COMPLETED, label: 'Tamamlanıb' },
   { value: BookingStatus.CANCELLED, label: 'Ləğv edilib' },
-  { value: BookingStatus.REJECTED, label: 'Rədd edilib' },
+  { value: BookingStatus.REJECTED, label: 'İmtina edilib' },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
@@ -33,17 +33,20 @@ const STATUS_LABEL: Record<string, string> = {
   IN_PROGRESS: 'Davam edir',
   COMPLETED: 'Tamamlanıb',
   CANCELLED: 'Ləğv edilib',
-  REJECTED: 'Rədd edilib',
+  REJECTED: 'İmtina edilib',
 };
 
-const STATUS_BADGE: Record<string, 'muted' | 'success' | 'warning' | 'destructive' | 'default'> = {
+const STATUS_BADGE: Record<
+  string,
+  'muted' | 'success' | 'warning' | 'destructive' | 'default' | 'info' | 'transit' | 'arrived' | 'progress'
+> = {
   PENDING: 'warning',
-  CONFIRMED: 'default',
-  EN_ROUTE: 'default',
-  ARRIVED: 'default',
-  IN_PROGRESS: 'default',
+  CONFIRMED: 'info',
+  EN_ROUTE: 'transit',
+  ARRIVED: 'arrived',
+  IN_PROGRESS: 'progress',
   COMPLETED: 'success',
-  CANCELLED: 'muted',
+  CANCELLED: 'destructive',
   REJECTED: 'destructive',
 };
 
@@ -173,6 +176,10 @@ export default function AdminBookingsPage() {
           )}
           {data.items.map((booking) => {
             const nextStatuses = ADMIN_NEXT_STATUSES[booking.status as BookingStatus] ?? [];
+            const showCancelReason =
+              Boolean(booking.cancelReason) &&
+              (booking.status === BookingStatus.CANCELLED ||
+                booking.status === BookingStatus.REJECTED);
             return (
               <Card key={booking.id}>
                 <CardHeader className="pb-3">
@@ -206,6 +213,13 @@ export default function AdminBookingsPage() {
                     </span>
                     <span>Qiymət: {formatPrice(booking.totalPrice)}</span>
                   </div>
+                  {showCancelReason && (
+                    <div className="px-4 py-3">
+                      <p className="text-sm text-destructive">
+                        <span className="font-medium">Səbəb:</span> {booking.cancelReason}
+                      </p>
+                    </div>
+                  )}
                   {nextStatuses.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {nextStatuses.map((next) => (

@@ -40,6 +40,11 @@ function buildSecurityHeaders() {
     wsOrigin.replace(/\/$/, ''),
     process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000',
     process.env.NODE_ENV === 'production' ? '' : 'ws://localhost:4000',
+    // Google Maps JavaScript API (konum seçici + canlı tracking)
+    'https://maps.googleapis.com',
+    'https://maps.gstatic.com',
+    'https://*.googleapis.com',
+    'https://*.gstatic.com',
   ].filter(Boolean);
 
   const csp = [
@@ -49,10 +54,12 @@ function buildSecurityHeaders() {
     "form-action 'self'",
     "object-src 'none'",
     "img-src 'self' data: blob: https:",
-    "font-src 'self' data:",
-    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "script-src 'self' 'unsafe-inline'" +
-      (process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'"),
+      (process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'") +
+      ' https://maps.googleapis.com https://maps.gstatic.com',
+    "worker-src 'self' blob:",
     `connect-src ${connectSrc.join(' ')}`,
   ];
 
@@ -62,6 +69,7 @@ function buildSecurityHeaders() {
 
   return [
     { key: 'Content-Security-Policy', value: csp.join('; ') },
+    { key: 'Permissions-Policy', value: 'geolocation=(self)' },
     { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
     { key: 'X-Content-Type-Options', value: 'nosniff' },
     { key: 'X-Frame-Options', value: 'DENY' },

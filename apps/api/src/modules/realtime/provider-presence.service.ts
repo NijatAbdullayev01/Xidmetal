@@ -1,13 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject, forwardRef } from '@nestjs/common';
 import { ProviderAvailability } from '@prisma/client';
 import { PrismaService } from '../../common/database/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
+import { DispatchService } from '../dispatch/dispatch.service';
 
 /**
  * Provider WS presence — User.lastSeenAt + ProviderAvailability.
  * Redis INCR/DECR ilə multi-instance; Redis yoxdursa process-local Map.
  * Yalnız PROVIDER profilinə toxunur; CUSTOMER/ADMIN OFFLINE edilmir.
- * BUSY sifariş zamanı disconnect-də toxunulmur.
+ * BUSY sifariş zamanı connect/disconnect-də toxunulmur.
  */
 @Injectable()
 export class ProviderPresenceService {
@@ -18,6 +19,9 @@ export class ProviderPresenceService {
   constructor(
     private prisma: PrismaService,
     private redis: RedisService,
+    @Optional()
+    @Inject(forwardRef(() => DispatchService))
+    private dispatch?: DispatchService,
   ) {}
 
   async onProviderConnect(userId: string): Promise<void> {
@@ -28,6 +32,23 @@ export class ProviderPresenceService {
       where: { id: userId },
       data: { lastSeenAt: now },
     });
+
+    // İlk socket — təsdiqlənmiş oflayn xidmət verəni onlayn et (BUSY saxlanılır)
+    if (n === 1) {
+      const result = await this.prisma.providerProfile.updateMany({
+        where: {
+          userId,
+          isVerified: true,
+          availability: ProviderAvailability.OFFLINE,
+        },
+        data: { availability: ProviderAvailability.ONLINE },
+      });
+      if (result.count > 0) {
+        this.logger.debug(`Provider presence ONLINE (WS connect): ${userId}`);
+        this.dispatch?.notifyProviderOnline(userId);
+      }
+    }
+
     this.logger.debug(`Provider WS connect: ${userId} (n=${n})`);
   }
 

@@ -96,7 +96,7 @@ Provider PWA                Gateway              Customer PWA
 - **Provider:** `navigator.geolocation.watchPosition` → ~3s throttle → `location:push` (yalnız trackable status).
 - **Server hot path:** validate + Redis throttle → **WS `location:update` dərhal** (haversine ETA).
 - **Server background:** ProviderProfile/PostGIS sync ~15s; `LocationPing` ~15s; Mapbox ETA dəqiqləşdirmə (opsional).
-- **Müştəri:** `location:update` → Mapbox marker + ETA/məsafə.
+- **Müştəri:** `location:update` → Google Maps marker + ETA/məsafə.
 
 > Battery/data: throttle interval və `enableHighAccuracy` balanslıdır. Background GPS brauzer/OS limitlərinə tabedir (tab açıq olanda etibarlı).
 > Miqyas: bax [CAPACITY.md](./CAPACITY.md).
@@ -105,8 +105,8 @@ Provider PWA                Gateway              Customer PWA
 
 ## 6. Xəritə & ETA
 
-- **Xəritə:** Mapbox GL JS (`NEXT_PUBLIC_MAPBOX_TOKEN`). Token yoxdursa AZ empty state — build sınmır.
-- **ETA:** Server `MAPBOX_ACCESS_TOKEN` Directions API (30s cache); yoxdursa haversine + ~30 km/s orta sürət.
+- **Xəritə:** Google Maps JS (`NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`). Açar yoxdursa AZ empty state — build sınmır.
+- **ETA / məsafə (Bolt üslubu):** `GET /geo/route` + WS — Google Routes (New) → OSRM → Mapbox → haversine×yol əmsalı. Client xəritə: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`.
 
 ---
 
@@ -132,7 +132,7 @@ Provider PWA                Gateway              Customer PWA
 - Handshake JWT auth (məcburi).
 - Otaq üzvlüyü server-side.
 - Rate limit WS `location:push`.
-- Mapbox secret yalnız backend-də (`MAPBOX_ACCESS_TOKEN`); client token domain-restricted public token.
+- Directions secret yalnız backend-də (`GOOGLE_MAPS_API_KEY` / `MAPBOX_ACCESS_TOKEN`); client Google Maps açarı domain-restricted public key.
 
 ---
 

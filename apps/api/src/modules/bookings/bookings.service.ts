@@ -26,9 +26,13 @@ import {
   isValidCoordinates,
   isBookingTransitionAllowed,
   bookingLifecycleFieldsForStatus,
+  isAzerbaijanLocation,
+  locationsServeSameCity,
+  matchCatalogLocationFromText,
+  resolveServiceCity,
   type BookingSummary,
 } from '@xidmetal/shared';
-import { ServiceStatus } from '@prisma/client';
+import { DispatchOfferStatus, ServiceStatus } from '@prisma/client';
 import { AvailabilityService } from '../availability/availability.service';
 import { shouldNotifyCustomerOnConfirmOrReject } from './booking-status-notify';
 import { RealtimeService } from '../realtime/realtime.service';
@@ -94,13 +98,69 @@ export class BookingsService {
       throw new NotFoundException('Sifariş tapılmadı');
     }
 
+    const isAssignedProvider =
+      booking.providerId === userId &&
+      (booking.type !== BookingType.INSTANT || booking.acceptedAt != null);
+
     const isParticipant =
-      booking.customerId === userId || booking.providerId === userId;
-    if (role !== UserRole.ADMIN && !isParticipant) {
+      booking.customerId === userId || isAssignedProvider;
+
+    let dispatchOffer:
+      | {
+          id: string;
+          distanceM: number | null;
+          expiresAt: Date;
+        }
+      | undefined;
+
+    if (role === UserRole.PROVIDER && !isParticipant) {
+      const offer = await this.prisma.dispatchOffer.findFirst({
+        where: {
+          bookingId: id,
+          providerId: userId,
+          status: {
+            in: [DispatchOfferStatus.PENDING, DispatchOfferStatus.ACCEPTED],
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, distanceM: true, expiresAt: true, status: true },
+      });
+      if (
+        !offer ||
+        (offer.status === DispatchOfferStatus.PENDING &&
+          offer.expiresAt <= new Date())
+      ) {
+        throw new ForbiddenException('Bu sifarişə baxmaq icazəniz yoxdur');
+      }
+      if (offer.status === DispatchOfferStatus.PENDING) {
+        dispatchOffer = {
+          id: offer.id,
+          distanceM: offer.distanceM,
+          expiresAt: offer.expiresAt,
+        };
+      }
+    } else if (role !== UserRole.ADMIN && !isParticipant) {
       throw new ForbiddenException('Bu sifarişə baxmaq icazəniz yoxdur');
+    } else if (
+      role === UserRole.PROVIDER &&
+      booking.type === BookingType.INSTANT &&
+      booking.status === BookingStatus.PENDING
+    ) {
+      const offer = await this.prisma.dispatchOffer.findFirst({
+        where: {
+          bookingId: id,
+          providerId: userId,
+          status: DispatchOfferStatus.PENDING,
+          expiresAt: { gt: new Date() },
+        },
+        select: { id: true, distanceM: true, expiresAt: true },
+      });
+      if (offer) {
+        dispatchOffer = offer;
+      }
     }
 
-    return await this.mapBooking(booking);
+    return await this.mapBooking(booking, dispatchOffer);
   }
 
   async findAll(
@@ -119,16 +179,64 @@ export class BookingsService {
           ? { status }
           : {};
 
-    const where = {
-      // PROVIDER hesabı eyni zamanda başqa provider-in xidmətinə sifariş verə
-      // bildiyi üçün həm `providerId`, həm də `customerId` üzrə uyğunluğa baxılır.
-      ...(role === UserRole.PROVIDER
-        ? { OR: [{ providerId: userId }, { customerId: userId }] }
+    const now = new Date();
+    const where =
+      role === UserRole.PROVIDER
+        ? {
+            AND: [
+              statusFilter,
+              {
+                OR: [
+                  // SCHEDULED və ya qəbul olunmuş INSTANT (acceptedAt dolu)
+                  {
+                    providerId: userId,
+                    OR: [
+                      { type: BookingType.SCHEDULED },
+                      {
+                        type: BookingType.INSTANT,
+                        acceptedAt: { not: null },
+                      },
+                    ],
+                  },
+                  // Aktiv təklifi olan təcili sifarişlər (formaya uyğun onlayn namizədlər)
+                  {
+                    type: BookingType.INSTANT,
+                    status: BookingStatus.PENDING,
+                    dispatchOffers: {
+                      some: {
+                        providerId: userId,
+                        status: DispatchOfferStatus.PENDING,
+                        expiresAt: { gt: now },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          }
         : role === UserRole.ADMIN
-          ? {}
-          : { customerId: userId }),
-      ...statusFilter,
-    };
+          ? { ...statusFilter }
+          : { customerId: userId, ...statusFilter };
+
+    const providerOfferInclude =
+      role === UserRole.PROVIDER
+        ? {
+            dispatchOffers: {
+              where: {
+                providerId: userId,
+                status: DispatchOfferStatus.PENDING,
+                expiresAt: { gt: now },
+              },
+              take: 1,
+              orderBy: { createdAt: 'desc' as const },
+              select: {
+                id: true,
+                distanceM: true,
+                expiresAt: true,
+              },
+            },
+          }
+        : {};
 
     const [items, total] = await Promise.all([
       this.prisma.booking.findMany({
@@ -136,14 +244,25 @@ export class BookingsService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: bookingSummaryInclude,
+        include: {
+          ...bookingSummaryInclude,
+          ...providerOfferInclude,
+        },
       }),
       this.prisma.booking.count({ where }),
     ]);
 
     return {
       items: await Promise.all(
-        items.map((b: (typeof items)[number]) => this.mapBooking(b)),
+        items.map((b: (typeof items)[number]) => {
+          const offer =
+            'dispatchOffers' in b &&
+            Array.isArray(b.dispatchOffers) &&
+            b.dispatchOffers[0]
+              ? b.dispatchOffers[0]
+              : undefined;
+          return this.mapBooking(b, offer);
+        }),
       ),
       total,
       page,
@@ -173,6 +292,7 @@ export class BookingsService {
       minRating: dto.minRating ?? null,
       minPrice: dto.minPrice ?? null,
       maxPrice: dto.maxPrice ?? null,
+      serviceLocation: dto.serviceLocation ?? null,
     };
 
     if (idempotencyKey) {
@@ -275,6 +395,23 @@ export class BookingsService {
         );
       }
 
+      const serviceLocation = this.resolveInstantServiceLocation({
+        isInstant,
+        requested: dto.serviceLocation,
+        serviceLocation: service.location,
+        address,
+      });
+
+      if (
+        isInstant &&
+        service.location &&
+        !locationsServeSameCity(service.location, serviceLocation!)
+      ) {
+        throw new BadRequestException(
+          'Seçilmiş xidmət sifariş ərazisinə uyğun deyil',
+        );
+      }
+
       if (!isInstant) {
         // SCHEDULED: Provider üzrə seriyalaşdırma + slot re-check (TOCTOU race-i bağlayır)
         await this.availabilityService.lockProviderBookings(tx, service.providerId);
@@ -316,31 +453,36 @@ export class BookingsService {
         });
       }
 
-      return created;
+      return { created, serviceLocation };
     });
+
+    const { created: createdBooking, serviceLocation } = booking;
 
     if (!isInstant) {
       void this.safeSendBookingMail({
-        to: booking.provider.email,
+        to: createdBooking.provider.email,
         event: NotificationType.BOOKING_CREATED,
-        serviceTitle: booking.service.title,
-        scheduledAtLabel: this.formatScheduledAt(booking.scheduledAt),
+        serviceTitle: createdBooking.service.title,
+        scheduledAtLabel: this.formatScheduledAt(createdBooking.scheduledAt),
       });
       this.channels?.deliverAfterInApp({
-        userId: booking.providerId,
+        userId: createdBooking.providerId,
         title: 'Yeni sifariş',
-        body: `${booking.customer.firstName} ${booking.customer.lastName} «${booking.service.title}» xidmətinə sifariş verdi.`,
+        body: `${createdBooking.customer.firstName} ${createdBooking.customer.lastName} «${createdBooking.service.title}» xidmətinə sifariş verdi.`,
         type: NotificationType.BOOKING_CREATED,
-        data: { bookingId: booking.id },
-        serviceTitle: booking.service.title,
-        scheduledAtLabel: this.formatScheduledAt(booking.scheduledAt),
+        data: { bookingId: createdBooking.id },
+        serviceTitle: createdBooking.service.title,
+        scheduledAtLabel: this.formatScheduledAt(createdBooking.scheduledAt),
       });
     } else {
       void this.dispatch
-        ?.startForBooking(booking.id, {
+        ?.startForBooking(createdBooking.id, {
           minRating: dto.minRating,
           minPrice: dto.minPrice,
           maxPrice: dto.maxPrice,
+          ...(serviceLocation
+            ? { serviceCity: resolveServiceCity(serviceLocation) }
+            : {}),
         })
         .catch((err) => {
           this.logger.warn(
@@ -353,7 +495,7 @@ export class BookingsService {
       isInstant ? BookingType.INSTANT : BookingType.SCHEDULED,
     );
 
-    const summary = await this.mapBooking(booking);
+    const summary = await this.mapBooking(createdBooking);
 
     if (idempotencyKey) {
       try {
@@ -627,10 +769,17 @@ export class BookingsService {
       );
     }
 
-    if (dto.status === BookingStatus.CANCELLED) {
+    if (
+      dto.status === BookingStatus.CANCELLED ||
+      dto.status === BookingStatus.REJECTED
+    ) {
       const reason = dto.cancelReason?.trim() ?? '';
       if (reason.length < 3) {
-        throw new BadRequestException('Ləğv səbəbi tələb olunur (minimum 3 simvol)');
+        throw new BadRequestException(
+          dto.status === BookingStatus.REJECTED
+            ? 'İmtina səbəbi tələb olunur (minimum 3 simvol)'
+            : 'Ləğv səbəbi tələb olunur (minimum 3 simvol)',
+        );
       }
     }
 
@@ -647,7 +796,11 @@ export class BookingsService {
                   : 'PROVIDER',
               cancelledAt: now,
             }
-          : {};
+          : dto.status === BookingStatus.REJECTED
+            ? {
+                cancelReason: dto.cancelReason!.trim(),
+              }
+            : {};
 
       const lifecycleMeta = bookingLifecycleFieldsForStatus(
         dto.status,
@@ -687,12 +840,15 @@ export class BookingsService {
         shouldNotifyCustomerOnConfirmOrReject(isProvider, isAdmin)
       ) {
         const actorLabel = isAdmin ? 'idarəçi' : 'xidmət verən';
+        const reasonSuffix = dto.cancelReason?.trim()
+          ? ` Səbəb: ${dto.cancelReason.trim()}`
+          : '';
         await tx.notification.create({
           data: {
             userId: booking.customerId,
             type: NotificationType.BOOKING_REJECTED,
             title: 'Sifariş rədd edildi',
-            body: `«${result.service.title}» sifarişiniz ${actorLabel} tərəfindən rədd edildi.`,
+            body: `«${result.service.title}» sifarişiniz ${actorLabel} tərəfindən rədd edildi.${reasonSuffix}`,
             data: { bookingId: result.id },
           },
         });
@@ -747,28 +903,40 @@ export class BookingsService {
       }
 
       if (dto.status === BookingStatus.CANCELLED) {
-        const recipientId = isCustomer ? booking.providerId : booking.customerId;
-        const actorLabel = isAdmin
-          ? 'idarəçi'
-          : isCustomer
-            ? 'müştəri'
-            : 'xidmət verən';
-        const reasonSuffix = dto.cancelReason?.trim()
-          ? ` Səbəb: ${dto.cancelReason.trim()}`
-          : '';
-        await tx.notification.create({
-          data: {
-            userId: recipientId,
-            type: NotificationType.BOOKING_CANCELLED,
-            title: 'Sifariş ləğv edildi',
-            body: `«${result.service.title}» sifarişi ${actorLabel} tərəfindən ləğv edildi.${reasonSuffix}`,
-            data: { bookingId: result.id },
-          },
-        });
+        // INSTANT: yalnız qəbul etmiş xidmət verənə bildiriş (seed providerId yox)
+        const hasAssignedProvider =
+          booking.type !== BookingType.INSTANT || booking.acceptedAt != null;
+        const recipientId = isCustomer
+          ? hasAssignedProvider
+            ? booking.providerId
+            : null
+          : booking.customerId;
+        if (recipientId) {
+          const actorLabel = isAdmin
+            ? 'idarəçi'
+            : isCustomer
+              ? 'müştəri'
+              : 'xidmət verən';
+          const reasonSuffix = dto.cancelReason?.trim()
+            ? ` Səbəb: ${dto.cancelReason.trim()}`
+            : '';
+          await tx.notification.create({
+            data: {
+              userId: recipientId,
+              type: NotificationType.BOOKING_CANCELLED,
+              title: 'Sifariş ləğv edildi',
+              body: `«${result.service.title}» sifarişi ${actorLabel} tərəfindən ləğv edildi.${reasonSuffix}`,
+              data: { bookingId: result.id },
+            },
+          });
+        }
       }
 
       return result;
     });
+
+    const hasAssignedProvider =
+      booking.type !== BookingType.INSTANT || booking.acceptedAt != null;
 
     this.enqueueStatusEmails(updated, {
       isProvider,
@@ -776,17 +944,38 @@ export class BookingsService {
       isAdmin,
       cancelReason: dto.cancelReason?.trim(),
       status: dto.status,
+      notifyAssignedProvider: hasAssignedProvider,
     });
 
-    this.realtime?.emitBookingStatus({
-      bookingId: updated.id,
-      status: dto.status,
-      timestamp: new Date().toISOString(),
-    });
+    const statusParticipants = [updated.customerId];
+    if (hasAssignedProvider) {
+      statusParticipants.push(updated.providerId);
+    }
+    this.realtime?.emitBookingStatus(
+      {
+        bookingId: updated.id,
+        status: dto.status,
+        timestamp: new Date().toISOString(),
+      },
+      statusParticipants,
+    );
     this.tracking?.invalidateBookingCache(updated.id);
 
     if (
       booking.type === BookingType.INSTANT &&
+      booking.status === BookingStatus.PENDING &&
+      dto.status === BookingStatus.CANCELLED
+    ) {
+      void this.dispatch?.abortForBooking(booking.id).catch((err) => {
+        this.logger.debug(
+          `Dispatch abort: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+    }
+
+    if (
+      booking.type === BookingType.INSTANT &&
+      hasAssignedProvider &&
       (dto.status === BookingStatus.COMPLETED ||
         dto.status === BookingStatus.CANCELLED ||
         dto.status === BookingStatus.REJECTED)
@@ -817,12 +1006,18 @@ export class BookingsService {
       isAdmin: boolean;
       cancelReason?: string;
       status: BookingStatus;
+      /** INSTANT qəbul olunmayıbsa seed provider-ə mail/push getməsin */
+      notifyAssignedProvider?: boolean;
     },
   ) {
     const event = bookingStatusToMailEvent(meta.status);
     if (!event) return;
 
     if (meta.status === BookingStatus.CANCELLED) {
+      const notifyProvider = meta.notifyAssignedProvider !== false;
+      if (meta.isCustomer && !notifyProvider) {
+        return;
+      }
       const recipientEmail = meta.isCustomer
         ? booking.provider.email
         : booking.customer.email;
@@ -860,12 +1055,17 @@ export class BookingsService {
       event,
       serviceTitle: booking.service.title,
       scheduledAtLabel: this.formatScheduledAt(booking.scheduledAt),
+      cancelReason:
+        meta.status === BookingStatus.REJECTED
+          ? meta.cancelReason
+          : undefined,
     });
 
     const channelCopy = this.statusChannelCopy(
       event,
       booking.service.title,
       this.formatScheduledAt(booking.scheduledAt),
+      meta.status === BookingStatus.REJECTED ? meta.cancelReason : undefined,
     );
     if (channelCopy) {
       this.channels?.deliverAfterInApp({
@@ -884,6 +1084,7 @@ export class BookingsService {
     event: NotificationType,
     serviceTitle: string,
     scheduledAtLabel: string,
+    cancelReason?: string,
   ): { title: string; body: string } | null {
     switch (event) {
       case NotificationType.BOOKING_CONFIRMED:
@@ -894,7 +1095,9 @@ export class BookingsService {
       case NotificationType.BOOKING_REJECTED:
         return {
           title: 'Sifariş rədd edildi',
-          body: `«${serviceTitle}» sifarişiniz rədd edildi.`,
+          body: `«${serviceTitle}» sifarişiniz rədd edildi.${
+            cancelReason ? ` Səbəb: ${cancelReason}` : ''
+          }`,
         };
       case NotificationType.BOOKING_EN_ROUTE:
         return {
@@ -975,37 +1178,73 @@ export class BookingsService {
     return { lat, lng };
   }
 
-  private async mapBooking(booking: {
-    id: string;
-    serviceId: string;
-    service: { title: string };
-    customerId: string;
-    customer: { firstName: string; lastName: string };
-    providerId: string;
-    provider: { firstName: string; lastName: string };
-    scheduledAt: Date;
-    proposedScheduledAt?: Date | null;
-    status: string;
-    type?: string;
-    totalPrice: { toNumber(): number };
-    notes: string | null;
-    address?: string | null;
-    destLat?: number | null;
-    destLng?: number | null;
-    originLat?: number | null;
-    originLng?: number | null;
-    imageUrl?: string | null;
-    cancelReason?: string | null;
-    cancelledBy?: string | null;
-    cancelledAt?: Date | null;
-    acceptedAt?: Date | null;
-    enRouteAt?: Date | null;
-    arrivedAt?: Date | null;
-    startedAt?: Date | null;
-    completedAt?: Date | null;
-    review?: { id: string } | null;
-    createdAt: Date;
-  }) {
+  /**
+   * INSTANT sifariş üçün xidmət ərazisini təyin edir.
+   * Prioritet: müştəri seçimi → seed xidmət location → ünvan mətnindən match.
+   */
+  private resolveInstantServiceLocation(input: {
+    isInstant: boolean;
+    requested?: string;
+    serviceLocation?: string | null;
+    address?: string;
+  }): string | null {
+    if (!input.isInstant) return null;
+
+    const candidates = [
+      input.requested?.trim(),
+      input.serviceLocation?.trim(),
+      input.address ? matchCatalogLocationFromText(input.address) : null,
+    ];
+
+    for (const candidate of candidates) {
+      if (candidate && isAzerbaijanLocation(candidate)) {
+        return candidate;
+      }
+    }
+
+    throw new BadRequestException(
+      'Ani sifariş üçün şəhər və ya rayon seçin',
+    );
+  }
+
+  private async mapBooking(
+    booking: {
+      id: string;
+      serviceId: string;
+      service: { title: string };
+      customerId: string;
+      customer: { firstName: string; lastName: string };
+      providerId: string;
+      provider: { firstName: string; lastName: string };
+      scheduledAt: Date;
+      proposedScheduledAt?: Date | null;
+      status: string;
+      type?: string;
+      totalPrice: { toNumber(): number };
+      notes: string | null;
+      address?: string | null;
+      destLat?: number | null;
+      destLng?: number | null;
+      originLat?: number | null;
+      originLng?: number | null;
+      imageUrl?: string | null;
+      cancelReason?: string | null;
+      cancelledBy?: string | null;
+      cancelledAt?: Date | null;
+      acceptedAt?: Date | null;
+      enRouteAt?: Date | null;
+      arrivedAt?: Date | null;
+      startedAt?: Date | null;
+      completedAt?: Date | null;
+      review?: { id: string } | null;
+      createdAt: Date;
+    },
+    dispatchOffer?: {
+      id: string;
+      distanceM: number | null;
+      expiresAt: Date;
+    },
+  ) {
     return {
       id: booking.id,
       serviceId: booking.serviceId,
@@ -1036,6 +1275,9 @@ export class BookingsService {
       completedAt: booking.completedAt?.toISOString(),
       hasReview: !!booking.review,
       createdAt: booking.createdAt.toISOString(),
+      dispatchOfferId: dispatchOffer?.id ?? null,
+      dispatchDistanceM: dispatchOffer?.distanceM ?? null,
+      dispatchExpiresAt: dispatchOffer?.expiresAt.toISOString() ?? null,
     };
   }
 }

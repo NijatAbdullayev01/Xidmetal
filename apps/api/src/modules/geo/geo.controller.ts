@@ -8,16 +8,22 @@ import { JwtAuthGuard, RolesGuard } from '../../common/guards';
 import {
   GeocodeQueryDto,
   NearbyProvidersQueryDto,
+  OnlineProvidersCountQueryDto,
   ReverseGeocodeQueryDto,
+  DrivingRouteQueryDto,
   UpdateProviderAvailabilityDto,
   UpdateProviderLocationDto,
 } from './dto';
 import { GeoService } from './geo.service';
+import { EtaService } from './eta.service';
 
 @ApiTags('Geo')
 @Controller('geo')
 export class GeoController {
-  constructor(private geoService: GeoService) {}
+  constructor(
+    private geoService: GeoService,
+    private etaService: EtaService,
+  ) {}
 
   @Public()
   @Get('geocode')
@@ -36,6 +42,17 @@ export class GeoController {
   }
 
   @Public()
+  @Get('online-count')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @ApiOperation({
+    summary:
+      'Seçilmiş xidmət növü üzrə onlayn xidmət verənlərin sayı (təcili sifariş UI)',
+  })
+  onlineCount(@Query() query: OnlineProvidersCountQueryDto) {
+    return this.geoService.countOnlineProviders(query);
+  }
+
+  @Public()
   @Get('nearby')
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @ApiOperation({
@@ -43,6 +60,25 @@ export class GeoController {
   })
   nearby(@Query() query: NearbyProvidersQueryDto) {
     return this.geoService.findNearby(query);
+  }
+
+  @Public()
+  @Get('route')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Sürücülük marşrutu — ETA, məsafə, polyline (Google Routes / OSRM)',
+  })
+  async route(@Query() query: DrivingRouteQueryDto) {
+    const estimate = await this.etaService.estimate(
+      { lat: query.fromLat, lng: query.fromLng },
+      { lat: query.toLat, lng: query.toLng },
+    );
+    return {
+      etaSeconds: estimate.etaSeconds,
+      distanceMeters: estimate.distanceMeters,
+      routePolyline: estimate.routePolyline ?? null,
+      source: estimate.source,
+    };
   }
 
   @ApiBearerAuth()

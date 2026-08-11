@@ -3,6 +3,8 @@ import {
   Inject,
   Injectable,
   Logger,
+  Optional,
+  forwardRef,
 } from '@nestjs/common';
 import { Prisma, ProviderAvailability, ServiceStatus, UserRole } from '@prisma/client';
 import {
@@ -10,6 +12,8 @@ import {
   isValidCoordinates,
   isValidHeading,
   kmToMeters,
+  locationLabelsForCity,
+  isAzerbaijanLocation,
   type NearbyProviderSummary,
 } from '@xidmetal/shared';
 import { PrismaService } from '../../common/database/prisma.service';
@@ -18,9 +22,11 @@ import {
   isProviderDutyAvailability,
 } from '../../common/provider/assert-provider-verified';
 import { StorageService } from '../../common/storage/storage.service';
+import { DispatchService } from '../dispatch/dispatch.service';
 import { GEOCODER_ADAPTER, type GeocoderAdapter } from './geocoder';
 import type {
   NearbyProvidersQueryDto,
+  OnlineProvidersCountQueryDto,
   UpdateProviderAvailabilityDto,
   UpdateProviderLocationDto,
 } from './dto';
@@ -49,6 +55,9 @@ export class GeoService {
     private prisma: PrismaService,
     @Inject(GEOCODER_ADAPTER) private geocoder: GeocoderAdapter,
     private storageService: StorageService,
+    @Optional()
+    @Inject(forwardRef(() => DispatchService))
+    private dispatch?: DispatchService,
   ) {}
 
   async geocode(query: string) {
@@ -72,6 +81,7 @@ export class GeoService {
 
     const profile = await this.ensureProviderProfile(userId);
     const now = new Date();
+    const previousAvailability = profile.availability;
     const availability = dto.availability ?? profile.availability;
 
     if (isProviderDutyAvailability(availability)) {
@@ -90,6 +100,13 @@ export class GeoService {
     });
 
     await this.syncLastLocationGeography(profile.id, dto.lat, dto.lng);
+
+    if (
+      availability === ProviderAvailability.ONLINE &&
+      previousAvailability !== ProviderAvailability.ONLINE
+    ) {
+      this.dispatch?.notifyProviderOnline(userId);
+    }
 
     return {
       availability,
@@ -143,6 +160,13 @@ export class GeoService {
     }
 
     const profile = await this.ensureProviderProfile(userId);
+    if (profile.availability === ProviderAvailability.BUSY) {
+      throw new BadRequestException(
+        'Aktiv sifariş bitənə qədər status dəyişdirilə bilməz',
+      );
+    }
+
+    const previousAvailability = profile.availability;
     const updated = await this.prisma.providerProfile.update({
       where: { id: profile.id },
       data: { availability: dto.availability },
@@ -155,6 +179,13 @@ export class GeoService {
       },
     });
 
+    if (
+      updated.availability === ProviderAvailability.ONLINE &&
+      previousAvailability !== ProviderAvailability.ONLINE
+    ) {
+      this.dispatch?.notifyProviderOnline(userId);
+    }
+
     return {
       availability: updated.availability,
       lastLat: updated.lastLat,
@@ -162,6 +193,67 @@ export class GeoService {
       lastHeading: updated.lastHeading,
       locationUpdatedAt: updated.locationUpdatedAt?.toISOString() ?? null,
     };
+  }
+
+  /**
+   * Seçilmiş xidmət növü üzrə hazırda ONLINE olan xidmət verənlərin sayı.
+   * Təcili sifariş UI-də müştəriyə göstərilir.
+   */
+  async countOnlineProviders(
+    dto: OnlineProvidersCountQueryDto,
+  ): Promise<{ count: number }> {
+    const priceFilter: { gte?: number; lte?: number } = {};
+    if (dto.minPrice !== undefined && Number.isFinite(dto.minPrice)) {
+      priceFilter.gte = dto.minPrice;
+    }
+    if (dto.maxPrice !== undefined && Number.isFinite(dto.maxPrice)) {
+      priceFilter.lte = dto.maxPrice;
+    }
+
+    const serviceTitle = dto.serviceTitle.trim();
+    if (!serviceTitle) {
+      return { count: 0 };
+    }
+
+    const locationFilter = this.resolveServiceLocationFilter(dto.serviceLocation);
+
+    const count = await this.prisma.providerProfile.count({
+      where: {
+        isVerified: true,
+        availability: ProviderAvailability.ONLINE,
+        ...(dto.minRating !== undefined && Number.isFinite(dto.minRating)
+          ? { rating: { gte: dto.minRating } }
+          : {}),
+        user: {
+          role: UserRole.PROVIDER,
+          isActive: true,
+          deletedAt: null,
+          services: {
+            some: {
+              status: ServiceStatus.ACTIVE,
+              categoryId: dto.categoryId,
+              title: serviceTitle,
+              ...(locationFilter ? { location: locationFilter } : {}),
+              ...(Object.keys(priceFilter).length > 0
+                ? { price: priceFilter }
+                : {}),
+            },
+          },
+        },
+      },
+    });
+
+    return { count };
+  }
+
+  private resolveServiceLocationFilter(
+    serviceLocation: string | undefined,
+  ): { in: string[] } | undefined {
+    const trimmed = serviceLocation?.trim();
+    if (!trimmed || !isAzerbaijanLocation(trimmed)) {
+      return undefined;
+    }
+    return { in: [...locationLabelsForCity(trimmed)] };
   }
 
   async findNearby(dto: NearbyProvidersQueryDto): Promise<{
@@ -182,7 +274,14 @@ export class GeoService {
           limit,
           categoryId: dto.categoryId,
         });
-        return { items, engine: 'postgis' };
+        // last_location NULL/stale olanda PostGIS boş qayıda bilər —
+        // lastLat/lng ilə haversine ehtiyatı.
+        if (items.length > 0) {
+          return { items, engine: 'postgis' };
+        }
+        this.logger.debug(
+          'PostGIS yaxınlıq boş — haversine fallback (last_location?)',
+        );
       } catch (error) {
         this.logger.warn(
           `PostGIS yaxınlıq uğursuz, haversine fallback: ${
@@ -246,7 +345,7 @@ export class GeoService {
               SELECT 1 FROM services s
               WHERE s.provider_id = u.id
                 AND s.status = 'ACTIVE'::"ServiceStatus"
-                AND s.category_id = ${categoryId}::uuid
+                AND s.category_id::text = ${categoryId}
             )
           ORDER BY distance_m ASC
           LIMIT ${limit}
@@ -394,10 +493,11 @@ export class GeoService {
   ): Promise<void> {
     if (!(await this.isPostgisAvailable())) return;
     try {
+      // Prisma UUID parametrini text kimi bağlaya bilər — ::text müqayisəsi etibarlıdır
       await this.prisma.$executeRaw`
         UPDATE provider_profiles
         SET last_location = ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography
-        WHERE id = ${profileId}::uuid
+        WHERE id::text = ${profileId}
       `;
     } catch (error) {
       this.logger.warn(

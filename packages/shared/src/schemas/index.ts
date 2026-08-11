@@ -12,11 +12,13 @@ import {
   ReportTargetType,
   ReportStatus,
   DevicePlatform,
+  AnalyticsEventType,
 } from '../enums';
 import { PRICE_UNIT_VALUES } from '../price-units';
 import { SERVICE_VENUE_VALUES } from '../service-venues';
 import { CARGO_ROUTE_SCOPE_VALUES } from '../vehicle-cargo';
 import { isValidCoordinates } from '../geo';
+import { isAzerbaijanLocation } from '../locations';
 import { PAYMENTS } from '../constants';
 
 const vehicleDimensionSchema = z
@@ -200,6 +202,11 @@ export const createBookingSchema = withOptionalCoordPairs(
     /** INSTANT dispatch filtri — xidmət qiymət diapazonu */
     minPrice: z.number().min(0).optional(),
     maxPrice: z.number().min(0).optional(),
+    /**
+     * INSTANT — xidmət ərazisi (AZERBAIJAN_LOCATIONS).
+     * Bakı daxili rayon seçimi bütün Bakı xidmət verənlərinə ötürülür.
+     */
+    serviceLocation: z.string().trim().min(1).max(120).optional(),
   }),
   [
     { latKey: 'destLat', lngKey: 'destLng', label: 'Təyinat' },
@@ -227,6 +234,13 @@ export const createBookingSchema = withOptionalCoordPairs(
         code: z.ZodIssueCode.custom,
         message: 'Ani sifariş üçün təyinat koordinatları məcburidir',
         path: ['destLat'],
+      });
+    }
+    if (data.serviceLocation && !isAzerbaijanLocation(data.serviceLocation)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Şəhər və ya rayon seçin',
+        path: ['serviceLocation'],
       });
     }
   }
@@ -262,6 +276,18 @@ export const nearbyProvidersQuerySchema = z.object({
   radiusKm: z.coerce.number().min(0.1, 'Radius minimum 0.1 km').max(100, 'Radius maksimum 100 km').default(10),
   categoryId: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export const onlineProvidersCountQuerySchema = z.object({
+  categoryId: z.string().uuid('Kateqoriya seçin'),
+  serviceTitle: z
+    .string()
+    .trim()
+    .min(1, 'Xidmət növü seçin')
+    .max(200, 'Xidmət növü maksimum 200 simvol ola bilər'),
+  minRating: z.coerce.number().min(0).max(5).optional(),
+  minPrice: z.coerce.number().min(0).optional(),
+  maxPrice: z.coerce.number().min(0).optional(),
 });
 
 export const geocodeQuerySchema = z.object({
@@ -629,9 +655,77 @@ export type AdminSetReportStatusInput = z.infer<typeof adminSetReportStatusSchem
 export type UpdateProviderLocationInput = z.infer<typeof updateProviderLocationSchema>;
 export type UpdateProviderAvailabilityInput = z.infer<typeof updateProviderAvailabilitySchema>;
 export type NearbyProvidersQueryInput = z.infer<typeof nearbyProvidersQuerySchema>;
+export type OnlineProvidersCountQueryInput = z.infer<
+  typeof onlineProvidersCountQuerySchema
+>;
 export type GeocodeQueryInput = z.infer<typeof geocodeQuerySchema>;
 export type ReverseGeocodeQueryInput = z.infer<typeof reverseGeocodeQuerySchema>;
 export type RegisterDeviceTokenInput = z.infer<typeof registerDeviceTokenSchema>;
 export type UnregisterDeviceTokenInput = z.infer<typeof unregisterDeviceTokenSchema>;
 export type CreatePaymentIntentInput = z.infer<typeof createPaymentIntentSchema>;
 export type PaymentActionInput = z.infer<typeof paymentActionSchema>;
+
+const analyticsPathSchema = z
+  .string()
+  .min(1)
+  .max(500)
+  .regex(/^\//, 'Path / ilə başlamalıdır');
+
+export const analyticsBeaconEventSchema = z.object({
+  type: z.nativeEnum(AnalyticsEventType),
+  path: analyticsPathSchema.optional(),
+  name: z.string().min(1).max(200).optional(),
+  /** Client timestamp (ms since epoch) — server clamp edir */
+  ts: z.number().int().positive().optional(),
+  meta: z.record(z.string().max(100), z.string().max(500)).optional(),
+});
+
+export const analyticsBeaconSchema = z
+  .object({
+    anonymousId: z.string().uuid('anonymousId UUID olmalıdır'),
+    sessionId: z.string().uuid('sessionId UUID olmalıdır'),
+    userId: z.string().uuid().optional(),
+    landingPath: analyticsPathSchema.optional(),
+    referrer: z.string().max(1000).optional(),
+    language: z.string().max(32).optional(),
+    screenWidth: z.number().int().min(0).max(10000).optional(),
+    durationMs: z.number().int().min(0).max(86_400_000).optional(),
+    events: z.array(analyticsBeaconEventSchema).min(1).max(50),
+  })
+  .superRefine((data, ctx) => {
+    data.events.forEach((event, i) => {
+      if (
+        (event.type === AnalyticsEventType.PAGE_VIEW ||
+          event.type === AnalyticsEventType.CLICK) &&
+        !event.path
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'page_view və click üçün path məcburidir',
+          path: ['events', i, 'path'],
+        });
+      }
+      if (event.type === AnalyticsEventType.CLICK && !event.name) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'click üçün name məcburidir',
+          path: ['events', i, 'name'],
+        });
+      }
+    });
+  });
+
+export const adminAnalyticsQuerySchema = z.object({
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'from YYYY-MM-DD formatında olmalıdır')
+    .optional(),
+  to: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'to YYYY-MM-DD formatında olmalıdır')
+    .optional(),
+});
+
+export type AnalyticsBeaconEventInput = z.infer<typeof analyticsBeaconEventSchema>;
+export type AnalyticsBeaconInput = z.infer<typeof analyticsBeaconSchema>;
+export type AdminAnalyticsQueryInput = z.infer<typeof adminAnalyticsQuerySchema>;

@@ -26,7 +26,7 @@ import { GeoService } from '../geo/geo.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { canPushLocation } from '../realtime/realtime-auth';
 import type { WsAuthenticatedUser } from '../realtime/realtime-auth';
-import { EtaService } from './eta.service';
+import { EtaService } from '../geo/eta.service';
 
 type TrackableBooking = {
   id: string;
@@ -41,7 +41,7 @@ const BOOKING_CACHE_TTL_MS = 2_000;
 
 /**
  * Canlı izləmə — hot path: validate → throttle → WS emit.
- * DB (geo/PostGIS/LocationPing) və Mapbox ETA arxa planda, throttle ilə.
+ * DB (geo/PostGIS/LocationPing) və Directions ETA arxa planda, throttle ilə.
  */
 @Injectable()
 export class TrackingService {
@@ -103,16 +103,23 @@ export class TrackingService {
       return { ok: false, reason: 'Çox tez-tez göndərilir' };
     }
 
-    // Hot path ETA: haversine (sync). Mapbox arxa planda dəqiqləşdirilir.
+    // Hot path ETA: cache (yol) → haversine fallback. Directions arxa planda dəqiqləşir.
     let etaSeconds: number | null = null;
     let distanceMeters: number | null = null;
+    let routePolyline: string | null = null;
     if (booking.destLat != null && booking.destLng != null) {
-      const fast = estimateEtaSeconds(
-        { lat: payload.lat, lng: payload.lng },
-        { lat: booking.destLat, lng: booking.destLng },
-      );
-      etaSeconds = fast.etaSeconds;
-      distanceMeters = fast.distanceMeters;
+      const from = { lat: payload.lat, lng: payload.lng };
+      const to = { lat: booking.destLat, lng: booking.destLng };
+      const cached = this.etaService.peekCached(from, to);
+      if (cached) {
+        etaSeconds = cached.etaSeconds;
+        distanceMeters = cached.distanceMeters;
+        routePolyline = cached.routePolyline ?? null;
+      } else {
+        const fast = estimateEtaSeconds(from, to);
+        etaSeconds = fast.etaSeconds;
+        distanceMeters = fast.distanceMeters;
+      }
     }
 
     const recordedAt = new Date();
@@ -124,6 +131,7 @@ export class TrackingService {
       speed: payload.speed ?? null,
       etaSeconds,
       distanceMeters,
+      routePolyline,
       recordedAt: recordedAt.toISOString(),
     };
     this.realtime.emitLocationUpdate(booking.id, update);
@@ -349,15 +357,19 @@ export class TrackingService {
         { lat: payload.lat, lng: payload.lng },
         { lat: booking.destLat, lng: booking.destLng },
       );
-      if (
-        refined.source === 'mapbox' &&
-        (refined.etaSeconds !== update.etaSeconds ||
-          refined.distanceMeters !== update.distanceMeters)
-      ) {
+      if (refined.source === 'haversine') return;
+
+      const changed =
+        refined.etaSeconds !== update.etaSeconds ||
+        refined.distanceMeters !== update.distanceMeters ||
+        (refined.routePolyline ?? null) !== (update.routePolyline ?? null);
+
+      if (changed) {
         this.realtime.emitLocationUpdate(booking.id, {
           ...update,
           etaSeconds: refined.etaSeconds,
           distanceMeters: refined.distanceMeters,
+          routePolyline: refined.routePolyline ?? null,
         });
       }
     } catch (error) {

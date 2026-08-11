@@ -6,10 +6,13 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, Radio, X } from 'lucide-react';
 import {
   BookingType,
+  ProviderAvailability,
   UserRole,
+  locationsServeSameCity,
+  matchCatalogLocationFromText,
   type CategorySummary,
   type ServiceSummary,
 } from '@xidmetal/shared';
@@ -22,10 +25,9 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { api, ApiError } from '@/lib/api';
 import { getServiceTypesForCategory } from '@/lib/service-types';
-import { formatPrice, cn } from '@/lib/utils';
+import { composeBookingAddress } from '@/lib/booking-address';
+import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
-
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN?.trim() ?? '';
 
 const RATING_OPTIONS = [
   { value: '', label: 'Fərq etməz' },
@@ -51,24 +53,53 @@ const urgentOrderSchema = z
       .trim()
       .min(1, 'Ünvan daxil edin')
       .max(500, 'Ünvan maksimum 500 simvol ola bilər'),
+    addressBlock: z.string().trim().max(30, 'Blok maksimum 30 simvol ola bilər').optional(),
+    addressFloor: z.string().trim().max(20, 'Mərtəbə maksimum 20 simvol ola bilər').optional(),
+    addressDoor: z.string().trim().max(30, 'Qapı maksimum 30 simvol ola bilər').optional(),
     destLat: z.string().optional(),
     destLng: z.string().optional(),
   })
   .superRefine((data, ctx) => {
+    const composed = composeBookingAddress({
+      street: data.address,
+      block: data.addressBlock,
+      floor: data.addressFloor,
+      door: data.addressDoor,
+    });
+    if (composed.length > 500) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Ünvan və detallar birlikdə maksimum 500 simvol ola bilər',
+        path: ['address'],
+      });
+    }
+
     const lat = data.destLat?.trim() ? Number(data.destLat) : NaN;
     const lng = data.destLng?.trim() ? Number(data.destLng) : NaN;
     if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Xəritədə mövqe seçin və ya yerinizi göndərin',
+        message: 'Konumunuzu paylaşın və ya xəritədən seçin',
         path: ['destLat'],
       });
     }
     if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Xəritədə mövqe seçin və ya yerinizi göndərin',
+        message: 'Konumunuzu paylaşın və ya xəritədən seçin',
         path: ['destLng'],
+      });
+    }
+
+    if (
+      data.address?.trim() &&
+      !matchCatalogLocationFromText(data.address)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Konumdan şəhər/rayon müəyyən olunmadı. Xəritədən yenidən seçin',
+        path: ['destLat'],
       });
     }
 
@@ -119,12 +150,19 @@ function matchesFilters(
   service: ServiceSummary,
   filters: {
     serviceType: string;
+    serviceLocation: string;
     minRating: number | null;
     minPrice: number | null;
     maxPrice: number | null;
   },
 ): boolean {
   if (service.title !== filters.serviceType) return false;
+  if (
+    !service.location ||
+    !locationsServeSameCity(service.location, filters.serviceLocation)
+  ) {
+    return false;
+  }
   if (filters.minRating !== null && service.averageRating < filters.minRating) {
     return false;
   }
@@ -174,6 +212,9 @@ export function UrgentOrderDialog({
       maxPrice: '',
       notes: '',
       address: '',
+      addressBlock: '',
+      addressFloor: '',
+      addressDoor: '',
       destLat: '',
       destLng: '',
     },
@@ -181,8 +222,15 @@ export function UrgentOrderDialog({
 
   const categoryId = watch('categoryId');
   const serviceType = watch('serviceType');
+  const address = watch('address');
   const destLat = watch('destLat');
   const destLng = watch('destLng');
+
+  /** Konum ünvanından şəhər/rayon — Bakı daxili rayonlar ümumi Bakı kimi sayılır */
+  const serviceLocation = useMemo(
+    () => (address?.trim() ? matchCatalogLocationFromText(address) : null),
+    [address],
+  );
 
   const categoriesQuery = useQuery({
     queryKey: ['urgent-order-categories'],
@@ -221,23 +269,77 @@ export function UrgentOrderDialog({
 
   const matchedServices = useMemo(() => {
     const services = servicesQuery.data ?? [];
-    if (!serviceType) return [] as ServiceSummary[];
+    if (!serviceType || !serviceLocation) return [] as ServiceSummary[];
     const minRating = parseOptionalRating(minRatingValue);
     const minPrice = parseOptionalPrice(minPriceValue);
     const maxPrice = parseOptionalPrice(maxPriceValue);
     return services.filter((s) =>
-      matchesFilters(s, { serviceType, minRating, minPrice, maxPrice }),
+      matchesFilters(s, {
+        serviceType,
+        serviceLocation,
+        minRating,
+        minPrice,
+        maxPrice,
+      }),
     );
   }, [
     servicesQuery.data,
     serviceType,
+    serviceLocation,
     minRatingValue,
     minPriceValue,
     maxPriceValue,
   ]);
 
   const matchingCount = matchedServices.length;
-  const seedPreview = pickSeedService(matchedServices);
+
+  const onlineFromServices = useMemo(() => {
+    const ids = new Set<string>();
+    for (const service of matchedServices) {
+      if (service.providerAvailability === ProviderAvailability.ONLINE) {
+        ids.add(service.providerId);
+      }
+    }
+    return ids.size;
+  }, [matchedServices]);
+
+  const minRatingParsed = parseOptionalRating(minRatingValue);
+  const minPriceParsed = parseOptionalPrice(minPriceValue);
+  const maxPriceParsed = parseOptionalPrice(maxPriceValue);
+
+  const onlineCountQuery = useQuery({
+    queryKey: [
+      'urgent-order-online-count',
+      categoryId,
+      serviceType,
+      serviceLocation,
+      minRatingParsed,
+      minPriceParsed,
+      maxPriceParsed,
+    ],
+    queryFn: () => {
+      if (!serviceLocation) {
+        return Promise.resolve({ count: 0 });
+      }
+      return api.geo.onlineCount({
+        categoryId,
+        serviceTitle: serviceType,
+        serviceLocation,
+        ...(minRatingParsed !== null ? { minRating: minRatingParsed } : {}),
+        ...(minPriceParsed !== null ? { minPrice: minPriceParsed } : {}),
+        ...(maxPriceParsed !== null ? { maxPrice: maxPriceParsed } : {}),
+      });
+    },
+    enabled: open && !!categoryId && !!serviceType && !!serviceLocation,
+    refetchInterval: 15_000,
+    retry: 2,
+    refetchOnMount: 'always',
+  });
+
+  /** API əsas mənbə; uğursuz olsa xidmət siyahısından ehtiyat say */
+  const onlineProviderCount =
+    onlineCountQuery.data?.count ??
+    (servicesQuery.isSuccess ? onlineFromServices : null);
 
   useEffect(() => {
     if (!open) return;
@@ -249,6 +351,9 @@ export function UrgentOrderDialog({
       minPrice: '',
       notes: '',
       address: '',
+      addressBlock: '',
+      addressFloor: '',
+      addressDoor: '',
       destLat: '',
       destLng: '',
     });
@@ -276,9 +381,16 @@ export function UrgentOrderDialog({
       const minRating = parseOptionalRating(values.minRating);
       const minPrice = parseOptionalPrice(values.minPrice);
       const maxPrice = parseOptionalPrice(values.maxPrice);
+      const resolvedLocation = matchCatalogLocationFromText(values.address);
+      if (!resolvedLocation) {
+        throw new Error(
+          'Konumdan şəhər/rayon müəyyən olunmadı. Xəritədən yenidən seçin.',
+        );
+      }
       const matched = services.filter((s) =>
         matchesFilters(s, {
           serviceType: values.serviceType,
+          serviceLocation: resolvedLocation,
           minRating,
           minPrice,
           maxPrice,
@@ -306,7 +418,13 @@ export function UrgentOrderDialog({
         {
           serviceId: seed.id,
           notes: values.notes.trim(),
-          address: values.address.trim(),
+          address: composeBookingAddress({
+            street: values.address,
+            block: values.addressBlock,
+            floor: values.addressFloor,
+            door: values.addressDoor,
+          }),
+          serviceLocation: resolvedLocation,
           type: BookingType.INSTANT,
           destLat: destLatNum,
           destLng: destLngNum,
@@ -478,14 +596,6 @@ export function UrgentOrderDialog({
             </div>
           </div>
 
-          {categoryId && serviceType && !servicesQuery.isLoading ? (
-            <p className="text-sm text-muted-foreground">
-              {matchingCount > 0
-                ? `${matchingCount} uyğun xidmət — təklif yaxınlıqdakı aktiv xidmət verənlərə gedəcək.`
-                : 'Seçilmiş meyarlara uyğun xidmət yoxdur.'}
-            </p>
-          ) : null}
-
           <div className="space-y-2">
             <Label htmlFor="urgent-notes">Qeyd</Label>
             <Textarea
@@ -506,7 +616,7 @@ export function UrgentOrderDialog({
             <Label htmlFor="urgent-address">Ünvan</Label>
             <Input
               id="urgent-address"
-              placeholder="Küçə, bina, mənzil"
+              placeholder="Xəritədən seçilən ünvan"
               disabled={isSubmitting}
               error={!!errors.address}
               {...register('address')}
@@ -518,36 +628,83 @@ export function UrgentOrderDialog({
             ) : null}
           </div>
 
-          <div className="space-y-2">
-            <Label>Mövqe</Label>
-            {MAPBOX_TOKEN ? (
-              <LocationMapPicker
-                lat={Number.isFinite(latNum) ? latNum : null}
-                lng={Number.isFinite(lngNum) ? lngNum : null}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="urgent-address-block">Blok</Label>
+              <Input
+                id="urgent-address-block"
+                placeholder="məs. 5"
                 disabled={isSubmitting}
-                onChange={({ lat, lng, address }) => {
-                  setValue('destLat', String(lat), {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  });
-                  setValue('destLng', String(lng), {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  });
-                  if (address?.trim()) {
-                    setValue('address', address.trim(), {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    });
-                  }
-                }}
+                error={!!errors.addressBlock}
+                autoComplete="off"
+                {...register('addressBlock')}
               />
-            ) : (
-              <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                Xəritə üçün Mapbox token təyin olunmayıb. Koordinatları əl ilə daxil etmək
-                mümkün deyil — administratorla əlaqə saxlayın.
-              </p>
-            )}
+              {errors.addressBlock ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {errors.addressBlock.message}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="urgent-address-floor">Mərtəbə</Label>
+              <Input
+                id="urgent-address-floor"
+                placeholder="məs. 3"
+                disabled={isSubmitting}
+                error={!!errors.addressFloor}
+                autoComplete="off"
+                inputMode="numeric"
+                {...register('addressFloor')}
+              />
+              {errors.addressFloor ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {errors.addressFloor.message}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="urgent-address-door">Qapı</Label>
+              <Input
+                id="urgent-address-door"
+                placeholder="məs. 14"
+                disabled={isSubmitting}
+                error={!!errors.addressDoor}
+                autoComplete="off"
+                {...register('addressDoor')}
+              />
+              {errors.addressDoor ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {errors.addressDoor.message}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Konum</Label>
+            <LocationMapPicker
+              lat={latNum != null && Number.isFinite(latNum) ? latNum : null}
+              lng={lngNum != null && Number.isFinite(lngNum) ? lngNum : null}
+              disabled={isSubmitting}
+              autoLocate
+              onChange={({ lat, lng, address: nextAddress }) => {
+                setValue('destLat', String(lat), {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                });
+                setValue('destLng', String(lng), {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                });
+                if (nextAddress?.trim()) {
+                  setValue('address', nextAddress.trim(), {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  });
+                }
+                clearErrors(['destLat', 'destLng', 'address']);
+              }}
+            />
             {(errors.destLat || errors.destLng) && (
               <p className="text-sm text-destructive" role="alert">
                 {errors.destLat?.message ?? errors.destLng?.message}
@@ -570,11 +727,15 @@ export function UrgentOrderDialog({
             'flex flex-col gap-3 border-t border-border/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between',
           )}
         >
-          <p className="text-xs text-muted-foreground sm:text-sm">
-            {seedPreview
-              ? `Nümunə qiymət: ~${formatPrice(seedPreview.price)}`
-              : 'Meyarlara uyğun xidmət seçin'}
-          </p>
+          <UrgentOnlineStatus
+            ready={!!categoryId && !!serviceType && !!serviceLocation}
+            loading={
+              (onlineCountQuery.isPending && !servicesQuery.isSuccess) ||
+              (servicesQuery.isPending && onlineProviderCount == null)
+            }
+            onlineCount={onlineProviderCount}
+            matchingCount={matchingCount}
+          />
           <Button
             type="submit"
             size="lg"
@@ -593,5 +754,103 @@ export function UrgentOrderDialog({
         </div>
       </form>
     </Modal>
+  );
+}
+
+type UrgentOnlineStatusProps = {
+  ready: boolean;
+  loading: boolean;
+  onlineCount: number | null;
+  matchingCount: number;
+};
+
+function UrgentOnlineStatus({
+  ready,
+  loading,
+  onlineCount,
+  matchingCount,
+}: UrgentOnlineStatusProps) {
+  if (!ready) {
+    return (
+      <p className="text-xs text-muted-foreground sm:text-sm">
+        Meyarlara uyğun xidmət seçin
+      </p>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div
+        className="inline-flex max-w-full items-center gap-2.5 rounded-xl border border-border/70 bg-muted/30 px-3 py-2"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-hidden />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground">Yoxlanılır…</p>
+          <p className="text-xs text-muted-foreground">Onlayn xidmət verənlər</p>
+        </div>
+      </div>
+    );
+  }
+
+  const count = onlineCount ?? 0;
+  const hasOnline = count > 0;
+  const noMatch = matchingCount === 0;
+
+  return (
+    <div
+      className={cn(
+        'inline-flex max-w-full items-center gap-2.5 rounded-xl border px-3 py-2',
+        hasOnline && 'border-emerald-500/25 bg-emerald-500/[0.06]',
+        !hasOnline && !noMatch && 'border-amber-500/25 bg-amber-500/[0.06]',
+        noMatch && 'border-border/70 bg-muted/30',
+      )}
+      aria-live="polite"
+    >
+      <span
+        className={cn(
+          'relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+          hasOnline && 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+          !hasOnline && !noMatch && 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+          noMatch && 'bg-muted text-muted-foreground',
+        )}
+        aria-hidden
+      >
+        {hasOnline ? (
+          <>
+            <span className="absolute inset-1 animate-ping rounded-md bg-emerald-500/20" />
+            <Radio className="relative h-3.5 w-3.5" />
+          </>
+        ) : (
+          <Radio className="h-3.5 w-3.5 opacity-60" />
+        )}
+      </span>
+
+      <div className="min-w-0">
+        <p className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-sm leading-tight">
+          <span
+            className={cn(
+              'tabular-nums text-base font-semibold tracking-tight',
+              hasOnline && 'text-emerald-700 dark:text-emerald-400',
+              !hasOnline && !noMatch && 'text-amber-800 dark:text-amber-400',
+              noMatch && 'text-foreground',
+            )}
+          >
+            {count}
+          </span>
+          <span className="font-medium text-foreground">onlayn</span>
+        </p>
+        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+          {hasOnline
+            ? 'Təklif bu ərazidəki onlayn xidmət verənlərə gedəcək'
+            : noMatch
+              ? 'Seçilmiş meyarlara uyğun xidmət yoxdur'
+              : 'Hazırda onlayn yoxdur — bir az sonra yenidən yoxlayın'}
+        </p>
+      </div>
+    </div>
   );
 }

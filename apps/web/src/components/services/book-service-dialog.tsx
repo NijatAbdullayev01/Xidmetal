@@ -10,7 +10,6 @@ import { ArrowRight, Camera, Loader2, Trash2, X } from 'lucide-react';
 import {
   AvailabilitySlotStatus,
   BookingType,
-  UserRole,
   type ServiceSummary,
 } from '@xidmetal/shared';
 import { Button } from '@/components/ui/button';
@@ -21,15 +20,13 @@ import { Modal } from '@/components/ui/modal';
 import { Textarea } from '@/components/ui/textarea';
 import { TimePicker, type TimePickerOption } from '@/components/ui/time-picker';
 import { api, ApiError, uploadImage } from '@/lib/api';
+import { composeBookingAddress } from '@/lib/booking-address';
 import { useAuthStore } from '@/store/auth.store';
 import { LocationMapPicker } from '@/components/geo/location-map-picker';
 import { cn, combineDateAndTime, formatPrice, formatTimeInBaku } from '@/lib/utils';
 import { getPriceUnitLabel } from '@/lib/provider-labels';
 
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN?.trim() ?? '';
-
 type ActivePicker = 'date' | 'time' | null;
-type BookingMode = 'SCHEDULED' | 'INSTANT';
 
 const MAX_IMAGE_SIZE_BYTES = 1 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -37,9 +34,8 @@ const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 function createBookServiceFormSchema(requireAddress: boolean) {
   return z
     .object({
-      mode: z.enum(['SCHEDULED', 'INSTANT']),
-      date: z.string().optional(),
-      time: z.string().optional(),
+      date: z.string().min(1, 'Tarix seçin'),
+      time: z.string().min(1, 'Saat seçin'),
       notes: z
         .string()
         .trim()
@@ -52,42 +48,27 @@ function createBookServiceFormSchema(requireAddress: boolean) {
             .min(1, 'Ünvan daxil edin')
             .max(500, 'Ünvan maksimum 500 simvol ola bilər')
         : z.string().max(500).optional(),
+      addressBlock: z.string().trim().max(30, 'Blok maksimum 30 simvol ola bilər').optional(),
+      addressFloor: z.string().trim().max(20, 'Mərtəbə maksimum 20 simvol ola bilər').optional(),
+      addressDoor: z.string().trim().max(30, 'Qapı maksimum 30 simvol ola bilər').optional(),
       destLat: z.string().optional(),
       destLng: z.string().optional(),
     })
     .superRefine((data, ctx) => {
-      if (data.mode === 'SCHEDULED') {
-        if (!data.date?.trim()) {
+      if (requireAddress || data.address?.trim()) {
+        const composed = composeBookingAddress({
+          street: data.address ?? '',
+          block: data.addressBlock,
+          floor: data.addressFloor,
+          door: data.addressDoor,
+        });
+        if (composed.length > 500) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: 'Tarix seçin',
-            path: ['date'],
+            message: 'Ünvan və detallar birlikdə maksimum 500 simvol ola bilər',
+            path: ['address'],
           });
         }
-        if (!data.time?.trim()) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'Saat seçin',
-            path: ['time'],
-          });
-        }
-        return;
-      }
-      const lat = data.destLat?.trim() ? Number(data.destLat) : NaN;
-      const lng = data.destLng?.trim() ? Number(data.destLng) : NaN;
-      if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Enlik daxil edin və ya mövqe göndərin',
-          path: ['destLat'],
-        });
-      }
-      if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Uzunluq daxil edin və ya mövqe göndərin',
-          path: ['destLng'],
-        });
       }
     });
 }
@@ -102,14 +83,12 @@ interface BookServiceDialogProps {
 
 export function BookServiceDialog({ service, open, onClose }: BookServiceDialogProps) {
   const router = useRouter();
-  const user = useAuthStore((state) => state.user);
   const fileInputRef = useRef<HTMLInputElement>(null);
   /** Retry-də eyni açar — mutationFn daxilində UUID yaratmamaq üçün */
   const idempotencyKeyRef = useRef<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | undefined>();
   const [imageError, setImageError] = useState<string | null>(null);
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
-  const [bookingMode, setBookingMode] = useState<BookingMode>('SCHEDULED');
   const requireAddress = !service.isRemote;
   const bookServiceFormSchema = useMemo(
     () => createBookServiceFormSchema(requireAddress),
@@ -129,11 +108,13 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
   } = useForm<BookServiceFormValues>({
     resolver: zodResolver(bookServiceFormSchema),
     defaultValues: {
-      mode: 'SCHEDULED',
       date: '',
       time: '',
       notes: '',
       address: '',
+      addressBlock: '',
+      addressFloor: '',
+      addressDoor: '',
       destLat: '',
       destLng: '',
     },
@@ -141,6 +122,10 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
 
   const selectedDate = watch('date');
   const selectedTime = watch('time');
+  const destLatValue = watch('destLat');
+  const destLngValue = watch('destLng');
+  const latNum = destLatValue?.trim() ? Number(destLatValue) : null;
+  const lngNum = destLngValue?.trim() ? Number(destLngValue) : null;
   const today = useMemo(() => {
     const now = new Date();
     const year = now.getFullYear();
@@ -152,7 +137,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
   const availabilityQuery = useQuery({
     queryKey: ['service-availability', service.id, selectedDate],
     queryFn: () => api.getServiceAvailability(service.id, selectedDate!, selectedDate!),
-    enabled: open && bookingMode === 'SCHEDULED' && !!selectedDate,
+    enabled: open && !!selectedDate,
   });
 
   const dayAvailability = availabilityQuery.data?.[0];
@@ -182,18 +167,19 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
   useEffect(() => {
     if (!open) return;
     reset({
-      mode: 'SCHEDULED',
       date: '',
       time: '',
       notes: '',
       address: '',
+      addressBlock: '',
+      addressFloor: '',
+      addressDoor: '',
       destLat: '',
       destLng: '',
     });
     setImagePreview(undefined);
     setImageError(null);
     setActivePicker(null);
-    setBookingMode('SCHEDULED');
     idempotencyKeyRef.current = null;
     clearErrors();
   }, [open, reset, clearErrors, service.id]);
@@ -222,35 +208,23 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
       }
       const idempotencyKey = idempotencyKeyRef.current;
 
-      if (bookingMode === 'INSTANT') {
-        const destLat = Number(values.destLat);
-        const destLng = Number(values.destLng);
-        return api.createBooking(
-          token,
-          {
-            serviceId: service.id,
-            notes: values.notes.trim(),
-            address: values.address?.trim() || undefined,
-            imageUrl: imagePreview,
-            type: BookingType.INSTANT,
-            destLat,
-            destLng,
-            // Müştəri mövqeyi — provider yaxınlıq/dispatch üçün origin
-            originLat: destLat,
-            originLng: destLng,
-          },
-          { idempotencyKey },
-        );
-      }
-
       if (!hasCalendar) {
         throw new Error('Xidmət verən hələ təqvim təyin etməyib');
       }
 
-      const scheduledAt = combineDateAndTime(values.date!, values.time!);
+      const scheduledAt = combineDateAndTime(values.date, values.time);
       if (new Date(scheduledAt) <= new Date()) {
         throw new Error('Sifariş tarixi gələcəkdə olmalıdır');
       }
+
+      const address = values.address?.trim()
+        ? composeBookingAddress({
+            street: values.address,
+            block: values.addressBlock,
+            floor: values.addressFloor,
+            door: values.addressDoor,
+          })
+        : undefined;
 
       return api.createBooking(
         token,
@@ -258,7 +232,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
           serviceId: service.id,
           scheduledAt,
           notes: values.notes.trim(),
-          address: values.address?.trim() || undefined,
+          address,
           imageUrl: imagePreview,
           type: BookingType.SCHEDULED,
         },
@@ -267,14 +241,10 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
     },
     onSuccess: (booking) => {
       onClose();
-      if (user?.role === UserRole.CUSTOMER) {
-        const qs = booking?.id
-          ? `?highlight=${encodeURIComponent(booking.id)}`
-          : '';
-        router.push(`/dashboard/customer/bookings${qs}`);
-        return;
-      }
-      router.push('/dashboard/provider/bookings?view=sent');
+      const qs = booking?.id
+        ? `?highlight=${encodeURIComponent(booking.id)}`
+        : '';
+      router.push(`/dashboard/customer/bookings${qs}`);
     },
     onError: (error) => {
       setError('root', {
@@ -360,42 +330,6 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
         <div className="space-y-4 overflow-y-auto overscroll-contain px-5 py-4">
-          <div className="flex gap-2 rounded-lg border border-border p-1">
-            <button
-              type="button"
-              className={cn(
-                'min-h-11 flex-1 rounded-md px-3 text-sm font-medium transition-colors',
-                bookingMode === 'SCHEDULED'
-                  ? 'bg-brand text-brand-foreground'
-                  : 'text-muted-foreground hover:bg-muted',
-              )}
-              onClick={() => {
-                setBookingMode('SCHEDULED');
-                setValue('mode', 'SCHEDULED', { shouldValidate: false });
-                clearErrors();
-              }}
-            >
-              Planlaşdır
-            </button>
-            <button
-              type="button"
-              className={cn(
-                'min-h-11 flex-1 rounded-md px-3 text-sm font-medium transition-colors',
-                bookingMode === 'INSTANT'
-                  ? 'bg-brand text-brand-foreground'
-                  : 'text-muted-foreground hover:bg-muted',
-              )}
-              onClick={() => {
-                setBookingMode('INSTANT');
-                setValue('mode', 'INSTANT', { shouldValidate: false });
-                clearErrors();
-              }}
-            >
-              İndi çağır
-            </button>
-          </div>
-
-          {bookingMode === 'SCHEDULED' && (
           <div className="grid gap-4 sm:grid-cols-2">
             <div className={cn('space-y-2', activePicker === 'date' && 'sm:col-span-2')}>
               <Label htmlFor={`booking-date-${service.id}`}>Tarix</Label>
@@ -466,77 +400,13 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
               )}
             </div>
           </div>
-          )}
 
-          {bookingMode === 'INSTANT' && (
-            <div className="space-y-3 rounded-lg border border-border/80 p-3">
-              <p className="text-sm text-muted-foreground">
-                Yaxın onlayn icraçılara təklif göndəriləcək. Ünvanı xəritədən seçin.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Ödəniş platformada aparılmır — xidmət haqqı tərəflər arasında razılaşdırılır.
-              </p>
-              <LocationMapPicker
-                disabled={isSubmitting}
-                lat={watch('destLat') ? Number(watch('destLat')) : null}
-                lng={watch('destLng') ? Number(watch('destLng')) : null}
-                onChange={({ lat, lng, address }) => {
-                  setValue('destLat', String(lat), {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  });
-                  setValue('destLng', String(lng), {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  });
-                  if (address) {
-                    setValue('address', address, {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    });
-                  }
-                  clearErrors(['destLat', 'destLng']);
-                }}
-              />
-              {(errors.destLat || errors.destLng) && (
-                <p className="text-sm text-destructive" role="alert">
-                  {errors.destLat?.message ?? errors.destLng?.message}
-                </p>
-              )}
-              {/* Token yoxdursa əl ilə enlik/uzunluq — fallback */}
-              {!MAPBOX_TOKEN && (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor={`booking-dest-lat-${service.id}`}>Enlik</Label>
-                    <Input
-                      id={`booking-dest-lat-${service.id}`}
-                      inputMode="decimal"
-                      placeholder="40.4093"
-                      disabled={isSubmitting}
-                      {...register('destLat')}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`booking-dest-lng-${service.id}`}>Uzunluq</Label>
-                    <Input
-                      id={`booking-dest-lng-${service.id}`}
-                      inputMode="decimal"
-                      placeholder="49.8671"
-                      disabled={isSubmitting}
-                      {...register('destLng')}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {(bookingMode === 'SCHEDULED' && calendarBlocked) && (
+          {calendarBlocked && (
             <p className="text-sm text-destructive" role="alert">
               Xidmət verən hələ təqvim təyin etməyib
             </p>
           )}
-          {(bookingMode === 'SCHEDULED' && noFreeSlots) && (
+          {noFreeSlots && (
             <p className="text-sm text-muted-foreground">Bu tarixdə boş vaxt yoxdur</p>
           )}
 
@@ -545,7 +415,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
               <Label htmlFor={`booking-address-${service.id}`}>Ünvan</Label>
               <Input
                 id={`booking-address-${service.id}`}
-                placeholder="Xidmətin göstəriləcəyi ünvan"
+                placeholder="Xəritədən seçilən ünvan"
                 error={!!errors.address}
                 disabled={isSubmitting}
                 {...register('address')}
@@ -553,6 +423,94 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
               {errors.address && (
                 <p className="text-sm text-destructive" role="alert">
                   {errors.address.message}
+                </p>
+              )}
+            </div>
+          )}
+
+          {requireAddress && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor={`booking-address-block-${service.id}`}>Blok</Label>
+                <Input
+                  id={`booking-address-block-${service.id}`}
+                  placeholder="məs. 5"
+                  error={!!errors.addressBlock}
+                  disabled={isSubmitting}
+                  autoComplete="off"
+                  {...register('addressBlock')}
+                />
+                {errors.addressBlock && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {errors.addressBlock.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`booking-address-floor-${service.id}`}>Mərtəbə</Label>
+                <Input
+                  id={`booking-address-floor-${service.id}`}
+                  placeholder="məs. 3"
+                  error={!!errors.addressFloor}
+                  disabled={isSubmitting}
+                  autoComplete="off"
+                  inputMode="numeric"
+                  {...register('addressFloor')}
+                />
+                {errors.addressFloor && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {errors.addressFloor.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`booking-address-door-${service.id}`}>Qapı</Label>
+                <Input
+                  id={`booking-address-door-${service.id}`}
+                  placeholder="məs. 14"
+                  error={!!errors.addressDoor}
+                  disabled={isSubmitting}
+                  autoComplete="off"
+                  {...register('addressDoor')}
+                />
+                {errors.addressDoor && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {errors.addressDoor.message}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {requireAddress && (
+            <div className="space-y-2">
+              <Label>Konum</Label>
+              <LocationMapPicker
+                lat={latNum != null && Number.isFinite(latNum) ? latNum : null}
+                lng={lngNum != null && Number.isFinite(lngNum) ? lngNum : null}
+                disabled={isSubmitting}
+                autoLocate
+                onChange={({ lat, lng, address: nextAddress }) => {
+                  setValue('destLat', String(lat), {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  });
+                  setValue('destLng', String(lng), {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  });
+                  if (nextAddress?.trim()) {
+                    setValue('address', nextAddress.trim(), {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    });
+                  }
+                  clearErrors(['destLat', 'destLng', 'address']);
+                }}
+              />
+              {(errors.destLat || errors.destLng) && (
+                <p className="text-sm text-destructive" role="alert">
+                  {errors.destLat?.message ?? errors.destLng?.message}
                 </p>
               )}
             </div>
@@ -645,20 +603,13 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
           <Button
             type="submit"
             disabled={
-              isSubmitting ||
-              (bookingMode === 'SCHEDULED' &&
-                (calendarBlocked || noFreeSlots || availabilityQuery.isLoading))
+              isSubmitting || calendarBlocked || noFreeSlots || availabilityQuery.isLoading
             }
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Göndərilir...
-              </>
-            ) : bookingMode === 'INSTANT' ? (
-              <>
-                İndi çağır
-                <ArrowRight className="h-4 w-4" />
               </>
             ) : (
               <>

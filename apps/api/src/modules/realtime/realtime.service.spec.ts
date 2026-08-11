@@ -1,8 +1,33 @@
 import { describe, expect, it, vi } from 'vitest';
-import { REALTIME_EVENTS } from '@xidmetal/shared';
+import { BookingStatus, REALTIME_EVENTS } from '@xidmetal/shared';
 import { RealtimeService } from './realtime.service';
 
 describe('RealtimeService', () => {
+  it('emitBookingStatus booking və iştirakçı user otaqlarına göndərir', () => {
+    const service = new RealtimeService();
+    const emit = vi.fn();
+    const to = vi.fn(() => ({ emit }));
+    service.setServer({ to } as never);
+
+    service.emitBookingStatus(
+      {
+        bookingId: 'b1',
+        status: BookingStatus.EN_ROUTE,
+        timestamp: '2026-08-10T12:00:00.000Z',
+      },
+      ['customer-1', 'provider-1', 'customer-1'],
+    );
+
+    expect(to).toHaveBeenCalledWith('booking:b1');
+    expect(to).toHaveBeenCalledWith('user:customer-1');
+    expect(to).toHaveBeenCalledWith('user:provider-1');
+    expect(emit).toHaveBeenCalledTimes(3);
+    expect(emit).toHaveBeenCalledWith(
+      REALTIME_EVENTS.BOOKING_STATUS,
+      expect.objectContaining({ bookingId: 'b1', status: BookingStatus.EN_ROUTE }),
+    );
+  });
+
   it('emitMessageNew user otağına MESSAGE_NEW göndərir', () => {
     const service = new RealtimeService();
     const emit = vi.fn();

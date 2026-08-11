@@ -5,7 +5,7 @@ import { ReviewStars } from '@/components/reviews/review-stars';
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Moderasiyada',
   APPROVED: 'Təsdiqlənib',
-  REJECTED: 'Rədd edilib',
+  REJECTED: 'İmtina edilib',
 };
 
 export function ReviewListItem({ review }: { review: ReviewSummary }) {

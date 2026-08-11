@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { UserRole } from '@xidmetal/shared';
 import { RequireRole } from '@/components/auth/require-role';
 import { DashboardSidebar } from '@/components/layout/dashboard-sidebar';
-import { ProviderDutyLocationSync } from '@/components/provider/provider-duty-location-sync';
+import { ProviderPresenceSync } from '@/components/provider/provider-presence-sync';
 import { usePresenceHeartbeat } from '@/hooks/use-presence-heartbeat';
 import { cn } from '@/lib/utils';
 
@@ -23,7 +23,7 @@ export default function ProviderDashboardLayout({ children }: { children: React.
 
   return (
     <RequireRole role={UserRole.PROVIDER}>
-      <ProviderDutyLocationSync />
+      <ProviderPresenceSync />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <DashboardSidebar variant="provider" />
         <main

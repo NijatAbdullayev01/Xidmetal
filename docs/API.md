@@ -212,7 +212,7 @@ Header: `Idempotency-Key` (opsional, tövsiyə — double-submit / INSTANT təkr
 
 Slot `availability` ilə yoxlanır (transaction + `pg_advisory_xact_lock`) — **yalnız SCHEDULED**. E-poçt təsdiqi + təsdiqlənmiş provider tələb olunur. Opsional `type`: `SCHEDULED` (default) | `INSTANT`.
 
-**INSTANT:** `destLat`/`destLng` məcburi; `scheduledAt` opsional (server ~15 dəq ofset); slot lock yoxdur; create sonrası `dispatch` yaxın ONLINE provider-lərə sequential offer göndərir.
+**INSTANT:** `destLat`/`destLng` məcburi; `serviceLocation` (şəhər/rayon kataloqu) tövsiyə olunur — yoxdursa seed xidmətin `location` və ya ünvan mətnindən çıxarılır; `scheduledAt` opsional (server ~15 dəq ofset); slot lock yoxdur; create sonrası `dispatch` **eyni xidmət şəhəri** + yaxın ONLINE xidmət verənlərə offer göndərir. Bakı daxili rayonlar (`Bakı, Nəsimi rayonu` və s.) ümumi **Bakı** kimi sayılır — Lerik kimi digər rayonlara ötürülmür.
 
 Opsional geo (SCHEDULED): `destLat`/`destLng`, `originLat`/`originLng` (cüt göndərilməlidir; ünvan string qalır).
 
@@ -222,10 +222,10 @@ Opsional geo (SCHEDULED): `destLat`/`destLng`, `originLat`/`originLng` (cüt gö
 |--------|------|------|
 | GET | `/dispatch/offers/pending` | Provider: aktiv PENDING təkliflər |
 | POST | `/dispatch/offers/:id/accept` | Qəbul → booking CONFIRMED (race-safe) |
-| POST | `/dispatch/offers/:id/reject` | Rədd → növbəti namizəd |
+| POST | `/dispatch/offers/:id/reject` | Rədd → 2 dəq sonra eyni xidmət verənə yenidən təklif (pəncərə açıqsa) |
 | GET | `/dispatch/offers?bookingId=` | Admin: sifariş üzrə bütün təkliflər |
 
-Env: `DISPATCH_RADIUS_M` (default 15000), `DISPATCH_OFFER_TIMEOUT_SEC` (default 30), `REDIS_URL` (BullMQ; yoxdursa dev setTimeout).
+Env: `DISPATCH_SEARCH_WINDOW_SEC` (default 600), `DISPATCH_REDISCOVERY_INTERVAL_SEC` (default 30), `DISPATCH_DECLINE_REOFFER_COOLDOWN_SEC` (default 120 — imtina sonrası yenidən təklif), `REDIS_URL` (BullMQ; yoxdursa dev setTimeout). Tək təklif timeout yoxdur — eyni xidmət növü + şəhər üzrə ONLINE xidmət verənlərə fan-out; imtina edənə 2 dəq sonra yenidən təklif (pəncərə bitənə / qəbul olunana qədər); pəncərə bitəndə auto-cancel.
 
 ### PATCH /bookings/:id/status 🔒
 
@@ -258,7 +258,7 @@ Yeni tarix təklifi + müştəriyə mesaj.
 
 ### POST /reviews 🔒
 
-Tamamlanmış sifarişə rəy; status **`PENDING`** (admin moderation → `APPROVED`/`REJECTED`). Aggregate yalnız `APPROVED` olduqda yenilənir. E-poçt təsdiqi məcburidir.
+Tamamlanmış sifarişə rəy; status dərhal **`APPROVED`** (ictimai görünür, reytinq yenilənir). Admin sonradan `REJECTED` edə bilər. E-poçt təsdiqi məcburidir.
 
 ### GET /reviews/received 🔒 PROVIDER
 
@@ -315,6 +315,13 @@ Geocoder: `GEOCODER_PROVIDER=mock` (default) və ya `nominatim` (`GEOCODER_BASE_
 Yalnız `ONLINE` + aktiv xidməti olan providerlər. Cavab: `{ items, engine: "postgis" | "haversine" }`.
 Web UI: `/services` səhifəsində «Yaxınımdakı xidmət verənlər» (`NearbyProvidersSection`).
 
+### GET /geo/online-count
+
+**Query:** `categoryId`, `serviceTitle`, `minRating?`, `minPrice?`, `maxPrice?`, `serviceLocation?`.
+
+Seçilmiş xidmət növü (və opsional ərazi) üzrə hazırda `ONLINE` olan xidmət verənlərin sayı. `serviceLocation` verildikdə Bakı daxili rayonlar ümumi Bakı kimi filtrələnir. Cavab: `{ count }`.
+Web UI: təcili sifariş dialoqu.
+
 ### POST /geo/me/location 🔒 PROVIDER
 
 **Body:** `{ "lat", "lng", "heading?", "availability?" }` — mövqe + opsional əlçatanlıq; PostGIS `last_location` sinxron.
@@ -354,7 +361,7 @@ brauzer client `withCredentials` + httpOnly cookie ilə qoşulur.
 | S→C | `message:new` | Chat: `user:{recipientId}` — `{ conversationId, messageId, senderId, preview, createdAt }` |
 | S→C | `dispatch:offer` / `dispatch:offer-expired` / `dispatch:offer-result` | Provider otağı / booking |
 
-Env: `NEXT_PUBLIC_WS_URL`, `NEXT_PUBLIC_MAPBOX_TOKEN`, `MAPBOX_ACCESS_TOKEN` (Directions; boş = haversine ETA).
+Env: `NEXT_PUBLIC_WS_URL`, `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `GOOGLE_MAPS_API_KEY` (Directions), `MAPBOX_ACCESS_TOKEN` (opsional; boş = haversine ETA).
 
 ---
 

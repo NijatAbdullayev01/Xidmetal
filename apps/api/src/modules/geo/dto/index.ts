@@ -88,6 +88,54 @@ export class NearbyProvidersQueryDto {
   limit?: number;
 }
 
+export class OnlineProvidersCountQueryDto {
+  @ApiProperty({ description: 'Kateqoriya UUID' })
+  @IsUUID()
+  categoryId!: string;
+
+  @ApiProperty({
+    example: 'Ev və ofis təmizliyi',
+    description: 'Xidmət növü (xidmət başlığı ilə eyni)',
+  })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  serviceTitle!: string;
+
+  @ApiPropertyOptional({ description: 'Minimum reytinq (0–5)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(5)
+  minRating?: number;
+
+  @ApiPropertyOptional({ description: 'Minimum qiymət (AZN)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minPrice?: number;
+
+  @ApiPropertyOptional({ description: 'Maksimum qiymət (AZN)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxPrice?: number;
+
+  @ApiPropertyOptional({
+    example: 'Bakı',
+    description:
+      'Xidmət ərazisi (şəhər/rayon). Bakı daxili rayonlar ümumi Bakı kimi sayılır.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  serviceLocation?: string;
+}
+
 export class GeocodeQueryDto {
   @ApiProperty({ example: 'Bakı, Nəsimi', description: 'Ünvan / axtarış mətni' })
   @IsString()
@@ -110,4 +158,34 @@ export class ReverseGeocodeQueryDto {
   @Min(-180)
   @Max(180)
   lng!: number;
+}
+
+export class DrivingRouteQueryDto {
+  @ApiProperty({ example: 40.4093, description: 'Başlanğıc enlik' })
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  fromLat!: number;
+
+  @ApiProperty({ example: 49.8671, description: 'Başlanğıc uzunluq' })
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  fromLng!: number;
+
+  @ApiProperty({ example: 40.3777, description: 'Təyinat enlik' })
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  toLat!: number;
+
+  @ApiProperty({ example: 49.852, description: 'Təyinat uzunluq' })
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  toLng!: number;
 }

@@ -40,20 +40,29 @@ export const PAGINATION = {
 
 /** On-demand dispatch (Faza 4) — env ilə override edilə bilər */
 export const DISPATCH = {
-  /** Yaxınlıq radiusu (metr) — default 15 km */
-  RADIUS_M: 15_000,
-  /** Təklif timeout (saniyə) */
-  OFFER_TIMEOUT_SEC: 30,
+  /**
+   * Ümumi axtarış pəncərəsi (saniyə) — booking yaradılışından etibarən.
+   * Tək təklif timeout yoxdur; təkliflər bu pəncərə bitənə qədər qalır.
+   * Pəncərə bitəndə hələ qəbul yoxdursa auto-cancel.
+   */
+  SEARCH_WINDOW_SEC: 600,
+  /** Yeni ONLINE xidmət verənlər üçün rediscovery intervalı (saniyə) */
+  REDISCOVERY_INTERVAL_SEC: 30,
+  /**
+   * Xidmət verən təcili təklifi imtina etdikdən sonra yenidən təklif üçün gözləmə (saniyə).
+   * Axtarış pəncərəsi açıq qaldıqca və sifariş qəbul olunmayana qədər təkrarlanır.
+   */
+  DECLINE_REOFFER_COOLDOWN_SEC: 120,
   /** INSTANT üçün scheduledAt ofseti (dəqiqə) — slot lock yox, display window */
   INSTANT_SCHEDULED_OFFSET_MIN: 15,
   /** BullMQ queue adı */
   QUEUE_NAME: 'dispatch-offers',
   /** Redis job prefix */
   QUEUE_PREFIX: 'xidmetal:dispatch',
-  /** Bir booking-ə eyni anda max aktiv PENDING offer (bütün namizədlərə fan-out) */
-  MAX_ACTIVE_OFFERS: 20,
-  /** Namizəd limiti */
-  MAX_CANDIDATES: 20,
+  /** Bir booking-ə eyni anda max aktiv PENDING offer (xidmət növü fan-out) */
+  MAX_ACTIVE_OFFERS: 500,
+  /** Namizəd limiti (eyni xidmət növü + şəhər) */
+  MAX_CANDIDATES: 500,
 } as const;
 
 /** Ödəniş (Faza 5) — default OFF; live charge yoxdur */

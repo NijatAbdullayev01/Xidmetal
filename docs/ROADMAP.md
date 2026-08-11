@@ -19,7 +19,7 @@ Bu sənəd hədəf arxitekturaya çatmaq üçün mərhələli, prioritetləşdir
 
 
 ## Faza 1 — Domain tamlığı (mövcud boşluqlar)
-- [x] **Reviews modulu** — yaratma + rating aggregate (transaction); admin moderation var.
+- [x] **Reviews modulu** — yaratma + rating aggregate (transaction); admin REJECT var.
 - [x] **Notifications modulu** — in-app siyahı + oxundu; push ✅ Faza 5.
 - [x] **Messages modulu** — REST chat (WebSocket ayrı fazada).
 - [x] **Booking state machine (əsas)** — icazəli keçidlər + rol matrisi (`PENDING`…`COMPLETED`); admin bypass.

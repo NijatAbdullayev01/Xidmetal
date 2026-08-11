@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Flag,
   Megaphone,
+  BarChart3,
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -35,6 +36,7 @@ interface NavItem {
 
 const ADMIN_NAV: NavItem[] = [
   { href: '/', label: 'İcmal', icon: LayoutDashboard, exact: true },
+  { href: '/analytics', label: 'Analitika', icon: BarChart3 },
   { href: '/users', label: 'Müştərilər', icon: Users },
   { href: '/providers', label: 'Xidmət verənlər', icon: ShieldCheck },
   { href: '/categories', label: 'Kateqoriyalar', icon: FolderTree },

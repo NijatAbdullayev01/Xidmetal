@@ -27,7 +27,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors',
+        'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
         'disabled:pointer-events-none disabled:opacity-50',
         variants[variant],
@@ -43,7 +43,7 @@ Button.displayName = 'Button';
 
 export function buttonStyles(variant: ButtonVariant = 'default', size: ButtonSize = 'md') {
   return cn(
-    'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors',
+    'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg font-medium transition-colors',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
     variants[variant],
     sizes[size],

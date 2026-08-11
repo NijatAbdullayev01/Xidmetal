@@ -64,7 +64,7 @@ Backend modulları (`apps/api/src/modules/`) — **cari status:**
 | `bookings` | Sifariş, status keçidləri (`EN_ROUTE`/`ARRIVED`), `BookingType`, tarix təklifi | ✅ |
 | `dispatch` | On-demand: yaxın provider, `DispatchOffer`, BullMQ timeout, sequential reassign | ✅ |
 | `payments` | Intent/hold/capture/refund scaffolding; `PAYMENTS_ENABLED=false` default (501) | ✅ flag OFF |
-| `reviews` | Rəy yaratma + rating aggregate (PENDING → admin APPROVED) | ✅ |
+| `reviews` | Rəy yaratma + rating aggregate (dərhal APPROVED; admin REJECT mümkündür) | ✅ |
 | `messages` | Müştəri↔provider söhbət (REST; TypingPresence DB) | ✅ |
 | `notifications` | In-app + best-effort push (FCM/noop) | ✅ |
 | `devices` | DeviceToken register/unregister (JWT) | ✅ |
@@ -139,7 +139,7 @@ Kateqoriyalar seed ilə; `Service`-də venue, (yükdaşıma üçün) ölçü və
 
 **Geospatial (Faza 2):** Docker `postgis/postgis:16-3.5`; `ProviderAvailability` (`OFFLINE`/`ONLINE`/`BUSY`) domain field-dir — `User.lastSeenAt` presence heartbeat-indən ayrıdır. WS connect/disconnect provider ONLINE→OFFLINE (BUSY toxunulmur); heartbeat `lastSeenAt` saxlayır. Yaxınlıq: PostGIS `ST_DWithin`; extension yoxdursa haversine fallback. Geocoder: `GEOCODER_PROVIDER=mock|nominatim`.
 
-**Dispatch (Faza 4):** `INSTANT` sifariş → `GeoService.findNearby` + sıralama (məsafə, reytinq) → bir anda bir `DispatchOffer` → BullMQ delayed timeout (`DISPATCH_OFFER_TIMEOUT_SEC`) → reject/expire → növbəti; tükənəndə auto-cancel + müştəri bildirişi. Redis yoxdursa development-də in-process `setTimeout`.
+**Dispatch (Faza 4):** `INSTANT` sifariş → eyni xidmət növü (kateqoriya + başlıq) + şəhər + ONLINE xidmət verənlərə fan-out `DispatchOffer` (tək təklif timeout yox) → axtarış pəncərəsi (`DISPATCH_SEARCH_WINDOW_SEC`, default 10 dəq) bitəndə hələ qəbul yoxdursa auto-cancel + müştəri bildirişi. İmtina edən xidmət verənə `DISPATCH_DECLINE_REOFFER_COOLDOWN_SEC` (default 2 dəq) sonra yenidən təklif (pəncərə açıq qaldıqca). Rediscovery yeni ONLINE-ları tutur. Redis yoxdursa development-də in-process `setTimeout`.
 
 ### Rollar
 

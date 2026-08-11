@@ -614,6 +614,26 @@ export const api = {
       apiClient<GeocodeResult | null>(
         `/geo/reverse?${new URLSearchParams({ lat: String(lat), lng: String(lng) })}`,
       ),
+    onlineCount: (params: {
+      categoryId: string;
+      serviceTitle: string;
+      minRating?: number;
+      minPrice?: number;
+      maxPrice?: number;
+      serviceLocation?: string;
+    }) => {
+      const query = new URLSearchParams({
+        categoryId: params.categoryId,
+        serviceTitle: params.serviceTitle,
+      });
+      if (params.minRating != null) query.set('minRating', String(params.minRating));
+      if (params.minPrice != null) query.set('minPrice', String(params.minPrice));
+      if (params.maxPrice != null) query.set('maxPrice', String(params.maxPrice));
+      if (params.serviceLocation) {
+        query.set('serviceLocation', params.serviceLocation);
+      }
+      return apiClient<{ count: number }>(`/geo/online-count?${query}`);
+    },
     nearby: (params: {
       lat: number;
       lng: number;
@@ -631,6 +651,26 @@ export const api = {
       return apiClient<{ items: NearbyProviderSummary[]; engine: 'postgis' | 'haversine' }>(
         `/geo/nearby?${query}`,
       );
+    },
+    /** Sürücülük ETA/məsafə/polyline — Bolt üslubu canlı izləmə */
+    route: (params: {
+      fromLat: number;
+      fromLng: number;
+      toLat: number;
+      toLng: number;
+    }) => {
+      const query = new URLSearchParams({
+        fromLat: String(params.fromLat),
+        fromLng: String(params.fromLng),
+        toLat: String(params.toLat),
+        toLng: String(params.toLng),
+      });
+      return apiClient<{
+        etaSeconds: number;
+        distanceMeters: number;
+        routePolyline: string | null;
+        source: 'google' | 'osrm' | 'mapbox' | 'haversine';
+      }>(`/geo/route?${query}`);
     },
     updateLocation: (token: string, data: UpdateProviderLocationInput) =>
       apiClient<{

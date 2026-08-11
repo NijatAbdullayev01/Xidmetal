@@ -70,7 +70,7 @@ Cari vəziyyət üçün: [ARCHITECTURE.md](./ARCHITECTURE.md). Aşağıdakı cə
 
 | Modul | Məsuliyyət | Status (cari) |
 |-------|------------|----------------|
-| `reviews` | Rəy yaratma + rating aggregate | ✅ MVP (`PENDING` + admin moderation) |
+| `reviews` | Rəy yaratma + rating aggregate | ✅ MVP (dərhal APPROVED; admin REJECT) |
 | `notifications` | In-app oxu/siyahı + push kanalları | ✅ (FCM adapter; default noop) |
 | `messages` | Müştəri↔provider chat | ✅ REST + polling (WS typing hələ yox; TypingPresence DB) |
 | `realtime` (gateway) | Socket.IO gateway, otaqlar; provider presence | ✅ |
@@ -107,9 +107,9 @@ Sifarişin iki tipi olur: `INSTANT` (indi çağır) və `SCHEDULED` (planlaşdı
 `INSTANT` axını:
 1. Müştəri sifariş yaradır (koordinatlar ilə).
 2. Dispatch engine PostGIS ilə **yaxın + online + uyğun** provider-ləri tapır.
-3. Növbə ilə (və ya paralel) təklif göndərilir → BullMQ **timeout** (məs. 30 san).
-4. Provider qəbul edir → `CONFIRMED`; rədd/timeout → növbəti provider-ə.
-5. Uyğun provider yoxdursa → müştəriyə bildiriş.
+3. Eyni xidmət növü + şəhər üzrə ONLINE provider-lərə təklif (tək timeout yox; axtarış ~10 dəq).
+4. Xidmət verən qəbul edir → `CONFIRMED`; rədd → 2 dəq sonra eyni xidmət verənə yenidən təklif (10 dəq pəncərə / qəbul olunana qədər).
+5. Axtarış pəncərəsi bitəndə qəbul yoxdursa → müştəriyə bildiriş.
 
 Ətraflı: [BOOKING_LIFECYCLE.md](./BOOKING_LIFECYCLE.md).
 

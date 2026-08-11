@@ -166,4 +166,18 @@
       transform: translateY(0) scale(1);
     }
   }
+
+  /* LocationMapPicker — Google Maps konteyner */
+  .location-map-canvas {
+    background: var(--color-muted);
+  }
+
+  .location-map-canvas:focus {
+    outline: none;
+  }
+
+  .location-map-canvas:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: -2px;
+  }
 }

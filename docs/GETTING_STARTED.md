@@ -52,10 +52,12 @@ cp .env.example .env
 | `GEOCODER_BASE_URL` | Nominatim base (opsional) | OSM default |
 | `GEOCODER_USER_AGENT` | Nominatim User-Agent | `Xidmetal/1.0 …` |
 | `NEXT_PUBLIC_WS_URL` | Socket.IO origin (birbaşa API) | `http://localhost:4000` |
-| `NEXT_PUBLIC_MAPBOX_TOKEN` | Mapbox GL JS (boş = xəritə empty state) | `""` |
-| `MAPBOX_ACCESS_TOKEN` | Server Directions ETA (boş = haversine) | `""` |
-| `DISPATCH_RADIUS_M` | On-demand yaxınlıq radiusu (metr) | `15000` |
-| `DISPATCH_OFFER_TIMEOUT_SEC` | Təklif timeout (saniyə) | `30` |
+| `GOOGLE_MAPS_API_KEY` | Server Directions ETA + traffic (boş = Mapbox/haversine) | `""` |
+| `MAPBOX_ACCESS_TOKEN` | Server Directions ETA (opsional; boş = Google/haversine) | `""` |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Google Maps JS (konum seçici + canlı tracking + client Directions; Directions API aktiv olsun) | `""` |
+| `DISPATCH_SEARCH_WINDOW_SEC` | Təcili sifariş axtarış pəncərəsi (saniyə); tək təklif timeout yox | `600` |
+| `DISPATCH_REDISCOVERY_INTERVAL_SEC` | Yeni ONLINE üçün yenidən axtarış intervalı | `30` |
+| `DISPATCH_DECLINE_REOFFER_COOLDOWN_SEC` | İmtina sonrası eyni xidmət verənə yenidən təklif gözləməsi | `120` |
 | `DISPATCH_QUEUE_PREFIX` | BullMQ Redis prefix (opsional) | `xidmetal:dispatch` |
 
 Mövcud `.env` varsa, portları yuxarıdakı ilə uyğunlaşdırın. Production-da `NODE_ENV=production`, güclü `JWT_SECRET` və işlək `SMTP_*` təyin edin.

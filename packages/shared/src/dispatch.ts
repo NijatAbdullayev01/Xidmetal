@@ -3,10 +3,108 @@
  * DB/Redis asılılığı yoxdur; unit test üçün əlverişlidir.
  */
 
+import { DISPATCH } from './constants';
+
 export interface DispatchCandidate {
   providerId: string;
   distanceM: number;
   rating: number;
+}
+
+/** Rediscovery istisnası üçün offer sətiri */
+export interface DispatchOfferExclusionInput {
+  providerId: string;
+  status: string;
+  respondedAt?: Date | string | null;
+}
+
+export interface ProvidersExcludedOptions {
+  now?: Date;
+  /** Default: DISPATCH.DECLINE_REOFFER_COOLDOWN_SEC */
+  declineReofferCooldownSec?: number;
+}
+
+function respondedAtMs(respondedAt: Date | string | null | undefined): number | null {
+  if (respondedAt == null) return null;
+  const ms =
+    typeof respondedAt === 'string'
+      ? new Date(respondedAt).getTime()
+      : respondedAt.getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * Rediscovery-dan istisna ediləcək xidmət verənlər:
+ * - PENDING / ACCEPTED təklifi olanlar
+ * - REJECTED və imtina cooldown-u hələ bitməyənlər
+ * Cooldown bitəndən sonra eyni xidmət verənə yenidən təklif göndərilə bilər
+ * (axtarış pəncərəsi açıq qaldıqca).
+ */
+export function providersExcludedFromRedispatch(
+  offers: readonly DispatchOfferExclusionInput[],
+  options?: ProvidersExcludedOptions,
+): Set<string> {
+  const now = options?.now?.getTime() ?? Date.now();
+  const cooldownSec =
+    options?.declineReofferCooldownSec ?? DISPATCH.DECLINE_REOFFER_COOLDOWN_SEC;
+  const cooldownMs =
+    Number.isFinite(cooldownSec) && cooldownSec > 0 ? cooldownSec * 1000 : 0;
+
+  const byProvider = new Map<string, DispatchOfferExclusionInput[]>();
+  for (const offer of offers) {
+    const list = byProvider.get(offer.providerId);
+    if (list) {
+      list.push(offer);
+    } else {
+      byProvider.set(offer.providerId, [offer]);
+    }
+  }
+
+  const exclude = new Set<string>();
+
+  for (const [providerId, providerOffers] of byProvider) {
+    if (providerOffers.some((o) => o.status === 'PENDING')) {
+      exclude.add(providerId);
+      continue;
+    }
+    if (providerOffers.some((o) => o.status === 'ACCEPTED')) {
+      exclude.add(providerId);
+      continue;
+    }
+
+    const rejectedTimes = providerOffers
+      .filter((o) => o.status === 'REJECTED')
+      .map((o) => respondedAtMs(o.respondedAt))
+      .filter((ms): ms is number => ms != null)
+      .sort((a, b) => b - a);
+
+    if (rejectedTimes.length > 0) {
+      const latestRejectAt = rejectedTimes[0]!;
+      // Kiçik grace — timer dəqiq cooldown sərhədində atəşləyəndə mane olmasın
+      if (now + 250 < latestRejectAt + cooldownMs) {
+        exclude.add(providerId);
+      }
+      // Cooldown bitib → yenidən təklifə uyğundur
+      continue;
+    }
+
+    // CANCELLED / EXPIRED və s. — yenidən göndərmə
+    exclude.add(providerId);
+  }
+
+  return exclude;
+}
+
+/**
+ * Axtarış pəncərəsi hələ açıqdırmı (booking.createdAt + SEARCH_WINDOW_SEC).
+ */
+export function isDispatchSearchWindowOpen(
+  createdAt: Date,
+  now: Date,
+  searchWindowSec: number,
+): boolean {
+  if (!Number.isFinite(searchWindowSec) || searchWindowSec <= 0) return false;
+  return now.getTime() < createdAt.getTime() + searchWindowSec * 1000;
 }
 
 /**

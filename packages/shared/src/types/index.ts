@@ -71,6 +71,8 @@ export interface ServiceSummary {
   providerName: string;
   providerAvatarUrl?: string;
   providerExperience?: number;
+  /** Xidmət verənin növbə statusu (ONLINE/OFFLINE/BUSY) — ictimai siyahı */
+  providerAvailability?: ProviderAvailability;
   averageRating: number;
   reviewCount: number;
   status: ServiceStatus;
@@ -129,6 +131,13 @@ export interface BookingSummary {
   completedAt?: string;
   hasReview?: boolean;
   createdAt: string;
+  /**
+   * Xidmət verənin aktiv ani-sifariş təklifi (yalnız list/find cavabında,
+   * PENDING INSTANT + uyğun DispatchOffer olduqda).
+   */
+  dispatchOfferId?: string | null;
+  dispatchDistanceM?: number | null;
+  dispatchExpiresAt?: string | null;
 }
 
 export interface CategorySummary {
@@ -465,4 +474,31 @@ export interface PushPayload {
   title: string;
   body: string;
   data?: Record<string, string>;
+}
+
+/** Admin — sayt analitika icmalı */
+export interface AdminAnalyticsOverview {
+  from: string;
+  to: string;
+  visitors: number;
+  sessions: number;
+  pageViews: number;
+  avgDurationMs: number;
+  bounceRate: number;
+  clicks: number;
+  topPages: Array<{ path: string; views: number; uniqueSessions: number }>;
+  topClicks: Array<{ name: string; path: string | null; count: number }>;
+  timeseries: Array<{
+    date: string;
+    visitors: number;
+    sessions: number;
+    pageViews: number;
+  }>;
+  /** Mövcud DB-dən biznes KPI (trafikdən asılı deyil) */
+  business: {
+    newCustomers: number;
+    newProviders: number;
+    newBookings: number;
+    completedBookings: number;
+  };
 }

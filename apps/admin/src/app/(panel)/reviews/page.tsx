@@ -14,13 +14,13 @@ const STATUS_OPTIONS = [
   { value: '', label: 'Bütün statuslar' },
   { value: ReviewStatus.PENDING, label: 'Gözləyir' },
   { value: ReviewStatus.APPROVED, label: 'Təsdiqlənib' },
-  { value: ReviewStatus.REJECTED, label: 'Rədd edilib' },
+  { value: ReviewStatus.REJECTED, label: 'İmtina edilib' },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Gözləyir',
   APPROVED: 'Təsdiqlənib',
-  REJECTED: 'Rədd edilib',
+  REJECTED: 'İmtina edilib',
 };
 
 const STATUS_BADGE: Record<string, 'warning' | 'success' | 'destructive' | 'muted'> = {
@@ -32,7 +32,7 @@ const STATUS_BADGE: Record<string, 'warning' | 'success' | 'destructive' | 'mute
 export default function AdminReviewsPage() {
   const token = useAuthToken();
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<string>(ReviewStatus.PENDING);
+  const [status, setStatus] = useState<string>('');
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,7 +68,7 @@ export default function AdminReviewsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Rəylər</h1>
         <p className="mt-1 text-muted-foreground">
-          Yeni rəylər təsdiqlənənə qədər ictimai siyahıda görünmür. Təsdiq reytinqə təsir edir.
+          Rəylər dərhal dərc olunur. İmtina etsəniz, reytinq və ictimai siyahıdan çıxarılır.
         </p>
       </div>
 

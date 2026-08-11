@@ -124,6 +124,17 @@ export class CreateBookingDto {
   @IsNumber()
   @Min(0)
   maxPrice?: number;
+
+  @ApiPropertyOptional({
+    example: 'Bakı, Nəsimi rayonu',
+    description:
+      'INSTANT — xidmət ərazisi (şəhər/rayon kataloqu). Bakı daxili rayon seçimi bütün Bakı üzrə xidmət verənlərə ötürülür.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  serviceLocation?: string;
 }
 
 export class UpdateBookingStatusDto {
@@ -131,7 +142,9 @@ export class UpdateBookingStatusDto {
   @IsEnum(BookingStatus)
   status!: BookingStatus;
 
-  @ApiPropertyOptional({ description: 'Ləğv səbəbi (CANCELLED olduqda tövsiyə olunur)' })
+  @ApiPropertyOptional({
+    description: 'Ləğv/imtina səbəbi (CANCELLED və REJECTED üçün tələb olunur)',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(500)

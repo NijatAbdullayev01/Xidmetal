@@ -31,8 +31,11 @@ export class RealtimeService {
     this.emitToRoom(bookingRoom(bookingId), REALTIME_EVENTS.LOCATION_UPDATE, payload);
   }
 
-  emitBookingStatus(payload: BookingStatusPayload): void {
+  emitBookingStatus(payload: BookingStatusPayload, participantUserIds: string[] = []): void {
     this.emitToRoom(bookingRoom(payload.bookingId), REALTIME_EVENTS.BOOKING_STATUS, payload);
+    for (const userId of new Set(participantUserIds)) {
+      this.emitToRoom(userRoom(userId), REALTIME_EVENTS.BOOKING_STATUS, payload);
+    }
   }
 
   emitNotificationNew(userId: string, payload: NotificationNewPayload): void {
