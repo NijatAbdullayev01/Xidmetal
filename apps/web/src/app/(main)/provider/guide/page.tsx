@@ -21,7 +21,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { ProviderGuideHeroCta } from './provider-guide-hero-cta';
 
 export const metadata: Metadata = {
-  title: 'Xidmət verən bələdçisi | Xidmətal',
+  title: 'Xidmət verən bələdçisi',
   description:
     'Xidmətal platformasında xidmət verən kimi necə qeydiyyatdan keçmək, xidmət yaratmaq, sifarişləri idarə etmək və reytinqinizi artırmaq barədə addım-addım bələdçi.',
 };

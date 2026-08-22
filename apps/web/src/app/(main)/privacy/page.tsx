@@ -4,7 +4,7 @@ import { Shield, Mail, FileText } from 'lucide-react';
 import { APP } from '@xidmetal/shared';
 
 export const metadata: Metadata = {
-  title: 'Məxfilik siyasəti | Xidmətal',
+  title: 'Məxfilik siyasəti',
   description:
     'Xidmətal platformasında şəxsi məlumatlarınızın toplanması, istifadəsi, saxlanması və qorunması qaydaları.',
 };

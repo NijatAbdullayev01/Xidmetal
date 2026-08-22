@@ -21,7 +21,7 @@ import { APP } from '@xidmetal/shared';
 import { buttonStyles } from '@/components/ui/button';
 
 export const metadata: Metadata = {
-  title: 'Necə işləyir? | Xidmətal',
+  title: 'Necə işləyir?',
   description:
     'Xidmətal-da xidmət tapmaq, müqayisə etmək, sifariş vermək və izləmək prosesi — addım-addım, sadə və aydın izah.',
 };

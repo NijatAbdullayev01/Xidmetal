@@ -38,6 +38,7 @@ import { shouldNotifyCustomerOnConfirmOrReject } from './booking-status-notify';
 import { RealtimeService } from '../realtime/realtime.service';
 import { DispatchService } from '../dispatch/dispatch.service';
 import { TrackingService } from '../tracking/tracking.service';
+import { GeoService } from '../geo/geo.service';
 import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
 import { MetricsService } from '../../common/metrics/metrics.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
@@ -87,6 +88,7 @@ export class BookingsService {
     @Optional()
     @Inject(forwardRef(() => TrackingService))
     private tracking?: TrackingService,
+    @Optional() private geo?: GeoService,
   ) {}
 
   async findById(id: string, userId: string, role: string) {
@@ -351,6 +353,12 @@ export class BookingsService {
         )
       : undefined;
 
+    let destCoords = this.normalizeCoordPair(dto.destLat, dto.destLng, 'Təyinat');
+    if (!destCoords && dto.address?.trim()) {
+      destCoords = await this.resolveDestFromAddress(dto.address.trim());
+    }
+    const originCoords = this.normalizeCoordPair(dto.originLat, dto.originLng, 'Mənşə');
+
     const booking = await this.prisma.$transaction(async (tx) => {
       const service = await tx.service.findUnique({
         where: { id: dto.serviceId },
@@ -383,11 +391,8 @@ export class BookingsService {
 
       const address = dto.address?.trim();
       if (!service.isRemote && !address) {
-        throw new BadRequestException('Ünvan daxil edin');
+        throw new BadRequestException('Yazılı ünvan daxil edin');
       }
-
-      const destCoords = this.normalizeCoordPair(dto.destLat, dto.destLng, 'Təyinat');
-      const originCoords = this.normalizeCoordPair(dto.originLat, dto.originLng, 'Mənşə');
 
       if (isInstant && !destCoords) {
         throw new BadRequestException(
@@ -1176,6 +1181,23 @@ export class BookingsService {
       throw new BadRequestException(`${label} koordinatları etibarsızdır`);
     }
     return { lat, lng };
+  }
+
+  /** Ünvan mətnindən təyinat koordinatı (planlı sifarişlər üçün fallback). */
+  private async resolveDestFromAddress(
+    address: string,
+  ): Promise<{ lat: number; lng: number } | null> {
+    if (!this.geo || address.length < 2) return null;
+    try {
+      const hits = await this.geo.geocode(address);
+      const hit = hits.find((row) => isValidCoordinates(row.lat, row.lng));
+      return hit ? { lat: hit.lat, lng: hit.lng } : null;
+    } catch (err) {
+      this.logger.warn(
+        `Ünvan geokodlaşdırılmadı: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return null;
+    }
   }
 
   /**

@@ -4,7 +4,7 @@ import { ArrowRight, HelpCircle } from 'lucide-react';
 import { APP } from '@xidmetal/shared';
 
 export const metadata: Metadata = {
-  title: 'Tez-tez verilən suallar | Xidmətal',
+  title: 'Tez-tez verilən suallar',
   description: `${APP.name} platforması haqqında ən çox soruşulan suallar və cavablar.`,
 };
 

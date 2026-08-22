@@ -101,3 +101,24 @@ export class DeleteAccountDto {
   @Matches(/^SIL$/i, { message: 'Təsdiq üçün Sil yazın' })
   confirmText!: string;
 }
+
+export class ConfirmPhoneDto {
+  @ApiProperty({ example: '12345678' })
+  @IsString()
+  @Length(8, 8, { message: 'Təsdiq kodu 8 rəqəm olmalıdır' })
+  @Matches(/^\d{8}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
+  code!: string;
+}
+
+export class SubmitKycDocumentDto {
+  @ApiProperty({ enum: ['ID_FRONT', 'ID_BACK', 'SELFIE'] })
+  @IsString()
+  @Matches(/^(ID_FRONT|ID_BACK|SELFIE)$/, { message: 'Sənəd növü seçin' })
+  type!: 'ID_FRONT' | 'ID_BACK' | 'SELFIE';
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(2048)
+  url!: string;
+}

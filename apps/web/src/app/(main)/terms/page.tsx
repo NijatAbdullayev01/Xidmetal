@@ -4,7 +4,7 @@ import { Scale, Mail, FileText } from 'lucide-react';
 import { APP } from '@xidmetal/shared';
 
 export const metadata: Metadata = {
-  title: 'İstifadə qaydaları | Xidmətal',
+  title: 'İstifadə qaydaları',
   description:
     'Xidmətal platformasının istifadə şərtləri, tərəflərin hüquq və öhdəlikləri, sifariş və məsuliyyət qaydaları.',
 };

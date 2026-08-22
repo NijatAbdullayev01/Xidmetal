@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { ServicesContent } from './services-content';
 
 export const metadata: Metadata = {
-  title: 'Xidmətlər | Xidmətal',
+  title: 'Xidmətlər',
   description:
     'Təmizlik, təmir, gözəllik, təhsil və daha çox — Xidmətal-da minlərlə etibarlı xidməti kəşf edin, müqayisə edin və sifariş verin.',
 };

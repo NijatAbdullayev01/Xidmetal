@@ -25,7 +25,7 @@ describe('resolveNotificationHref', () => {
         { type: NotificationType.BOOKING_CREATED, data: { bookingId: 'b1' } },
         UserRole.PROVIDER,
       ),
-    ).toBe('/dashboard/provider/bookings');
+    ).toBe('/dashboard/provider/bookings/b1');
   });
 
   it('REJECTED bildirişini bookings-ə aparır', () => {
@@ -34,7 +34,7 @@ describe('resolveNotificationHref', () => {
         { type: NotificationType.BOOKING_REJECTED, data: { bookingId: 'b2' } },
         UserRole.CUSTOMER,
       ),
-    ).toBe('/dashboard/customer/bookings');
+    ).toBe('/dashboard/customer/bookings/b2');
   });
 
   it('RESCHEDULE_REJECTED bildirişini bookings-ə aparır', () => {
@@ -46,7 +46,7 @@ describe('resolveNotificationHref', () => {
         },
         UserRole.PROVIDER,
       ),
-    ).toBe('/dashboard/provider/bookings');
+    ).toBe('/dashboard/provider/bookings/b3');
   });
 
   it('rəy bildirişini ratings-ə aparır', () => {

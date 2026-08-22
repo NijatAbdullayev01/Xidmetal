@@ -31,7 +31,9 @@ export function isPrivateUploadKey(key: string): boolean {
   return (
     key.startsWith(`${UPLOAD_FOLDERS.BOOKINGS}/`) ||
     key.startsWith(`${UPLOAD_FOLDERS.SERVICES}/`) ||
-    key.startsWith(`${UPLOAD_FOLDERS.AVATARS}/`)
+    key.startsWith(`${UPLOAD_FOLDERS.AVATARS}/`) ||
+    key.startsWith(`${UPLOAD_FOLDERS.KYC}/`) ||
+    key.startsWith(`${UPLOAD_FOLDERS.MESSAGES}/`)
   );
 }
 

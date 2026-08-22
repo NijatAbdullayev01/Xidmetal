@@ -231,10 +231,14 @@ export class AdminService {
       },
     });
 
+    if (adminId) {
+      void this.writeAudit(adminId, 'USER_ACTIVE', 'USER', id, { isActive: dto.isActive });
+    }
+
     return this.mapUser(updated);
   }
 
-  async setProviderVerified(userId: string, dto: SetProviderVerifiedDto) {
+  async setProviderVerified(userId: string, dto: SetProviderVerifiedDto, adminId?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { providerProfile: true },
@@ -299,6 +303,12 @@ export class AdminService {
         providerVerified: dto.isVerified,
       },
     });
+
+    if (adminId) {
+      void this.writeAudit(adminId, 'PROVIDER_VERIFY', 'USER', userId, {
+        isVerified: dto.isVerified,
+      });
+    }
 
     return this.getUser(userId);
   }
@@ -1062,6 +1072,167 @@ export class AdminService {
     }
 
     return { sentCount: users.length };
+  }
+
+  async listProviderKyc(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true },
+    });
+    if (!user || user.role !== UserRole.PROVIDER) {
+      throw new NotFoundException('Xidmət verən tapılmadı');
+    }
+    const rows = await this.prisma.providerKycDocument.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return Promise.all(
+      rows.map(async (row) => ({
+        id: row.id,
+        type: row.type,
+        url: (await this.storageService.toReadableMediaUrl(row.url)) ?? row.url,
+        status: row.status,
+        adminNote: row.adminNote,
+        reviewedAt: row.reviewedAt?.toISOString() ?? null,
+        createdAt: row.createdAt.toISOString(),
+      })),
+    );
+  }
+
+  async setKycStatus(
+    documentId: string,
+    adminId: string,
+    dto: { status: 'APPROVED' | 'REJECTED'; adminNote?: string },
+  ) {
+    const doc = await this.prisma.providerKycDocument.findUnique({
+      where: { id: documentId },
+    });
+    if (!doc) throw new NotFoundException('KYC sənədi tapılmadı');
+
+    const updated = await this.prisma.providerKycDocument.update({
+      where: { id: documentId },
+      data: {
+        status: dto.status,
+        adminNote: dto.adminNote?.trim() || null,
+        reviewedAt: new Date(),
+      },
+    });
+    void this.writeAudit(adminId, 'KYC_REVIEW', 'KYC', documentId, {
+      userId: doc.userId,
+      status: dto.status,
+    });
+    return {
+      id: updated.id,
+      type: updated.type,
+      url: (await this.storageService.toReadableMediaUrl(updated.url)) ?? updated.url,
+      status: updated.status,
+      adminNote: updated.adminNote,
+      reviewedAt: updated.reviewedAt?.toISOString() ?? null,
+      createdAt: updated.createdAt.toISOString(),
+    };
+  }
+
+  async listContactMessages(query: { page?: number; limit?: number; isRead?: boolean }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const where = query.isRead === undefined ? {} : { isRead: query.isRead };
+    const [rows, total] = await Promise.all([
+      this.prisma.contactMessage.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.contactMessage.count({ where }),
+    ]);
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        phone: row.phone,
+        subject: row.subject,
+        message: row.message,
+        isRead: row.isRead,
+        createdAt: row.createdAt.toISOString(),
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 0,
+    };
+  }
+
+  async markContactRead(id: string, adminId: string) {
+    const row = await this.prisma.contactMessage.findUnique({ where: { id } });
+    if (!row) throw new NotFoundException('Mesaj tapılmadı');
+    const updated = await this.prisma.contactMessage.update({
+      where: { id },
+      data: { isRead: true },
+    });
+    void this.writeAudit(adminId, 'CONTACT_READ', 'CONTACT', id, {});
+    return {
+      id: updated.id,
+      name: updated.name,
+      email: updated.email,
+      phone: updated.phone,
+      subject: updated.subject,
+      message: updated.message,
+      isRead: updated.isRead,
+      createdAt: updated.createdAt.toISOString(),
+    };
+  }
+
+  async listAuditLogs(query: { page?: number; limit?: number }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 30;
+    const [rows, total] = await Promise.all([
+      this.prisma.adminAuditLog.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { admin: { select: { firstName: true, lastName: true } } },
+      }),
+      this.prisma.adminAuditLog.count(),
+    ]);
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        adminId: row.adminId,
+        adminName: `${row.admin.firstName} ${row.admin.lastName}`,
+        action: row.action,
+        targetType: row.targetType,
+        targetId: row.targetId,
+        meta: (row.meta as Record<string, unknown> | null) ?? null,
+        createdAt: row.createdAt.toISOString(),
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 0,
+    };
+  }
+
+  private async writeAudit(
+    adminId: string,
+    action: string,
+    targetType: string,
+    targetId: string | null,
+    meta: Record<string, unknown>,
+  ) {
+    try {
+      await this.prisma.adminAuditLog.create({
+        data: {
+          adminId,
+          action,
+          targetType,
+          targetId,
+          meta: meta as Prisma.InputJsonValue,
+        },
+      });
+    } catch {
+      // audit heç vaxt əsas əməliyyatı pozmasın
+    }
   }
 
   private async mapUser(user: {

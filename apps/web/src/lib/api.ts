@@ -22,6 +22,9 @@ import type {
   CreateReportInput,
   RequestEmailChangeInput,
   ConfirmEmailChangeInput,
+  ConfirmPhoneVerificationInput,
+  SubmitKycDocumentInput,
+  KycDocumentSummary,
   ConversationSummary,
   ConversationDetail,
   MessageSummary,
@@ -185,7 +188,7 @@ export async function apiClient<T>(
 export async function uploadImage(
   token: string,
   file: File,
-  folder: 'services' | 'avatars' | 'bookings',
+  folder: 'services' | 'avatars' | 'bookings' | 'kyc' | 'messages',
 ): Promise<string> {
   const form = new FormData();
   form.append('file', file);
@@ -285,6 +288,25 @@ export const api = {
       }),
     confirmEmailChange: (token: string, data: ConfirmEmailChangeInput) =>
       apiClient<UserProfile>('/users/me/email/confirm-change', {
+        method: 'POST',
+        token,
+        body: JSON.stringify(data),
+      }),
+    requestPhoneVerify: (token: string) =>
+      apiClient<{ message: string; previewCode?: string }>('/users/me/phone/request-verify', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({}),
+      }),
+    confirmPhone: (token: string, data: ConfirmPhoneVerificationInput) =>
+      apiClient<UserProfile>('/users/me/phone/confirm', {
+        method: 'POST',
+        token,
+        body: JSON.stringify(data),
+      }),
+    kyc: (token: string) => apiClient<KycDocumentSummary[]>('/users/me/kyc', { token }),
+    submitKyc: (token: string, data: SubmitKycDocumentInput) =>
+      apiClient<KycDocumentSummary>('/users/me/kyc', {
         method: 'POST',
         token,
         body: JSON.stringify(data),
@@ -403,6 +425,9 @@ export const api = {
     const query = params ? `?${new URLSearchParams(params)}` : '';
     return apiClient<PaginatedResponse<BookingSummary>>(`/bookings${query}`, { token });
   },
+
+  booking: (token: string, id: string) =>
+    apiClient<BookingSummary>(`/bookings/${id}`, { token }),
 
   createBooking: (
     token: string,
@@ -605,6 +630,8 @@ export const api = {
           targetId: data.targetId?.trim() || undefined,
         }),
       }),
+    mine: (token: string) =>
+      apiClient<PaginatedResponse<ReportSummary>>('/reports/mine', { token }),
   },
 
   geo: {

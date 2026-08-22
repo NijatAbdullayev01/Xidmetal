@@ -39,7 +39,9 @@ export class CreateBookingDto {
   @MaxLength(1000)
   notes!: string;
 
-  @ApiPropertyOptional({ description: 'Xidmətin göstəriləcəyi ünvan (yerində xidmət üçün məcburi)' })
+  @ApiPropertyOptional({
+    description: 'Xidmətin göstəriləcəyi yazılı ünvan (yerində xidmət üçün məcburi)',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(500)
@@ -62,9 +64,9 @@ export class CreateBookingDto {
   type?: BookingType;
 
   @ApiPropertyOptional({
-    description: 'Təyinat enliyi (INSTANT üçün məcburi)',
+    description: 'Təyinat enliyi (xəritə mövqeyi; ani sifarişdə məcburi)',
   })
-  @ValidateIf((o: CreateBookingDto) => o.type === BookingType.INSTANT)
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(-90)
@@ -72,9 +74,9 @@ export class CreateBookingDto {
   destLat?: number;
 
   @ApiPropertyOptional({
-    description: 'Təyinat uzunluğu (INSTANT üçün məcburi)',
+    description: 'Təyinat uzunluğu (xəritə mövqeyi; ani sifarişdə məcburi)',
   })
-  @ValidateIf((o: CreateBookingDto) => o.type === BookingType.INSTANT)
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(-180)

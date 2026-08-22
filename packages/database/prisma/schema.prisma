@@ -31,6 +31,8 @@ model User {
   /** Soft-delete — hard delete əvəzinə; auth rədd edir */
   deletedAt     DateTime? @map("deleted_at")
   lastSeenAt    DateTime? @map("last_seen_at")
+  /** Telefon OTP təsdiqi — e-poçt verify-dən ayrı */
+  phoneVerifiedAt DateTime? @map("phone_verified_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
@@ -50,6 +52,8 @@ model User {
   reportsResolved         Report[]       @relation("ReportsResolved")
   dispatchOffers          DispatchOffer[]
   deviceTokens            DeviceToken[]
+  kycDocuments            ProviderKycDocument[]
+  adminAuditLogs          AdminAuditLog[] @relation("AdminAuditActor")
 
   @@index([deletedAt])
   @@map("users")
@@ -59,6 +63,7 @@ enum EmailVerificationPurpose {
   EMAIL_CHANGE
   SIGNUP_VERIFY
   PASSWORD_RESET
+  PHONE_VERIFY
 }
 
 model EmailVerificationCode {
@@ -495,6 +500,7 @@ model Message {
   conversationId String    @map("conversation_id")
   senderId       String    @map("sender_id")
   content        String
+  imageUrl       String?   @map("image_url")
   isRead         Boolean   @default(false) @map("is_read")
   readAt         DateTime? @map("read_at")
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -693,4 +699,63 @@ model AnalyticsEvent {
   @@index([name, createdAt])
   @@index([sessionId, createdAt])
   @@map("analytics_events")
+}
+
+enum KycDocumentType {
+  ID_FRONT
+  ID_BACK
+  SELFIE
+}
+
+enum KycDocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ProviderKycDocument {
+  id           String            @id @default(uuid())
+  userId       String            @map("user_id")
+  type         KycDocumentType
+  url          String
+  status       KycDocumentStatus @default(PENDING)
+  adminNote    String?           @map("admin_note")
+  reviewedAt   DateTime?         @map("reviewed_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("provider_kyc_documents")
+}
+
+model AdminAuditLog {
+  id         String   @id @default(uuid())
+  adminId    String   @map("admin_id")
+  action     String
+  targetType String   @map("target_type")
+  targetId   String?  @map("target_id")
+  meta       Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  admin User @relation("AdminAuditActor", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([adminId, createdAt])
+  @@map("admin_audit_logs")
+}
+
+model ContactMessage {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([isRead, createdAt])
+  @@map("contact_messages")
 }

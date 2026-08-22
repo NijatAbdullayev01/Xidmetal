@@ -10,6 +10,7 @@ import { ArrowRight, Camera, Loader2, Trash2, X } from 'lucide-react';
 import {
   AvailabilitySlotStatus,
   BookingType,
+  isValidCoordinates,
   type ServiceSummary,
 } from '@xidmetal/shared';
 import { Button } from '@/components/ui/button';
@@ -45,8 +46,8 @@ function createBookServiceFormSchema(requireAddress: boolean) {
         ? z
             .string()
             .trim()
-            .min(1, 'Ünvan daxil edin')
-            .max(500, 'Ünvan maksimum 500 simvol ola bilər')
+            .min(1, 'Yazılı ünvan daxil edin')
+            .max(500, 'Yazılı ünvan maksimum 500 simvol ola bilər')
         : z.string().max(500).optional(),
       addressBlock: z.string().trim().max(30, 'Blok maksimum 30 simvol ola bilər').optional(),
       addressFloor: z.string().trim().max(20, 'Mərtəbə maksimum 20 simvol ola bilər').optional(),
@@ -65,8 +66,19 @@ function createBookServiceFormSchema(requireAddress: boolean) {
         if (composed.length > 500) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: 'Ünvan və detallar birlikdə maksimum 500 simvol ola bilər',
+            message: 'Yazılı ünvan və detallar birlikdə maksimum 500 simvol ola bilər',
             path: ['address'],
+          });
+        }
+      }
+      if (requireAddress) {
+        const lat = data.destLat?.trim() ? Number(data.destLat) : NaN;
+        const lng = data.destLng?.trim() ? Number(data.destLng) : NaN;
+        if (!isValidCoordinates(lat, lng)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Mövqeyi xəritədən seçin',
+            path: ['destLat'],
           });
         }
       }
@@ -226,6 +238,10 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
           })
         : undefined;
 
+      const destLat = values.destLat?.trim() ? Number(values.destLat) : NaN;
+      const destLng = values.destLng?.trim() ? Number(values.destLng) : NaN;
+      const hasDest = isValidCoordinates(destLat, destLng);
+
       return api.createBooking(
         token,
         {
@@ -235,6 +251,8 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
           address,
           imageUrl: imagePreview,
           type: BookingType.SCHEDULED,
+          destLat: hasDest ? destLat : undefined,
+          destLng: hasDest ? destLng : undefined,
         },
         { idempotencyKey },
       );
@@ -412,10 +430,10 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
 
           {requireAddress && (
             <div className="space-y-2">
-              <Label htmlFor={`booking-address-${service.id}`}>Ünvan</Label>
+              <Label htmlFor={`booking-address-${service.id}`}>Yazılı ünvan</Label>
               <Input
                 id={`booking-address-${service.id}`}
-                placeholder="Xəritədən seçilən ünvan"
+                placeholder="Xəritədən seçilən yazılı ünvan"
                 error={!!errors.address}
                 disabled={isSubmitting}
                 {...register('address')}
@@ -484,7 +502,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
 
           {requireAddress && (
             <div className="space-y-2">
-              <Label>Konum</Label>
+              <Label>Mövqe</Label>
               <LocationMapPicker
                 lat={latNum != null && Number.isFinite(latNum) ? latNum : null}
                 lng={lngNum != null && Number.isFinite(lngNum) ? lngNum : null}

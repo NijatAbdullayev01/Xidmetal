@@ -73,6 +73,30 @@ export class ReportsService {
     return this.mapReport(report);
   }
 
+  async listMine(
+    reporterId: string,
+    page = 1,
+    limit = 20,
+  ): Promise<{ items: ReportSummary[]; total: number; page: number; limit: number; totalPages: number }> {
+    const skip = (page - 1) * limit;
+    const [rows, total] = await Promise.all([
+      this.prisma.report.findMany({
+        where: { reporterId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.report.count({ where: { reporterId } }),
+    ]);
+    return {
+      items: rows.map((row) => this.mapReport(row)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 0,
+    };
+  }
+
   /**
    * Hədəf mövcudluğu + reporter əlaqəsi.
    * İcazəsiz / mövcud olmayan → eyni «tapılmadı» (ID probing azaltmaq üçün).

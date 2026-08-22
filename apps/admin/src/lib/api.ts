@@ -23,6 +23,10 @@ import type {
   AdminSetReviewStatusInput,
   AdminSetReportStatusInput,
   AdminAnnouncementInput,
+  KycDocumentSummary,
+  ContactInboxSummary,
+  AdminAuditLogSummary,
+  AdminSetKycStatusInput,
 } from '@xidmetal/shared';
 import { BookingStatus, CLIENT_APP, CLIENT_APP_HEADER } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
@@ -283,6 +287,32 @@ export const api = {
         token,
         body: JSON.stringify(data),
       }),
+    providerKyc: (token: string, userId: string) =>
+      apiClient<KycDocumentSummary[]>(`/admin/providers/${userId}/kyc`, { token }),
+    setKycStatus: (token: string, id: string, data: AdminSetKycStatusInput) =>
+      apiClient<KycDocumentSummary>(`/admin/kyc/${id}/status`, {
+        method: 'PATCH',
+        token,
+        body: JSON.stringify(data),
+      }),
+    contact: (token: string, params?: Record<string, string>) => {
+      const query = params ? `?${new URLSearchParams(params)}` : '';
+      return apiClient<PaginatedResponse<ContactInboxSummary>>(`/admin/contact${query}`, {
+        token,
+      });
+    },
+    markContactRead: (token: string, id: string) =>
+      apiClient<ContactInboxSummary>(`/admin/contact/${id}/read`, {
+        method: 'PATCH',
+        token,
+        body: JSON.stringify({}),
+      }),
+    audit: (token: string, params?: Record<string, string>) => {
+      const query = params ? `?${new URLSearchParams(params)}` : '';
+      return apiClient<PaginatedResponse<AdminAuditLogSummary>>(`/admin/audit${query}`, {
+        token,
+      });
+    },
   },
 
   updateBookingStatus: (

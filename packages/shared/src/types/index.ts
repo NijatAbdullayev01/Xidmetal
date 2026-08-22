@@ -49,6 +49,7 @@ export interface UserProfile {
   role: UserRole;
   isVerified: boolean;
   createdAt: string;
+  phoneVerifiedAt?: string | null;
   providerProfile?: ProviderProfile;
 }
 
@@ -267,6 +268,38 @@ export interface ReportSummary {
   createdAt: string;
 }
 
+export interface KycDocumentSummary {
+  id: string;
+  type: string;
+  url: string;
+  status: string;
+  adminNote?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+}
+
+export interface AdminAuditLogSummary {
+  id: string;
+  adminId: string;
+  adminName: string;
+  action: string;
+  targetType: string;
+  targetId?: string | null;
+  meta?: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface ContactInboxSummary {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  subject: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 export interface AdminReportSummary extends ReportSummary {
   reporterId: string;
   reporterName: string;
@@ -282,6 +315,7 @@ export interface MessageSummary {
   senderId: string;
   senderName: string;
   content: string;
+  imageUrl?: string | null;
   isRead: boolean;
   /** Oxunma vaxtı (WhatsApp tipli oxundu) */
   readAt?: string | null;

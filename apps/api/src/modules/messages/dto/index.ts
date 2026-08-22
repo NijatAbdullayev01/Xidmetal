@@ -37,12 +37,17 @@ export class CreateConversationDto {
 }
 
 export class SendMessageDto {
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Mesaj boş ola bilməz' })
-  @MinLength(1, { message: 'Mesaj boş ola bilməz' })
   @MaxLength(2000)
-  content!: string;
+  content?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  imageUrl?: string;
 }
 
 export class ConversationQueryDto {

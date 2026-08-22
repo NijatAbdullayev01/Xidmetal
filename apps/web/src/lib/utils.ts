@@ -84,6 +84,26 @@ export function combineDateAndTime(date: string, time: string): string {
   return combined.toISOString();
 }
 
+/** ETA saniyəsini qısa AZ mətnə çevirir: «4 dəq», «1 saat 12 dəq». */
+export function formatEta(seconds: number | null | undefined): string | null {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return null;
+  const totalMin = Math.max(0, Math.round(seconds / 60));
+  if (totalMin < 1) return '1 dəq-dən az';
+  if (totalMin < 60) return `${totalMin} dəq`;
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  if (mins === 0) return `${hours} saat`;
+  return `${hours} saat ${mins} dəq`;
+}
+
+/** Məsafəni qısa AZ mətnə çevirir. */
+export function formatDistanceMeters(meters: number | null | undefined): string | null {
+  if (meters == null || !Number.isFinite(meters) || meters < 0) return null;
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  const km = meters / 1000;
+  return `${km < 10 ? km.toFixed(1) : Math.round(km)} km`;
+}
+
 /** ISO datetime-dan Asia/Baku HH:mm */
 export function formatTimeInBaku(iso: string | Date): string {
   const parts = new Intl.DateTimeFormat('en-GB', {

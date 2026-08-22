@@ -179,7 +179,7 @@ function BusyBookingSummary({
       <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">{meta}</p>
       {booking.address ? (
         <p className="mt-0.5 truncate text-xs text-muted-foreground sm:text-sm">
-          {booking.address}
+          Yazılı ünvan: {booking.address}
         </p>
       ) : null}
     </div>

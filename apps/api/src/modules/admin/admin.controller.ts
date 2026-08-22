@@ -26,6 +26,9 @@ import {
   RequestServiceRevisionDto,
   SetUserActiveDto,
   UpdateCategoryDto,
+  SetKycStatusDto,
+  AdminContactQueryDto,
+  AdminPaginationQueryDto,
 } from './dto';
 import { JwtAuthGuard, RolesGuard } from '../../common/guards';
 import { Roles } from '../../common/decorators';
@@ -69,8 +72,12 @@ export class AdminController {
 
   @Patch('providers/:userId/verify')
   @ApiOperation({ summary: 'Xidmət verəni təsdiqlə / təsdiqi ləğv et' })
-  setProviderVerified(@Param('userId') userId: string, @Body() dto: SetProviderVerifiedDto) {
-    return this.adminService.setProviderVerified(userId, dto);
+  setProviderVerified(
+    @Param('userId') userId: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: SetProviderVerifiedDto,
+  ) {
+    return this.adminService.setProviderVerified(userId, dto, adminId);
   }
 
   @Get('categories')
@@ -153,5 +160,39 @@ export class AdminController {
   @ApiOperation({ summary: 'Platforma bildirişi göndər' })
   createAnnouncement(@Body() dto: CreateAnnouncementDto) {
     return this.adminService.createAnnouncement(dto);
+  }
+
+  @Get('providers/:userId/kyc')
+  @ApiOperation({ summary: 'Xidmət verənin KYC sənədləri' })
+  listProviderKyc(@Param('userId') userId: string) {
+    return this.adminService.listProviderKyc(userId);
+  }
+
+  @Patch('kyc/:id/status')
+  @ApiOperation({ summary: 'KYC sənədini təsdiqlə / rədd et' })
+  setKycStatus(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: SetKycStatusDto,
+  ) {
+    return this.adminService.setKycStatus(id, adminId, dto);
+  }
+
+  @Get('contact')
+  @ApiOperation({ summary: 'Əlaqə formu mesajları' })
+  listContact(@Query() query: AdminContactQueryDto) {
+    return this.adminService.listContactMessages(query);
+  }
+
+  @Patch('contact/:id/read')
+  @ApiOperation({ summary: 'Əlaqə mesajını oxundu işarələ' })
+  markContactRead(@Param('id') id: string, @CurrentUser('id') adminId: string) {
+    return this.adminService.markContactRead(id, adminId);
+  }
+
+  @Get('audit')
+  @ApiOperation({ summary: 'Admin audit jurnalı' })
+  listAudit(@Query() query: AdminPaginationQueryDto) {
+    return this.adminService.listAuditLogs(query);
   }
 }

@@ -49,3 +49,27 @@ export function isHumanReadableAddress(value: string | null | undefined): boolea
   if (COORD_LIKE.test(trimmed)) return false;
   return true;
 }
+
+function encodeLatLngQuery(lat: number, lng: number): string {
+  return encodeURIComponent(`${lat},${lng}`);
+}
+
+/** Nöqtəni Google Maps-də açır (baxış). */
+export function googleMapsPlaceUrl(lat: number, lng: number): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeLatLngQuery(lat, lng)}`;
+}
+
+/** Ünvan mətnini Google Maps-də açır. */
+export function googleMapsPlaceQueryUrl(query: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query.trim())}`;
+}
+
+/** Nöqtəyə yol tarifi (xidmət verən naviqasiyası). */
+export function googleMapsDirectionsUrl(lat: number, lng: number): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeLatLngQuery(lat, lng)}`;
+}
+
+/** Ünvan mətninə yol tarifi. */
+export function googleMapsDirectionsQueryUrl(query: string): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query.trim())}`;
+}

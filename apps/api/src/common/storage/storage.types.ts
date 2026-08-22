@@ -37,6 +37,8 @@ export const UPLOAD_FOLDERS = {
   SERVICES: 'services',
   AVATARS: 'avatars',
   BOOKINGS: 'bookings',
+  KYC: 'kyc',
+  MESSAGES: 'messages',
 } as const;
 
 export type UploadFolder = (typeof UPLOAD_FOLDERS)[keyof typeof UPLOAD_FOLDERS];

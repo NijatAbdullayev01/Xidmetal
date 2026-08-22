@@ -13,6 +13,8 @@ import {
   ReportStatus,
   DevicePlatform,
   AnalyticsEventType,
+  KycDocumentType,
+  KycDocumentStatus,
 } from '../enums';
 import { PRICE_UNIT_VALUES } from '../price-units';
 import { SERVICE_VENUE_VALUES } from '../service-venues';
@@ -189,7 +191,7 @@ export const createBookingSchema = withOptionalCoordPairs(
     /** SCHEDULED üçün məcburi; INSTANT-da opsional (server ofset təyin edir) */
     scheduledAt: z.string().datetime().optional(),
     notes: z.string().trim().min(1, 'Qeyd yazın').max(1000),
-    address: z.string().trim().min(1, 'Ünvan daxil edin').max(500).optional(),
+    address: z.string().trim().min(1, 'Yazılı ünvan daxil edin').max(500).optional(),
     imageUrl: imageUrlSchema.optional(),
     /** Default SCHEDULED. INSTANT → avto-dispatch (Faza 4). */
     type: z.nativeEnum(BookingType).optional(),
@@ -417,8 +419,36 @@ export const createConversationSchema = z.object({
   initialMessage: z.string().min(1, 'Mesaj boş ola bilməz').max(2000).optional(),
 });
 
-export const sendMessageSchema = z.object({
-  content: z.string().min(1, 'Mesaj boş ola bilməz').max(2000),
+export const sendMessageSchema = z
+  .object({
+    content: z.string().max(2000).optional().default(''),
+    imageUrl: z.string().min(8, 'Şəkil URL-i tələb olunur').max(2048).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const text = data.content?.trim() ?? '';
+    if (!text && !data.imageUrl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Mesaj və ya şəkil lazımdır',
+        path: ['content'],
+      });
+    }
+  });
+
+export const requestPhoneVerificationSchema = z.object({});
+
+export const confirmPhoneVerificationSchema = z.object({
+  code: verificationCodeSchema,
+});
+
+export const submitKycDocumentSchema = z.object({
+  type: z.nativeEnum(KycDocumentType),
+  url: z.string().min(8, 'Şəkil URL-i tələb olunur').max(2048),
+});
+
+export const adminSetKycStatusSchema = z.object({
+  status: z.enum([KycDocumentStatus.APPROVED, KycDocumentStatus.REJECTED]),
+  adminNote: z.string().max(1000).optional(),
 });
 
 export const workingHoursEntrySchema = z
@@ -636,6 +666,9 @@ export type RequestEmailChangeInput = z.infer<typeof requestEmailChangeSchema>;
 export type ConfirmEmailChangeInput = z.infer<typeof confirmEmailChangeSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+export type ConfirmPhoneVerificationInput = z.infer<typeof confirmPhoneVerificationSchema>;
+export type SubmitKycDocumentInput = z.infer<typeof submitKycDocumentSchema>;
+export type AdminSetKycStatusInput = z.infer<typeof adminSetKycStatusSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
 export type UpsertWorkingHoursInput = z.infer<typeof upsertWorkingHoursSchema>;
 export type CreateAvailabilityOverrideInput = z.infer<typeof createAvailabilityOverrideSchema>;

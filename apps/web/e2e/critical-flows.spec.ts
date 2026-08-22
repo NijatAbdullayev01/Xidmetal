@@ -27,6 +27,16 @@ test.describe('Kritik axınlar (UI)', () => {
     await expect(page.getByText(/şifrə|bərpa/i).first()).toBeVisible();
   });
 
+  test('sifariş detal kabineti giriş tələb edir', async ({ page }) => {
+    await page.goto('/dashboard/customer/bookings/00000000-0000-4000-8000-000000000001');
+    await expect(page).toHaveURL(/\/login/, { timeout: 15_000 });
+  });
+
+  test('xidmət verən sifariş detalı giriş tələb edir', async ({ page }) => {
+    await page.goto('/dashboard/provider/bookings/00000000-0000-4000-8000-000000000001');
+    await expect(page).toHaveURL(/\/login/, { timeout: 15_000 });
+  });
+
   test('xidmət kartı preview pop-up açır', async ({ page }) => {
     await page.goto('/services');
     const firstCard = page

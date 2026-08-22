@@ -33,6 +33,10 @@ export function resolveNotificationHref(
   if (!base) return null;
 
   if (BOOKING_TYPES.has(notification.type)) {
+    const bookingId = typeof data?.bookingId === 'string' ? data.bookingId : null;
+    if (bookingId) {
+      return `${base}/bookings/${encodeURIComponent(bookingId)}`;
+    }
     return `${base}/bookings`;
   }
 

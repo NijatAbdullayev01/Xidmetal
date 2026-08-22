@@ -10,7 +10,7 @@ import { api } from '@/lib/api';
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: 'Kateqoriyalar | Xidmətal',
+  title: 'Kateqoriyalar',
   description:
     'Xidmətal-da bütün xidmət kateqoriyalarını kəşf edin — təmizlik, təmir, gözəllik və daha çox.',
 };

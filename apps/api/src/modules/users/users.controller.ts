@@ -22,10 +22,12 @@ import {
   RequestEmailChangeDto,
   ConfirmEmailChangeDto,
   DeleteAccountDto,
+  ConfirmPhoneDto,
+  SubmitKycDocumentDto,
 } from './dto';
-import { JwtAuthGuard, RolesGuard } from '../../common/guards';
+import { JwtAuthGuard, RolesGuard, EmailVerifiedGuard } from '../../common/guards';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators';
+import { Roles, RequireEmailVerified } from '../../common/decorators';
 import { clearAuthCookies } from '../../common/auth/auth-cookies';
 
 @ApiTags('Users')
@@ -89,6 +91,38 @@ export class UsersController {
     @Body() dto: ConfirmEmailChangeDto,
   ) {
     return this.usersService.confirmEmailChange(userId, dto);
+  }
+
+  @Post('me/phone/request-verify')
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Telefon üçün təsdiq kodu göndər (e-poçt + opsional SMS)' })
+  requestPhoneVerify(@CurrentUser('id') userId: string) {
+    return this.usersService.requestPhoneVerification(userId);
+  }
+
+  @Post('me/phone/confirm')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Telefon təsdiq kodunu yoxla' })
+  confirmPhone(@CurrentUser('id') userId: string, @Body() dto: ConfirmPhoneDto) {
+    return this.usersService.confirmPhoneVerification(userId, dto);
+  }
+
+  @Get('me/kyc')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.PROVIDER)
+  @ApiOperation({ summary: 'KYC sənədlərim' })
+  listKyc(@CurrentUser('id') userId: string) {
+    return this.usersService.listMyKyc(userId);
+  }
+
+  @Post('me/kyc')
+  @UseGuards(RolesGuard, EmailVerifiedGuard)
+  @Roles(UserRole.PROVIDER)
+  @RequireEmailVerified()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'KYC sənədi yüklə' })
+  submitKyc(@CurrentUser('id') userId: string, @Body() dto: SubmitKycDocumentDto) {
+    return this.usersService.submitKycDocument(userId, dto);
   }
 
   @Delete('me')

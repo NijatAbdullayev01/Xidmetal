@@ -27,6 +27,7 @@ describe('MessagesService.sendMessage', () => {
               conversationId: 'conv-1',
               senderId: 'customer-1',
               content: 'Salam',
+              imageUrl: null,
               isRead: false,
               readAt: null,
               createdAt,

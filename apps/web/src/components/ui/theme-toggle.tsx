@@ -20,7 +20,13 @@ export function ThemeToggle({ className, variant = 'icon' }: ThemeToggleProps) {
 
   const isDark = resolvedTheme === 'dark';
   const toggleTheme = () => setTheme(isDark ? 'light' : 'dark');
-  const label = isDark ? 'Gündüz rejimi' : 'Gecə rejimi';
+  // resolvedTheme SSR-də yoxdur, client-də localStorage/system-dən gəlir —
+  // mount-dan əvvəl sabit label, əks halda hydration mismatch.
+  const label = mounted
+    ? isDark
+      ? 'Gündüz rejimi'
+      : 'Gecə rejimi'
+    : 'Tema dəyişdir';
 
   if (variant === 'switch') {
     return (

@@ -272,3 +272,24 @@ export class CreateAnnouncementDto {
   @MaxLength(500)
   href?: string;
 }
+
+export class SetKycStatusDto {
+  @ApiProperty({ enum: ['APPROVED', 'REJECTED'] })
+  @IsString()
+  @Matches(/^(APPROVED|REJECTED)$/)
+  status!: 'APPROVED' | 'REJECTED';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  adminNote?: string;
+}
+
+export class AdminContactQueryDto extends AdminPaginationQueryDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(optionalBoolean)
+  @IsBoolean()
+  isRead?: boolean;
+}

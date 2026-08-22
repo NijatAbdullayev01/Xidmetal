@@ -14,7 +14,7 @@ import { APP } from '@xidmetal/shared';
 import { ContactForm } from '@/components/contact/contact-form';
 
 export const metadata: Metadata = {
-  title: 'Əlaqə | Xidmətal',
+  title: 'Əlaqə',
   description:
     'Xidmətal komandası ilə əlaqə saxlayın. Sual, təklif və ya dəstək üçün bizə yazın.',
 };

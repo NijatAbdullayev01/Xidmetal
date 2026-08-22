@@ -50,6 +50,7 @@ const PROVIDER_NAV: NavItem[] = [
   { href: '/dashboard/provider/messages', label: 'Mesajlarım', icon: MessageSquare },
   { href: '/dashboard/provider/notifications', label: 'Bildirişlər', icon: Bell },
   { href: '/dashboard/provider/ratings', label: 'Reytinq', icon: Star },
+  { href: '/dashboard/provider/report', label: 'Şikayət', icon: Flag },
   { href: '/dashboard/provider/settings', label: 'Tənzimləmələr', icon: Settings },
 ];
 

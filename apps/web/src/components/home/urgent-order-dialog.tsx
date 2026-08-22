@@ -51,8 +51,8 @@ const urgentOrderSchema = z
     address: z
       .string()
       .trim()
-      .min(1, 'Ünvan daxil edin')
-      .max(500, 'Ünvan maksimum 500 simvol ola bilər'),
+      .min(1, 'Yazılı ünvan daxil edin')
+      .max(500, 'Yazılı ünvan maksimum 500 simvol ola bilər'),
     addressBlock: z.string().trim().max(30, 'Blok maksimum 30 simvol ola bilər').optional(),
     addressFloor: z.string().trim().max(20, 'Mərtəbə maksimum 20 simvol ola bilər').optional(),
     addressDoor: z.string().trim().max(30, 'Qapı maksimum 30 simvol ola bilər').optional(),
@@ -69,7 +69,7 @@ const urgentOrderSchema = z
     if (composed.length > 500) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Ünvan və detallar birlikdə maksimum 500 simvol ola bilər',
+        message: 'Yazılı ünvan və detallar birlikdə maksimum 500 simvol ola bilər',
         path: ['address'],
       });
     }
@@ -79,14 +79,14 @@ const urgentOrderSchema = z
     if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Konumunuzu paylaşın və ya xəritədən seçin',
+        message: 'Mövqenizi paylaşın və ya xəritədən seçin',
         path: ['destLat'],
       });
     }
     if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Konumunuzu paylaşın və ya xəritədən seçin',
+        message: 'Mövqenizi paylaşın və ya xəritədən seçin',
         path: ['destLng'],
       });
     }
@@ -98,7 +98,7 @@ const urgentOrderSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message:
-          'Konumdan şəhər/rayon müəyyən olunmadı. Xəritədən yenidən seçin',
+          'Mövqedən şəhər/rayon müəyyən olunmadı. Xəritədən yenidən seçin',
         path: ['destLat'],
       });
     }
@@ -384,7 +384,7 @@ export function UrgentOrderDialog({
       const resolvedLocation = matchCatalogLocationFromText(values.address);
       if (!resolvedLocation) {
         throw new Error(
-          'Konumdan şəhər/rayon müəyyən olunmadı. Xəritədən yenidən seçin.',
+          'Mövqedən şəhər/rayon müəyyən olunmadı. Xəritədən yenidən seçin.',
         );
       }
       const matched = services.filter((s) =>
@@ -613,10 +613,10 @@ export function UrgentOrderDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="urgent-address">Ünvan</Label>
+            <Label htmlFor="urgent-address">Yazılı ünvan</Label>
             <Input
               id="urgent-address"
-              placeholder="Xəritədən seçilən ünvan"
+              placeholder="Xəritədən seçilən yazılı ünvan"
               disabled={isSubmitting}
               error={!!errors.address}
               {...register('address')}
@@ -681,7 +681,7 @@ export function UrgentOrderDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Konum</Label>
+            <Label>Mövqe</Label>
             <LocationMapPicker
               lat={latNum != null && Number.isFinite(latNum) ? latNum : null}
               lng={lngNum != null && Number.isFinite(lngNum) ? lngNum : null}

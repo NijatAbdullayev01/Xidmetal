@@ -1,15 +1,17 @@
-import { ReportForm } from '@/components/reports/report-form';
+import { ReportPage } from '@/components/reports/report-page';
 
-export default function CustomerReportPage() {
+interface PageProps {
+  searchParams: Promise<{ targetType?: string; targetId?: string }>;
+}
+
+export default async function CustomerReportPage({ searchParams }: PageProps) {
+  const params = await searchParams;
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Şikayət et</h1>
-        <p className="mt-1 text-muted-foreground">
-          Pozuntu və ya təhlükəsizlik problemini bizə bildirin.
-        </p>
-      </div>
-      <ReportForm />
-    </div>
+    <ReportPage
+      title="Şikayət et"
+      description="Pozuntu və ya təhlükəsizlik problemini bizə bildirin."
+      targetType={params.targetType}
+      targetId={params.targetId}
+    />
   );
 }

@@ -117,7 +117,10 @@ export function DispatchOffersCard() {
                   {offer.booking?.address && (
                     <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
                       <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      <span>{offer.booking.address}</span>
+                      <span>
+                        <span className="text-foreground">Yazılı ünvan:</span>{' '}
+                        {offer.booking.address}
+                      </span>
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground">

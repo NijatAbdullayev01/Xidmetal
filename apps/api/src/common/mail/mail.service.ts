@@ -54,6 +54,15 @@ export class MailService {
     );
   }
 
+  async sendPhoneVerificationCode(email: string, code: string): Promise<MailSendResult> {
+    return this.sendCodeMail(
+      email,
+      'Xidmətal — Telefon təsdiqi',
+      'Telefon nömrənizi təsdiqləmək üçün kodunuz',
+      code,
+    );
+  }
+
   async sendPasswordResetCode(email: string, code: string): Promise<MailSendResult> {
     return this.sendCodeMail(
       email,

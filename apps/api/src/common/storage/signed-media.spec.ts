@@ -84,4 +84,16 @@ describe('signed-media', () => {
       ).toBe(false);
     }
   });
+
+  it('kyc və messages da imzalanır', () => {
+    for (const key of ['kyc/x.jpg', 'messages/x.jpg'] as const) {
+      const signed = signPrivateMediaUrl(
+        `http://localhost:4000/uploads/${key}`,
+        secret,
+        60,
+      );
+      expect(signed).toContain('sig=');
+      expect(isPrivateUploadKey(key)).toBe(true);
+    }
+  });
 });

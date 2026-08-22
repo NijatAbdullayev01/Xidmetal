@@ -177,7 +177,7 @@ async function waitForStableContainerLayout(container: HTMLDivElement): Promise<
 }
 
 /**
- * Konum seçici — Google Maps + Bolt üslubu:
+ * Mövqe seçici — Google Maps + Bolt üslubu:
  * mərkəzdə sabit pin, xəritə pan edilir; toxunuş mərkəzləşdirir.
  */
 export function LocationMapPicker({
@@ -393,7 +393,7 @@ export function LocationMapPicker({
       });
     } catch (err) {
       if (gen !== locateGenRef.current) return;
-      setError(err instanceof GeoPositionError ? err.message : 'Konum alınmadı');
+      setError(err instanceof GeoPositionError ? err.message : 'Mövqe alınmadı');
     } finally {
       if (gen === locateGenRef.current) setGeoBusy(false);
     }
@@ -598,7 +598,7 @@ export function LocationMapPicker({
         });
       } catch (err) {
         if (cancelled || gen !== locateGenRef.current) return;
-        setError(err instanceof GeoPositionError ? err.message : 'Konum alınmadı');
+        setError(err instanceof GeoPositionError ? err.message : 'Mövqe alınmadı');
       } finally {
         if (!cancelled && gen === locateGenRef.current) setGeoBusy(false);
       }
@@ -610,7 +610,7 @@ export function LocationMapPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLocate, disabled, ready, resolveUserLocation]);
 
-  const addressLabel = resolvedAddress?.trim() || (hasSelection ? 'Seçilmiş konum' : null);
+  const addressLabel = resolvedAddress?.trim() || (hasSelection ? 'Seçilmiş mövqe' : null);
   const accuracyHint =
     accuracyM == null
       ? null
@@ -657,7 +657,7 @@ export function LocationMapPicker({
           ref={containerRef}
           className="location-map-canvas z-0 h-[260px] w-full touch-manipulation sm:h-[300px]"
           role="application"
-          aria-label="Konum seçimi xəritəsi"
+          aria-label="Mövqe seçimi xəritəsi"
         />
 
         {/* Mərkəz pin — ucu dəqiq mərkəzdə (Bolt) */}
@@ -757,7 +757,7 @@ export function LocationMapPicker({
           type="button"
           disabled={disabled || geoBusy || !ready}
           onClick={() => void locateMe()}
-          aria-label="Mənim konumuma get"
+          aria-label="Mənim mövqeyimə get"
           aria-busy={geoBusy}
           className={cn(
             'absolute bottom-[4.75rem] right-3 z-[4] flex h-11 w-11 items-center justify-center',
@@ -788,7 +788,7 @@ export function LocationMapPicker({
             {reverseBusy || geoBusy ? (
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
-                {geoBusy ? 'Dəqiq konum axtarılır…' : 'Ünvan dəqiqləşdirilir…'}
+                {geoBusy ? 'Dəqiq mövqe axtarılır…' : 'Yazılı ünvan dəqiqləşdirilir…'}
               </p>
             ) : addressLabel ? (
               <div className="min-w-0">

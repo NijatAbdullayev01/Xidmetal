@@ -40,6 +40,7 @@ type ConversationWithRelations = {
     conversationId: string;
     senderId: string;
     content: string;
+    imageUrl: string | null;
     isRead: boolean;
     readAt: Date | null;
     createdAt: Date;
@@ -235,7 +236,7 @@ export class MessagesService {
     const summary = await this.mapConversation(withMessages, unreadCount, 'asc');
     return {
       ...summary,
-      messages: messagesAsc.map((m) => this.mapMessage(m)),
+      messages: await Promise.all(messagesAsc.map((m) => this.mapMessage(m))),
       nextCursor,
       hasMore,
       peerPresence: this.mapPeerPresence(peer?.lastSeenAt ?? null),
@@ -298,7 +299,7 @@ export class MessagesService {
     const nextCursor = hasMore ? messagesAsc[0]?.id ?? null : null;
 
     return {
-      items: messagesAsc.map((m) => this.mapMessage(m)),
+      items: await Promise.all(messagesAsc.map((m) => this.mapMessage(m))),
       nextCursor,
       hasMore,
     };
@@ -528,10 +529,19 @@ export class MessagesService {
 
     this.assertParticipant(conversation, userId);
 
-    const content = dto.content.trim();
-    if (!content) {
-      throw new BadRequestException('Mesaj boş ola bilməz');
+    const content = dto.content?.trim() ?? '';
+    let imageUrl: string | null = null;
+    if (dto.imageUrl?.trim()) {
+      imageUrl = await this.storageService.assertOwnedUploadUrl(
+        dto.imageUrl.trim(),
+        'messages',
+        userId,
+      );
     }
+    if (!content && !imageUrl) {
+      throw new BadRequestException('Mesaj və ya şəkil lazımdır');
+    }
+    const storedContent = content || '[Şəkil]';
 
     await clearTypingDb(this.prisma, conversationId, userId);
 
@@ -540,14 +550,16 @@ export class MessagesService {
         ? conversation.providerId
         : conversation.customerId;
 
-    const preview = content.length > 80 ? `${content.slice(0, 80)}…` : content;
+    const previewSource = content || 'Şəkil';
+    const preview = previewSource.length > 80 ? `${previewSource.slice(0, 80)}…` : previewSource;
 
     const { message, notification } = await this.prisma.$transaction(async (tx) => {
       const created = await tx.message.create({
         data: {
           conversationId,
           senderId: userId,
-          content,
+          content: storedContent,
+          imageUrl,
         },
         include: { sender: { select: { firstName: true, lastName: true } } },
       });
@@ -637,13 +649,16 @@ export class MessagesService {
     };
   }
 
-  private mapMessage(message: ConversationWithRelations['messages'][number]): MessageSummary {
+  private async mapMessage(message: ConversationWithRelations['messages'][number]): Promise<MessageSummary> {
     return {
       id: message.id,
       conversationId: message.conversationId,
       senderId: message.senderId,
       senderName: `${message.sender.firstName} ${message.sender.lastName}`,
       content: message.content,
+      imageUrl: message.imageUrl
+        ? ((await this.storageService.toReadableMediaUrl(message.imageUrl)) ?? message.imageUrl)
+        : null,
       isRead: message.isRead,
       readAt: message.readAt?.toISOString() ?? null,
       createdAt: message.createdAt.toISOString(),
@@ -670,7 +685,7 @@ export class MessagesService {
       providerAvatarUrl: await this.storageService.toReadableMediaUrl(conv.provider.avatarUrl),
       bookingId: conv.bookingId ?? undefined,
       serviceTitle: conv.booking?.service.title,
-      lastMessage: lastMsg?.content,
+      lastMessage: lastMsg?.imageUrl && lastMsg.content === '[Şəkil]' ? 'Şəkil' : lastMsg?.content,
       lastMessageAt: lastMsg?.createdAt.toISOString(),
       unreadCount,
       updatedAt: conv.updatedAt.toISOString(),

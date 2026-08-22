@@ -10,10 +10,12 @@ import {
   requestEmailChangeSchema,
   confirmEmailChangeSchema,
   deleteAccountSchema,
+  confirmPhoneVerificationSchema,
   type UpdateProfileInput,
   type ChangePasswordInput,
   type RequestEmailChangeInput,
   type ConfirmEmailChangeInput,
+  type ConfirmPhoneVerificationInput,
   type DeleteAccountInput,
 } from '@xidmetal/shared';
 import {
@@ -101,6 +103,9 @@ export function SettingsForm() {
   const [emailChangeStep, setEmailChangeStep] = useState<'idle' | 'editing' | 'verify'>('idle');
   const [emailChangeSuccess, setEmailChangeSuccess] = useState<string | null>(null);
   const [emailChangeServerError, setEmailChangeServerError] = useState<string | null>(null);
+  const [phoneVerifyStep, setPhoneVerifyStep] = useState<'idle' | 'verify'>('idle');
+  const [phoneVerifySuccess, setPhoneVerifySuccess] = useState<string | null>(null);
+  const [phoneVerifyServerError, setPhoneVerifyServerError] = useState<string | null>(null);
 
   const dismissTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
   useEffect(() => {
@@ -159,6 +164,11 @@ export function SettingsForm() {
   const emailConfirmForm = useForm<ConfirmEmailChangeInput>({
     resolver: zodResolver(confirmEmailChangeSchema),
     defaultValues: { newEmail: '', code: '' },
+  });
+
+  const phoneConfirmForm = useForm<ConfirmPhoneVerificationInput>({
+    resolver: zodResolver(confirmPhoneVerificationSchema),
+    defaultValues: { code: '' },
   });
 
   useEffect(() => {
@@ -299,6 +309,49 @@ export function SettingsForm() {
     setEmailChangeServerError(null);
     setEmailChangeSuccess(null);
   };
+
+  const requestPhoneVerifyMutation = useMutation({
+    mutationFn: () => api.users.requestPhoneVerify(token!),
+    onSuccess: (result) => {
+      setPhoneVerifyStep('verify');
+      setPhoneVerifyServerError(null);
+      const message = result.previewCode
+        ? `${result.message} (DEV kod: ${result.previewCode})`
+        : result.message;
+      setPhoneVerifySuccess(message);
+      if (result.previewCode) {
+        phoneConfirmForm.setValue('code', result.previewCode);
+      }
+      autoDismiss(setPhoneVerifySuccess, 8000);
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setPhoneVerifyServerError(error.message);
+      } else {
+        setPhoneVerifyServerError('Kod göndərilərkən xəta baş verdi');
+      }
+    },
+  });
+
+  const confirmPhoneMutation = useMutation({
+    mutationFn: (data: ConfirmPhoneVerificationInput) => api.users.confirmPhone(token!, data),
+    onSuccess: (updatedUser) => {
+      updateUser(updatedUser);
+      queryClient.setQueryData(['users', 'me'], updatedUser);
+      phoneConfirmForm.reset();
+      setPhoneVerifyStep('idle');
+      setPhoneVerifySuccess('Telefon nömrəsi təsdiqləndi');
+      setPhoneVerifyServerError(null);
+      autoDismiss(setPhoneVerifySuccess, 4000);
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setPhoneVerifyServerError(error.message);
+      } else {
+        setPhoneVerifyServerError('Telefon təsdiqlənərkən xəta baş verdi');
+      }
+    },
+  });
 
   const handleAvatarSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -686,6 +739,113 @@ export function SettingsForm() {
             )}
             {emailChangeSuccess && (
               <p className="text-sm text-green-600 dark:text-green-400">{emailChangeSuccess}</p>
+            )}
+          </div>
+
+          <div className="space-y-3 border-t border-border pt-6">
+            <div>
+              <h3 className="text-base font-semibold">Telefon təsdiqi</h3>
+              <p className="text-sm text-muted-foreground">
+                Nömrəni əvvəlcə profilə yazın, sonra e-poçtunuza gələn kodla təsdiqləyin.
+              </p>
+            </div>
+            {source.phone ? (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm">
+                  {source.phone}{' '}
+                  <span
+                    className={
+                      source.phoneVerifiedAt
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-amber-700 dark:text-amber-400'
+                    }
+                  >
+                    {source.phoneVerifiedAt ? '· Təsdiqlənib' : '· Təsdiqlənməyib'}
+                  </span>
+                </p>
+                {!source.phoneVerifiedAt && phoneVerifyStep === 'idle' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-[44px] shrink-0"
+                    disabled={requestPhoneVerifyMutation.isPending}
+                    onClick={() => requestPhoneVerifyMutation.mutate()}
+                  >
+                    {requestPhoneVerifyMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Göndərilir...
+                      </>
+                    ) : (
+                      'Təsdiq kodu göndər'
+                    )}
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Təsdiq üçün əvvəlcə telefon nömrəsini saxlayın.
+              </p>
+            )}
+            {phoneVerifyStep === 'verify' && !source.phoneVerifiedAt && (
+              <form
+                onSubmit={phoneConfirmForm.handleSubmit((values) =>
+                  confirmPhoneMutation.mutate(values),
+                )}
+                className="space-y-3"
+                noValidate
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="phoneCode">Təsdiq kodu</Label>
+                  <Input
+                    id="phoneCode"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={8}
+                    placeholder="8 rəqəm"
+                    {...phoneConfirmForm.register('code')}
+                  />
+                  {phoneConfirmForm.formState.errors.code && (
+                    <p className="text-sm text-destructive">
+                      {phoneConfirmForm.formState.errors.code.message}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    type="submit"
+                    className="min-h-[44px]"
+                    disabled={confirmPhoneMutation.isPending}
+                  >
+                    {confirmPhoneMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Yoxlanır...
+                      </>
+                    ) : (
+                      'Təsdiqlə'
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-[44px]"
+                    onClick={() => {
+                      setPhoneVerifyStep('idle');
+                      phoneConfirmForm.reset();
+                      setPhoneVerifyServerError(null);
+                    }}
+                  >
+                    Ləğv et
+                  </Button>
+                </div>
+              </form>
+            )}
+            {phoneVerifyServerError && (
+              <p className="text-sm text-destructive">{phoneVerifyServerError}</p>
+            )}
+            {phoneVerifySuccess && (
+              <p className="text-sm text-green-600 dark:text-green-400">{phoneVerifySuccess}</p>
             )}
           </div>
 

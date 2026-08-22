@@ -158,6 +158,30 @@ export enum ReportStatus {
   DISMISSED = 'DISMISSED',
 }
 
+export enum KycDocumentType {
+  ID_FRONT = 'ID_FRONT',
+  ID_BACK = 'ID_BACK',
+  SELFIE = 'SELFIE',
+}
+
+export enum KycDocumentStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
+
+export const KYC_DOCUMENT_TYPE_LABELS: Record<KycDocumentType, string> = {
+  [KycDocumentType.ID_FRONT]: 'Şəxsiyyət vəsiqəsi (ön)',
+  [KycDocumentType.ID_BACK]: 'Şəxsiyyət vəsiqəsi (arxa)',
+  [KycDocumentType.SELFIE]: 'Selfie',
+};
+
+export const KYC_DOCUMENT_STATUS_LABELS: Record<KycDocumentStatus, string> = {
+  [KycDocumentStatus.PENDING]: 'Gözləyir',
+  [KycDocumentStatus.APPROVED]: 'Təsdiqlənib',
+  [KycDocumentStatus.REJECTED]: 'Rədd edilib',
+};
+
 /** Provider reytinq / rəy badge-i */
 export const REVIEW_NOTIFICATION_TYPES = [NotificationType.REVIEW_RECEIVED] as const;
 

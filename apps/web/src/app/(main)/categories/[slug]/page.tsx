@@ -54,13 +54,13 @@ export async function generateMetadata({
   const data = await loadCategoryData(slug);
 
   if (!data) {
-    return { title: 'Kateqoriya tapılmadı | Xidmətal' };
+    return { title: 'Kateqoriya tapılmadı' };
   }
 
   const { category } = data;
 
   return {
-    title: `${category.name} | Xidmətal`,
+    title: category.name,
     description:
       category.description ??
       `${category.name} kateqoriyasında etibarlı xidmət verənləri tapın, müqayisə edin və sifariş verin.`,

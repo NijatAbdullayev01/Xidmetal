@@ -5,6 +5,7 @@ import { AvailabilityModule } from '../availability/availability.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { TrackingModule } from '../tracking/tracking.module';
 import { DispatchModule } from '../dispatch/dispatch.module';
+import { GeoModule } from '../geo/geo.module';
 import { NotificationChannelsModule } from '../../common/notifications/notification-channels.module';
 import { IdempotencyModule } from '../../common/idempotency/idempotency.module';
 
@@ -16,6 +17,7 @@ import { IdempotencyModule } from '../../common/idempotency/idempotency.module';
     NotificationChannelsModule,
     IdempotencyModule,
     forwardRef(() => DispatchModule),
+    GeoModule,
   ],
   controllers: [BookingsController],
   providers: [BookingsService],

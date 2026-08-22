@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { RequireEmailVerified } from '../../common/decorators';
@@ -22,5 +22,11 @@ export class ReportsController {
   @ApiOperation({ summary: 'Şikayət göndər' })
   create(@CurrentUser('id') userId: string, @Body() dto: CreateReportDto) {
     return this.reportsService.create(userId, dto);
+  }
+
+  @Get('mine')
+  @ApiOperation({ summary: 'Öz şikayətlərimin statusu' })
+  listMine(@CurrentUser('id') userId: string) {
+    return this.reportsService.listMine(userId);
   }
 }

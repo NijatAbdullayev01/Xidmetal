@@ -17,7 +17,7 @@ import { APP } from '@xidmetal/shared';
 import { BecomeProviderLink } from '@/components/auth/become-provider-link';
 
 export const metadata: Metadata = {
-  title: 'Haqqımızda | Xidmətal',
+  title: 'Haqqımızda',
   description:
     'Xidmətal haqqında — missiyamız, dəyərlərimiz və xidmət verənlərlə xidmət alanları necə birləşdirdiyimiz barədə məlumat.',
 };

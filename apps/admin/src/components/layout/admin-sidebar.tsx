@@ -17,6 +17,8 @@ import {
   Flag,
   Megaphone,
   BarChart3,
+  Inbox,
+  ScrollText,
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -44,6 +46,8 @@ const ADMIN_NAV: NavItem[] = [
   { href: '/bookings', label: 'Sifarişlər', icon: ClipboardList },
   { href: '/reviews', label: 'Rəylər', icon: Star },
   { href: '/reports', label: 'Şikayətlər', icon: Flag },
+  { href: '/contact', label: 'Əlaqə', icon: Inbox },
+  { href: '/audit', label: 'Audit', icon: ScrollText },
   { href: '/announcements', label: 'Bildirişlər', icon: Megaphone },
   { href: '/settings', label: 'Tənzimləmələr', icon: Settings },
 ];

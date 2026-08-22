@@ -30,15 +30,15 @@ export class GeoPositionError extends Error {
 export function geoErrorMessage(code: GeoPositionErrorCode): string {
   switch (code) {
     case 'unsupported':
-      return 'Brauzeriniz konum paylaşımını dəstəkləmir';
+      return 'Brauzeriniz mövqe paylaşımını dəstəkləmir';
     case 'permission_denied':
-      return 'Konum icazəsi verilmədi — brauzer ayarlarından icazə verin';
+      return 'Mövqe icazəsi verilmədi — brauzer ayarlarından icazə verin';
     case 'position_unavailable':
-      return 'Konum tapılmadı — xəritədən əl ilə seçin və ya GPS-i yoxlayın';
+      return 'Mövqe tapılmadı — xəritədən əl ilə seçin və ya GPS-i yoxlayın';
     case 'timeout':
-      return 'Konum sorğusu vaxt aşımına uğradı — xəritədən seçin və ya yenidən cəhd edin';
+      return 'Mövqe sorğusu vaxt aşımına uğradı — xəritədən seçin və ya yenidən cəhd edin';
     default:
-      return 'Konum alınmadı — xəritədən əl ilə seçə bilərsiniz';
+      return 'Mövqe alınmadı — xəritədən əl ilə seçə bilərsiniz';
   }
 }
 
@@ -50,7 +50,7 @@ function getGeolocationSupportError(): GeoPositionError | null {
   if (typeof window !== 'undefined' && !window.isSecureContext) {
     return new GeoPositionError(
       'permission_denied',
-      'Konum üçün sayt HTTPS və ya localhost üzərindən açılmalıdır',
+      'Mövqe üçün sayt HTTPS və ya localhost üzərindən açılmalıdır',
     );
   }
 
