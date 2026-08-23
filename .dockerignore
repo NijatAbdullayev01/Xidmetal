@@ -12,8 +12,6 @@
 **/dist
 **/coverage
 **/*.md
-apps/web
-apps/admin
 uploads
 .pnpm-store
 agent-transcripts

@@ -6,7 +6,7 @@ export function resolveSocketCorsOrigins(
 ): string | string[] | false {
   const socketCors = config.get<string>('SOCKET_CORS_ORIGIN')?.trim();
   const corsOriginRaw =
-    socketCors || config.get<string>('CORS_ORIGIN', 'http://localhost:3020,http://localhost:3021');
+    socketCors || config.get<string>('CORS_ORIGIN', 'http://localhost:3120,http://localhost:3121');
   const origins = [
     ...corsOriginRaw.split(','),
     config.get<string>('NEXT_PUBLIC_APP_URL'),

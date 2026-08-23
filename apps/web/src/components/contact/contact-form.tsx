@@ -37,7 +37,8 @@ export function ContactForm() {
   } = useForm<ContactFormInput>({
     resolver: zodResolver(contactFormSchema),
     defaultValues: {
-      name: '',
+      firstName: '',
+      lastName: '',
       email: '',
       phone: '',
       subject: 'general',
@@ -57,7 +58,7 @@ export function ContactForm() {
 
     try {
       await api.contact.submit({
-        name: values.name.trim(),
+        name: `${values.firstName.trim()} ${values.lastName.trim()}`,
         email: values.email.trim(),
         phone: values.phone?.trim() || undefined,
         subject: values.subject,
@@ -129,20 +130,38 @@ export function ContactForm() {
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="contact-name">Ad və soyad</Label>
-          <Input
-            id="contact-name"
-            autoComplete="name"
-            placeholder="Adınızı daxil edin"
-            error={!!errors.name}
-            {...register('name')}
-          />
-          {errors.name && (
-            <p className="text-sm text-destructive" role="alert">
-              {errors.name.message}
-            </p>
-          )}
+        <div className="grid grid-cols-2 gap-3 min-w-0 sm:gap-5">
+          <div className="min-w-0 space-y-2">
+            <Label htmlFor="contact-first-name">Ad</Label>
+            <Input
+              id="contact-first-name"
+              autoComplete="given-name"
+              placeholder="Əli"
+              error={!!errors.firstName}
+              {...register('firstName')}
+            />
+            {errors.firstName && (
+              <p className="text-sm text-destructive" role="alert">
+                {errors.firstName.message}
+              </p>
+            )}
+          </div>
+
+          <div className="min-w-0 space-y-2">
+            <Label htmlFor="contact-last-name">Soyad</Label>
+            <Input
+              id="contact-last-name"
+              autoComplete="family-name"
+              placeholder="Məmmədov"
+              error={!!errors.lastName}
+              {...register('lastName')}
+            />
+            {errors.lastName && (
+              <p className="text-sm text-destructive" role="alert">
+                {errors.lastName.message}
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">

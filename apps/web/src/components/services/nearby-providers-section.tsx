@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2, MapPin, Navigation, ShieldCheck } from 'lucide-react';
 import { Button, buttonStyles } from '@/components/ui/button';
 import { api } from '@/lib/api';
+import { GeoPositionError, readCurrentPositionWithFallback } from '@/lib/geolocation';
 import { cn } from '@/lib/utils';
 
 function formatDistance(meters: number): string {
@@ -25,31 +26,24 @@ type GeoState =
 export function NearbyProvidersSection({ className }: { className?: string }) {
   const [geo, setGeo] = useState<GeoState>({ status: 'idle' });
 
-  function requestLocation() {
-    if (!navigator.geolocation) {
+  async function requestLocation() {
+    setGeo({ status: 'locating' });
+    try {
+      const pos = await readCurrentPositionWithFallback({ desiredAccuracyM: 80 });
+      setGeo({
+        status: 'ready',
+        lat: pos.lat,
+        lng: pos.lng,
+      });
+    } catch (err) {
       setGeo({
         status: 'denied',
-        message: 'Brauzeriniz mövqe paylaşımını dəstəkləmir',
+        message:
+          err instanceof GeoPositionError
+            ? err.message
+            : 'Mövqe icazəsi verilmədi. Yaxın xidmətləri görmək üçün icazə verin.',
       });
-      return;
     }
-    setGeo({ status: 'locating' });
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGeo({
-          status: 'ready',
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        });
-      },
-      () => {
-        setGeo({
-          status: 'denied',
-          message: 'Mövqe icazəsi verilmədi. Yaxın xidmətləri görmək üçün icazə verin.',
-        });
-      },
-      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 },
-    );
   }
 
   useEffect(() => {

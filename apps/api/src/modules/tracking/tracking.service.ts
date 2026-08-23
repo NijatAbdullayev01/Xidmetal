@@ -9,7 +9,6 @@ import {
   LOCATION_GEO_SYNC_INTERVAL_MS,
   LOCATION_PING_SAMPLE_INTERVAL_MS,
   LOCATION_PUSH_MIN_INTERVAL_MS,
-  UserRole,
   estimateEtaSeconds,
   isTrackableBookingStatus,
   isValidCoordinates,
@@ -27,10 +26,13 @@ import { RealtimeService } from '../realtime/realtime.service';
 import { canPushLocation } from '../realtime/realtime-auth';
 import type { WsAuthenticatedUser } from '../realtime/realtime-auth';
 import { EtaService } from '../geo/eta.service';
+import { isBookingParticipant } from '../bookings/booking-access';
 
 type TrackableBooking = {
   id: string;
   status: string;
+  type: string;
+  acceptedAt: Date | null;
   providerId: string;
   customerId: string;
   destLat: number | null;
@@ -157,15 +159,20 @@ export class TrackingService {
   ): Promise<LocationPingSummary[]> {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      select: { customerId: true, providerId: true },
+      select: {
+        customerId: true,
+        providerId: true,
+        type: true,
+        status: true,
+        acceptedAt: true,
+      },
     });
     if (!booking) {
       throw new NotFoundException('Sifariş tapılmadı');
     }
 
-    const isParticipant =
-      booking.customerId === userId || booking.providerId === userId;
-    if (role !== UserRole.ADMIN && !isParticipant) {
+    const isParticipant = isBookingParticipant(userId, role, booking);
+    if (!isParticipant) {
       throw new ForbiddenException('Bu sifarişə baxmaq icazəniz yoxdur');
     }
 
@@ -193,7 +200,12 @@ export class TrackingService {
   ): Promise<{ customerId: string; providerId: string }> {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      select: { customerId: true, providerId: true },
+      select: {
+        customerId: true,
+        providerId: true,
+        type: true,
+        acceptedAt: true,
+      },
     });
     if (!booking) {
       throw new NotFoundException('Sifariş tapılmadı');
@@ -236,6 +248,8 @@ export class TrackingService {
       select: {
         id: true,
         status: true,
+        type: true,
+        acceptedAt: true,
         providerId: true,
         customerId: true,
         destLat: true,

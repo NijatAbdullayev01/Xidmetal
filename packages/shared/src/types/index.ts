@@ -6,6 +6,7 @@ import {
   AvailabilityOverrideType,
   AvailabilitySlotStatus,
   ProviderAvailability,
+  ProviderAccountType,
 } from '../enums';
 
 export interface ApiResponse<T = unknown> {
@@ -28,6 +29,8 @@ export interface ProviderProfile {
   bio?: string;
   experience?: number;
   location?: string;
+  accountType?: ProviderAccountType;
+  companyName?: string | null;
   isVerified: boolean;
   rating: number;
   reviewCount: number;
@@ -228,6 +231,8 @@ export interface AdminUserSummary {
     reviewCount: number;
     location?: string;
     experience?: number;
+    accountType?: ProviderAccountType;
+    companyName?: string | null;
   };
   _count?: {
     services: number;

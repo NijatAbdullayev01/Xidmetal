@@ -90,12 +90,20 @@ enum ProviderAvailability {
   BUSY
 }
 
+/** Xidmət verən qeydiyyat növü — fərdi şəxs və ya şirkət */
+enum ProviderAccountType {
+  INDIVIDUAL
+  COMPANY
+}
+
 model ProviderProfile {
   id          String   @id @default(uuid())
   userId      String   @unique @map("user_id")
   bio         String?
   experience  Int?
   location    String?
+  accountType ProviderAccountType @default(INDIVIDUAL) @map("account_type")
+  companyName String?             @map("company_name")
   isVerified  Boolean  @default(false) @map("is_verified")
   rating      Float    @default(0)
   reviewCount Int      @default(0) @map("review_count")

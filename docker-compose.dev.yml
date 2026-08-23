@@ -1,0 +1,48 @@
+# Development infra ONLY — production stack-ə toxunmur.
+# Production: docker-compose.yml + docker-compose.prod.yml (xidmetal.com → 3020/3021/4000)
+# Dev:        pnpm docker:dev  sonra  pnpm dev  (3120 / 3121 / 4100)
+#
+#   pnpm docker:dev
+#   pnpm docker:dev:down
+#
+# Ayrı Compose layihəsi (xidmetal-dev): volume, konteyner və host portları
+# canlı xidmetal.com Postgres/Redis-indən izolə olunub.
+
+name: xidmetal-dev
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.5
+    container_name: xidmetal-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: xidmetal
+      POSTGRES_PASSWORD: xidmetal_dev
+      POSTGRES_DB: xidmetal
+    ports:
+      - '127.0.0.1:5435:5432'
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U xidmetal -d xidmetal']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: xidmetal-dev-redis
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6381:6379'
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:

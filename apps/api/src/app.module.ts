@@ -38,7 +38,13 @@ import { RedisThrottlerStorage } from './common/throttler/redis-throttler.storag
 @Module({
   imports: [
     SentryModule.forRoot(),
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../../.env', '.env'] }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath:
+        process.env.NODE_ENV === 'production'
+          ? ['.env']
+          : ['../../.env.development', '../../.env', '.env'],
+    }),
     RedisModule,
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],

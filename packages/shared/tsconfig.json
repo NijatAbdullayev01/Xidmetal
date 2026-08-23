@@ -7,6 +7,7 @@
     "rootDir": "./src",
     "module": "CommonJS",
     "moduleResolution": "Node10",
+    "ignoreDeprecations": "6.0",
     "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
   "include": ["src/**/*"],

@@ -189,7 +189,7 @@ const sections: {
     paragraphs: [
       'Platformanın dizaynı, loqosu, proqram təminatı, mətnləri, qrafikası və digər brend elementləri Xidmətala və ya müvafiq hüquq sahiblərinə məxsusdur. Bu materialların icazəsiz surəti, dəyişdirilməsi və kommersiya istifadəsi qadağandır.',
       'İstifadəçi Platformaya məzmun (elan, şəkil, rəy və s.) yerləşdirməklə həmin məzmuna dair lazımi hüquqlara malik olduğunu təsdiq edir və Platformaya məzmunu Platformanın fəaliyyəti çərçivəsində göstərmək, saxlamaq və texniki cəhətdən emal etmək üçün qeyri-eksklüziv, ödənişsiz lisenziya verir.',
-      'Hüquq pozuntusu barədə müraciət üçün legal@xidmetal.az ünvanına yazın.',
+      'Hüquq pozuntusu barədə müraciət üçün legal@xidmetal.com ünvanına yazın.',
     ],
   },
   {
@@ -283,8 +283,8 @@ const sections: {
       'İstifadə qaydaları ilə bağlı sual, bildiriş və hüquqi müraciətlərinizi aşağıdakı ünvanlara göndərə bilərsiniz:',
     ],
     list: [
-      'Hüquqi müraciətlər: legal@xidmetal.az',
-      'Ümumi əlaqə: info@xidmetal.az',
+      'Hüquqi müraciətlər: legal@xidmetal.com',
+      'Ümumi əlaqə: info@xidmetal.com',
       'Ünvan: Bakı, Azərbaycan',
       'Əlaqə forması: /contact səhifəsi',
     ],
@@ -415,10 +415,10 @@ export default function TermsPage() {
                     <p className="mt-2 text-sm leading-relaxed text-brand-foreground/80">
                       İstifadə qaydaları ilə bağlı müraciətinizi{' '}
                       <a
-                        href="mailto:legal@xidmetal.az"
+                        href="mailto:legal@xidmetal.com"
                         className="font-medium underline underline-offset-2 hover:text-brand-foreground"
                       >
-                        legal@xidmetal.az
+                        legal@xidmetal.com
                       </a>{' '}
                       ünvanına göndərə və ya{' '}
                       <Link

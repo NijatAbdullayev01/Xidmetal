@@ -48,6 +48,15 @@ describe('assertProductionRuntimeConfig', () => {
     ).toThrow(/SMTP_HOST|TURNSTILE|REDIS_URL|METRICS_TOKEN/);
   });
 
+  it('loopback SMTP_HOST production-da qadağandır', () => {
+    expect(() =>
+      assertProductionRuntimeConfig({
+        ...valid,
+        smtpHost: 'localhost',
+      }),
+    ).toThrow(/SMTP_HOST/);
+  });
+
   it('MEDIA_SIGNING_SECRET əskikdirsə fail edir', () => {
     expect(() =>
       assertProductionRuntimeConfig({
@@ -82,6 +91,15 @@ describe('assertProductionRuntimeConfig', () => {
         paymentsEnabled: 'true',
       }),
     ).toThrow(/PAYMENTS_ENABLED/);
+  });
+
+  it('Cloudflare dummy Turnstile secret boot-u dayandırmır (captcha skip)', () => {
+    expect(() =>
+      assertProductionRuntimeConfig({
+        ...valid,
+        turnstileSecret: '1x0000000000000000000000000000000AA',
+      }),
+    ).not.toThrow();
   });
 
   it('PAYMENT_PROVIDER=stripe production-da qadağandır', () => {

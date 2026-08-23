@@ -28,8 +28,8 @@ const contactInfo: {
   {
     icon: Mail,
     title: 'E-poçt',
-    value: 'info@xidmetal.az',
-    href: 'mailto:info@xidmetal.az',
+    value: 'info@xidmetal.com',
+    href: 'mailto:info@xidmetal.com',
   },
   {
     icon: Phone,

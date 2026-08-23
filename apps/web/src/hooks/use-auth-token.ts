@@ -13,5 +13,5 @@ export function useAuthToken(): string | null {
     return null;
   }
 
-  return 'session';
+  return user.id;
 }

@@ -15,18 +15,20 @@ import {
   ServiceStatus,
   UserRole,
 } from '@prisma/client';
-import type {
-  AdminAnnouncementResult,
-  AdminCategorySummary,
-  AdminDashboardStats,
-  AdminReportSummary,
-  AdminReviewSummary,
-  AdminUserSummary,
-  BookingSummary,
-  PaginatedResponse,
-  ServiceSummary,
+import {
+  formatProviderDisplayName,
+  ProviderAccountType,
+  sanitizeInternalPath,
+  type AdminAnnouncementResult,
+  type AdminCategorySummary,
+  type AdminDashboardStats,
+  type AdminReportSummary,
+  type AdminReviewSummary,
+  type AdminUserSummary,
+  type BookingSummary,
+  type PaginatedResponse,
+  type ServiceSummary,
 } from '@xidmetal/shared';
-import { sanitizeInternalPath } from '@xidmetal/shared';
 import { PrismaService } from '../../common/database/prisma.service';
 import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
 import { StorageService } from '../../common/storage/storage.service';
@@ -146,6 +148,8 @@ export class AdminService {
               { email: { contains: query.search, mode: 'insensitive' } },
               { firstName: { contains: query.search, mode: 'insensitive' } },
               { lastName: { contains: query.search, mode: 'insensitive' } },
+              { phone: { contains: query.search, mode: 'insensitive' } },
+              { providerProfile: { companyName: { contains: query.search, mode: 'insensitive' } } },
             ],
           }
         : {}),
@@ -421,7 +425,7 @@ export class AdminService {
               firstName: true,
               lastName: true,
               avatarUrl: true,
-              providerProfile: { select: { experience: true, rating: true, reviewCount: true } },
+              providerProfile: { select: { experience: true, rating: true, reviewCount: true, accountType: true, companyName: true } },
             },
           },
           images: { orderBy: { sortOrder: 'asc' }, take: 1 },
@@ -441,7 +445,7 @@ export class AdminService {
         categoryId: s.categoryId,
         categoryName: s.category.name,
         providerId: s.providerId,
-        providerName: `${s.provider.firstName} ${s.provider.lastName}`,
+        providerName: formatProviderDisplayName(s.provider),
         providerAvatarUrl: await this.storageService.toReadableMediaUrl(s.provider.avatarUrl),
         providerExperience: s.provider.providerProfile?.experience ?? undefined,
         averageRating: s.provider.providerProfile?.rating ?? 0,
@@ -615,7 +619,7 @@ export class AdminService {
           firstName: true,
           lastName: true,
           avatarUrl: true,
-          providerProfile: { select: { experience: true, rating: true, reviewCount: true } },
+          providerProfile: { select: { experience: true, rating: true, reviewCount: true, accountType: true, companyName: true } },
         },
       },
       images: { orderBy: { sortOrder: 'asc' as const }, take: 3 },
@@ -652,6 +656,8 @@ export class AdminService {
         experience: number | null;
         rating: number;
         reviewCount: number;
+        accountType?: string | null;
+        companyName?: string | null;
       } | null;
     };
     images: Array<{ id: string; url: string; alt: string | null; sortOrder: number }>;
@@ -666,7 +672,7 @@ export class AdminService {
       categoryId: updated.categoryId,
       categoryName: updated.category.name,
       providerId: updated.providerId,
-      providerName: `${updated.provider.firstName} ${updated.provider.lastName}`,
+      providerName: formatProviderDisplayName(updated.provider),
       providerAvatarUrl: await this.storageService.toReadableMediaUrl(
         updated.provider.avatarUrl,
       ),
@@ -1254,6 +1260,8 @@ export class AdminService {
       reviewCount: number;
       location: string | null;
       experience: number | null;
+      accountType?: string;
+      companyName?: string | null;
     } | null;
     _count: {
       services: number;
@@ -1281,6 +1289,10 @@ export class AdminService {
             reviewCount: user.providerProfile.reviewCount,
             location: user.providerProfile.location ?? undefined,
             experience: user.providerProfile.experience ?? undefined,
+            accountType:
+              (user.providerProfile.accountType as ProviderAccountType | undefined) ??
+              ProviderAccountType.INDIVIDUAL,
+            companyName: user.providerProfile.companyName ?? null,
           }
         : undefined,
       _count: user._count,

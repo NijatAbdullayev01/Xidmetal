@@ -8,6 +8,8 @@ export type GeoCoords = {
 
 export type GeoCoordsWithAccuracy = GeoCoords & {
   accuracyM: number | null;
+  /** GPS oxunuşunda tez-tez dolu; Wi‑Fi/şəbəkə mövqeyində yoxdur */
+  hasAltitude: boolean;
 };
 
 export type GeoPositionErrorCode =
@@ -15,7 +17,34 @@ export type GeoPositionErrorCode =
   | 'permission_denied'
   | 'position_unavailable'
   | 'timeout'
+  | 'aborted'
   | 'unknown';
+
+/**
+ * Chrome native `timeout`-u icazə pəncərəsindən də sayır.
+ * JS deadline-ə əlavə ehtiyat — dialoq bağlanana qədər GPS-i kəsmə.
+ */
+const GEO_PERMISSION_GRACE_MS = 20_000;
+
+/** Watch ilişəndə yenidən start — yalnız ilk callback-dən sonra. */
+const GEO_WATCH_KICK_MS = 8_000;
+
+/**
+ * Bu dəqiqlikdən (metr) yaxşı oxunuş sıx GPS locku sayılır —
+ * dərhal qəbul edilir (şəbəkə/Wi‑Fi oxunuşu bura düşmür).
+ */
+const GEO_TIGHT_LOCK_ACCURACY_M = 20;
+
+/**
+ * İlk kobud oxunuşdan sonra GPS-in dəqiqləşməsi üçün minimum gözləmə (ms).
+ * Chrome ilk callback-də tez-tez şəbəkə mövqeyi verir; bu pəncərə olmadan
+ * pin dəqiq GPS-ə çatmamış "yaxın amma dəqiq deyil" yerdə ilişir.
+ */
+const GEO_MIN_REFINE_WEBKIT_MS = 8_000;
+const GEO_MIN_REFINE_DEFAULT_MS = 5_000;
+
+/** Oxunuşlar dayandıqdan (yaxşılaşma bitdikdən) sonra ən yaxşını ver (ms). */
+const GEO_SETTLE_AFTER_MS = 3_000;
 
 export class GeoPositionError extends Error {
   readonly code: GeoPositionErrorCode;
@@ -27,18 +56,144 @@ export class GeoPositionError extends Error {
   }
 }
 
+export function geoPermissionDeniedMessage(
+  webkit = isWebKitGeolocationEngine(),
+  appleMobile = isAppleMobileGeolocation(),
+): string {
+  if (appleMobile) {
+    return 'Mövqe üçün xəritədəki düyməyə basın. Açılmazsa: Ayarlar → Məxfilik → Məkan Xidmətləri → Safari → Soruş və ya İcazə ver';
+  }
+  if (webkit) {
+    return 'Mövqe üçün xəritədəki düyməyə basın. Açılmazsa: Safari → Ayarlar → Vebsaytlar → Məkan Xidmətləri';
+  }
+  return 'Mövqe icazəsi verilmədi — ünvan çubuğundakı kilidə basıb Məkan → İcazə ver seçin';
+}
+
 export function geoErrorMessage(code: GeoPositionErrorCode): string {
   switch (code) {
     case 'unsupported':
       return 'Brauzeriniz mövqe paylaşımını dəstəkləmir';
     case 'permission_denied':
-      return 'Mövqe icazəsi verilmədi — brauzer ayarlarından icazə verin';
+      return geoPermissionDeniedMessage();
     case 'position_unavailable':
-      return 'Mövqe tapılmadı — xəritədən əl ilə seçin və ya GPS-i yoxlayın';
+      return 'Mövqe tapılmadı — xəritədən əl ilə seçin, cihazın məkan xidmətini və GPS-i yoxlayın';
     case 'timeout':
-      return 'Mövqe sorğusu vaxt aşımına uğradı — xəritədən seçin və ya yenidən cəhd edin';
+      return 'Mövqe sorğusu vaxt aşımına uğradı — ünvan çubuğunda məkan icazəsini yoxlayın və ya xəritədən seçin';
+    case 'aborted':
+      return 'Mövqe sorğusu ləğv edildi';
     default:
       return 'Mövqe alınmadı — xəritədən əl ilə seçə bilərsiniz';
+  }
+}
+
+/** Safari avtomatik GPS-i jest olmadan rədd edir — yalnız düymə. */
+export function shouldAutoRequestGeolocation(
+  webkit = isWebKitGeolocationEngine(),
+): boolean {
+  return !webkit;
+}
+
+/**
+ * iOS (Safari/Chrome/Firefox) və masaüstü Safari — CoreLocation + WebKit.
+ * Android Chrome buraya düşmür.
+ */
+export function isWebKitGeolocationEngine(
+  userAgent: string = typeof navigator === 'undefined' ? '' : navigator.userAgent,
+  maxTouchPoints: number = typeof navigator === 'undefined' ? 0 : navigator.maxTouchPoints,
+  platform: string = typeof navigator === 'undefined' ? '' : navigator.platform,
+): boolean {
+  if (!userAgent) return false;
+  const iOSDevice = /iP(ad|hone|od)/i.test(userAgent);
+  const iPadOsDesktop = platform === 'MacIntel' && maxTouchPoints > 1;
+  const desktopSafari =
+    /Safari/i.test(userAgent) &&
+    !/Chrome|Chromium|CriOS|FxiOS|Edg|OPR|Android/i.test(userAgent);
+  return iOSDevice || iPadOsDesktop || desktopSafari;
+}
+
+export function isAppleMobileGeolocation(
+  userAgent: string = typeof navigator === 'undefined' ? '' : navigator.userAgent,
+  maxTouchPoints: number = typeof navigator === 'undefined' ? 0 : navigator.maxTouchPoints,
+  platform: string = typeof navigator === 'undefined' ? '' : navigator.platform,
+): boolean {
+  if (/iP(ad|hone|od)/i.test(userAgent)) return true;
+  return platform === 'MacIntel' && maxTouchPoints > 1;
+}
+
+export function defaultHighAccuracyWaitMs(
+  webkit = isWebKitGeolocationEngine(),
+): number {
+  return webkit ? 28_000 : 20_000;
+}
+
+/** Yalnız icazə rəddi / dəstəklənməmə watch-u kəsir. TIMEOUT və UNAVAILABLE GPS istiləşməsidir. */
+export function shouldAbortGeoWatchOnError(code: GeoPositionErrorCode): boolean {
+  return code === 'permission_denied' || code === 'unsupported';
+}
+
+/**
+ * watchPosition seçimləri.
+ * Native `timeout` ötürülmür: Chrome icazə dialoqunu da sayır, TIMEOUT isə
+ * watch-u kəsir; Safari-də isə ilk Wi‑Fi-dən sonra GPS heç vaxt çatmır.
+ * Deadline yalnız JS timer-dir.
+ */
+export function buildWatchPositionOptions(params: {
+  enableHighAccuracy: boolean;
+  maximumAge: number;
+  /** @deprecated Native timeout watch-u kəsir — istifadə olunmur */
+  timeoutMs?: number;
+  webkit?: boolean;
+}): PositionOptions {
+  return {
+    enableHighAccuracy: params.enableHighAccuracy,
+    maximumAge: params.maximumAge,
+  };
+}
+
+export function isBetterGeoReading(
+  next: GeoCoordsWithAccuracy,
+  current: GeoCoordsWithAccuracy | null,
+): boolean {
+  if (!current) return true;
+  const nextAcc = next.accuracyM ?? Number.POSITIVE_INFINITY;
+  const curAcc = current.accuracyM ?? Number.POSITIVE_INFINITY;
+  if (nextAcc + 5 < curAcc) return true;
+  if (curAcc + 5 < nextAcc) return false;
+  if (next.hasAltitude && !current.hasAltitude) return true;
+  return nextAcc < curAcc;
+}
+
+export function geoAccuracyHint(accuracyM: number | null): string | null {
+  if (accuracyM == null) return null;
+  if (accuracyM > 300) {
+    return isAppleMobileGeolocation()
+      ? 'Təxmini yer gəldi — Ayarlar → Məxfilik → Məkan Xidmətləri → Safari → Dəqiq Məkanı açın və ya pini əl ilə düzəldin'
+      : 'GPS dəqiqliyi zəifdir — pini xəritədə əl ilə düzəldin';
+  }
+  if (accuracyM > 100) return 'Siqnal zəifdir — açıq yerdə yenidən cəhd edin';
+  return 'GPS dəqiqliyi yaxşıdır';
+}
+
+/**
+ * Ayrıca `getCurrentPosition` (Wi‑Fi prime) Chrome-da icazə dialoqunu
+ * qısa timeout-la öldürür. watchPosition özü şəbəkə mövqeyini birinci verir.
+ */
+export function shouldPrimeWithNetworkLocation(
+  webkit = isWebKitGeolocationEngine(),
+): boolean {
+  void webkit;
+  return false;
+}
+
+async function queryGeolocationPermission(): Promise<PermissionState | 'unknown'> {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.permissions?.query) {
+      return 'unknown';
+    }
+    const status = await navigator.permissions.query({ name: 'geolocation' });
+    return status.state;
+  } catch {
+    return 'unknown';
   }
 }
 
@@ -84,7 +239,13 @@ function fromGeolocationPosition(pos: GeolocationPosition): GeoCoordsWithAccurac
     accuracyM: Number.isFinite(pos.coords.accuracy)
       ? Math.round(pos.coords.accuracy)
       : null,
+    hasAltitude:
+      pos.coords.altitude != null && Number.isFinite(pos.coords.altitude),
   };
+}
+
+function abortedError(): GeoPositionError {
+  return new GeoPositionError('aborted', geoErrorMessage('aborted'));
 }
 
 function readPositionOnce(options: PositionOptions): Promise<GeoCoordsWithAccuracy> {
@@ -102,21 +263,12 @@ function readPositionOnce(options: PositionOptions): Promise<GeoCoordsWithAccura
   });
 }
 
-function isBetterReading(
-  next: GeoCoordsWithAccuracy,
-  current: GeoCoordsWithAccuracy | null,
-): boolean {
-  if (!current) return true;
-  const nextAcc = next.accuracyM ?? Number.POSITIVE_INFINITY;
-  const curAcc = current.accuracyM ?? Number.POSITIVE_INFINITY;
-  return nextAcc < curAcc;
-}
-
 export function readCurrentPosition(options?: PositionOptions): Promise<GeoCoords> {
+  const webkit = isWebKitGeolocationEngine();
   return readPositionOnce({
     enableHighAccuracy: true,
-    timeout: 15_000,
     maximumAge: 0,
+    ...(webkit ? {} : { timeout: 15_000 }),
     ...options,
   }).then(({ lat, lng, heading }) => ({ lat, lng, heading }));
 }
@@ -124,6 +276,7 @@ export function readCurrentPosition(options?: PositionOptions): Promise<GeoCoord
 /**
  * Sürətli ilkin oxunuş:
  * qısa-müddətli keş və ya şəbəkə mövqeyi ilə xəritəni tez doldurur.
+ * GPS-dən əvvəl çağırmayın — `shouldPrimeWithNetworkLocation`.
  */
 export function readCachedPosition(options?: {
   maximumAgeMs?: number;
@@ -138,22 +291,33 @@ export function readCachedPosition(options?: {
 
 /**
  * Bolt/Uber üslubu — təzə GPS oxunuşu:
- * 1) enableHighAccuracy + maximumAge:0
- * 2) watchPosition ilə dəqiqlik yaxşılaşana qədər (və ya timeout)
- * 3) yalnız tam uğursuzluqda şəbəkə/Wi‑Fi fallback
+ * 1) enableHighAccuracy + watchPosition (native timeout yoxdur)
+ * 2) TIMEOUT/UNAVAILABLE watch-u kəsmir — GPS istiləşə bilər
+ * 3) icazə dialoqu JS deadline-ə daxil edilmir
+ * 4) yalnız tam uğursuzluqda şəbəkə/Wi‑Fi fallback
  */
 export async function readCurrentPositionWithFallback(options?: {
   /** Məqsəd dəqiqlik (metr) — default 40 */
   desiredAccuracyM?: number;
-  /** GPS gözləmə (ms) — default 12s */
+  /** GPS gözləmə (ms) — default WebKit 28s, Chrome 20s */
   highAccuracyWaitMs?: number;
+  /** İcazə dialoqu üçün əlavə ehtiyat (ms) */
+  permissionGraceMs?: number;
+  /** Hər yaxşılaşan oxunuş — xəritəni Bakı default-unda saxlamamaq üçün */
+  onReading?: (reading: GeoCoordsWithAccuracy) => void;
+  signal?: AbortSignal;
 }): Promise<GeoCoordsWithAccuracy> {
   const desiredAccuracyM = options?.desiredAccuracyM ?? 40;
-  const highAccuracyWaitMs = options?.highAccuracyWaitMs ?? 12_000;
+  const highAccuracyWaitMs =
+    options?.highAccuracyWaitMs ?? defaultHighAccuracyWaitMs();
 
   const supportError = getGeolocationSupportError();
   if (supportError) {
     throw supportError;
+  }
+
+  if (options?.signal?.aborted) {
+    throw abortedError();
   }
 
   try {
@@ -162,6 +326,9 @@ export async function readCurrentPositionWithFallback(options?: {
       desiredAccuracyM,
       maxWaitMs: highAccuracyWaitMs,
       maximumAge: 0,
+      permissionGraceMs: options?.permissionGraceMs ?? GEO_PERMISSION_GRACE_MS,
+      onReading: options?.onReading,
+      signal: options?.signal,
     });
   } catch (err) {
     if (err instanceof GeoPositionError && err.code === 'permission_denied') {
@@ -170,9 +337,15 @@ export async function readCurrentPositionWithFallback(options?: {
     if (err instanceof GeoPositionError && err.code === 'unsupported') {
       throw err;
     }
+    if (err instanceof GeoPositionError && err.code === 'aborted') {
+      throw err;
+    }
   }
 
-  // Şəbəkə/Wi‑Fi və qısa-müddətli keş — dəqiq GPS yoxdursa son çarə
+  if (options?.signal?.aborted) {
+    throw abortedError();
+  }
+
   try {
     return await readPositionOnce({
       enableHighAccuracy: false,
@@ -181,84 +354,203 @@ export async function readCurrentPositionWithFallback(options?: {
     });
   } catch (err) {
     if (err instanceof GeoPositionError) throw err;
-    throw new GeoPositionError('position_unavailable', geoErrorMessage('position_unavailable'));
+    throw new GeoPositionError(
+      'position_unavailable',
+      geoErrorMessage('position_unavailable'),
+    );
   }
 }
 
 /**
+ * Sıx GPS locku — həqiqi mövqe sayılıb dərhal qəbul edilir.
+ * Yalnız altitude yetərli deyil: bəzi Android oxunuşları altitude ilə gəlir,
+ * amma dəqiqlik hələ 30–40 m olur; belələri refine pəncərəsində gözləməlidir.
+ */
+function looksLikeGpsFix(reading: GeoCoordsWithAccuracy): boolean {
+  return reading.accuracyM != null && reading.accuracyM <= GEO_TIGHT_LOCK_ACCURACY_M;
+}
+
+/**
  * watchPosition ilə ən yaxşı oxunuşu seçir.
- * Dəqiqlik hədəfə çatanda və ya maxWait bitəndə resolve.
+ * Refine timer ilk callback-dən sonra başlayır (icazə dialoqu sayılmır).
  */
 function watchBestPosition(params: {
   enableHighAccuracy: boolean;
   desiredAccuracyM: number;
   maxWaitMs: number;
   maximumAge: number;
+  permissionGraceMs: number;
+  onReading?: (reading: GeoCoordsWithAccuracy) => void;
+  signal?: AbortSignal;
 }): Promise<GeoCoordsWithAccuracy> {
-  const { enableHighAccuracy, desiredAccuracyM, maxWaitMs, maximumAge } = params;
+  const {
+    enableHighAccuracy,
+    desiredAccuracyM,
+    maxWaitMs,
+    maximumAge,
+    permissionGraceMs,
+    onReading,
+    signal,
+  } = params;
+  const webkit = isWebKitGeolocationEngine();
+  const minRefineMs = webkit ? GEO_MIN_REFINE_WEBKIT_MS : GEO_MIN_REFINE_DEFAULT_MS;
+  const startedAt = Date.now();
 
   return new Promise((resolve, reject) => {
     let best: GeoCoordsWithAccuracy | null = null;
     let settled = false;
+    let watchId = 0;
+    let kicked = false;
+    let gotCallback = false;
+    let refineTimer = 0;
+    let settleTimer = 0;
+
+    const clearWatch = () => {
+      if (watchId !== 0) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = 0;
+      }
+    };
+
+    const clearTimers = () => {
+      window.clearTimeout(hardCapTimer);
+      window.clearTimeout(kickTimer);
+      window.clearTimeout(refineTimer);
+      window.clearTimeout(settleTimer);
+    };
 
     const finish = (result: GeoCoordsWithAccuracy) => {
       if (settled) return;
       settled = true;
-      window.clearTimeout(timer);
-      navigator.geolocation.clearWatch(watchId);
+      signal?.removeEventListener('abort', onAbort);
+      clearTimers();
+      clearWatch();
       resolve(result);
     };
 
     const fail = (error: GeoPositionError) => {
       if (settled) return;
       settled = true;
-      window.clearTimeout(timer);
-      navigator.geolocation.clearWatch(watchId);
-      if (best) {
+      signal?.removeEventListener('abort', onAbort);
+      clearTimers();
+      clearWatch();
+      if (best && error.code !== 'aborted' && error.code !== 'permission_denied') {
         resolve(best);
         return;
       }
       reject(error);
     };
 
-    const timer = window.setTimeout(() => {
+    const onAbort = () => {
+      fail(abortedError());
+    };
+
+    /**
+     * Yaxşılaşma dayananda ən yaxşı oxunuşu ver — amma minimum refine
+     * pəncərəsindən əvvəl yox. Tək oxunuşlu masaüstündə (GPS yoxdur) uzun
+     * gözləməni bağlayır, mobil GPS-də isə yığılmaya imkan verir.
+     */
+    const armSettleTimer = () => {
+      window.clearTimeout(settleTimer);
+      const sinceStart = Date.now() - startedAt;
+      const wait = Math.max(GEO_SETTLE_AFTER_MS, minRefineMs - sinceStart);
+      settleTimer = window.setTimeout(() => {
+        if (best) finish(best);
+      }, wait);
+    };
+
+    const maybeFinishBest = () => {
+      if (!best || best.accuracyM == null) return;
+      // Sıx GPS locku (≤20 m) — həqiqi mövqe, dərhal ver.
+      if (looksLikeGpsFix(best)) {
+        finish(best);
+        return;
+      }
+      // Qəbul ediləbilən dəqiqlik, amma şəbəkə oxunuşu ola bilər —
+      // GPS-in dəqiqləşməsi üçün minimum pəncərədən sonra ver.
+      if (best.accuracyM <= desiredAccuracyM && Date.now() - startedAt >= minRefineMs) {
+        finish(best);
+      }
+    };
+
+    const armRefineTimer = () => {
+      if (refineTimer) return;
+      refineTimer = window.setTimeout(() => {
+        if (best) {
+          finish(best);
+          return;
+        }
+        fail(new GeoPositionError('timeout', geoErrorMessage('timeout')));
+      }, maxWaitMs);
+    };
+
+    const onPos = (pos: GeolocationPosition) => {
+      gotCallback = true;
+      armRefineTimer();
+      const reading = fromGeolocationPosition(pos);
+      if (isBetterGeoReading(reading, best)) {
+        best = reading;
+        onReading?.(reading);
+        // Hər yaxşılaşma settle-i sıfırlayır — oxunuşlar dayananda ver.
+        armSettleTimer();
+      }
+      maybeFinishBest();
+    };
+
+    const onErr = (err: GeolocationPositionError) => {
+      const mapped = mapGeolocationError(err);
+      if (shouldAbortGeoWatchOnError(mapped.code)) {
+        fail(mapped);
+        return;
+      }
+      // TIMEOUT / UNAVAILABLE: Chrome və Safari-də GPS hələ işə düşə bilər
+      gotCallback = true;
+      armRefineTimer();
+    };
+
+    const watchOptions = buildWatchPositionOptions({
+      enableHighAccuracy,
+      maximumAge,
+      webkit,
+    });
+
+    const startWatch = () => {
+      clearWatch();
+      watchId = navigator.geolocation.watchPosition(onPos, onErr, watchOptions);
+    };
+
+    const hardCapTimer = window.setTimeout(() => {
       if (best) {
         finish(best);
         return;
       }
       fail(new GeoPositionError('timeout', geoErrorMessage('timeout')));
-    }, maxWaitMs);
+    }, maxWaitMs + permissionGraceMs);
 
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const reading = fromGeolocationPosition(pos);
-        if (isBetterReading(reading, best)) {
-          best = reading;
-        }
-        const acc = best?.accuracyM;
-        if (acc != null && acc <= desiredAccuracyM) {
-          finish(best!);
-        }
-      },
-      (err) => {
-        // İcazə rədd — dərhal; digər xətalarda əgər best varsa onu qaytar
-        const mapped = mapGeolocationError(err);
-        if (mapped.code === 'permission_denied' || mapped.code === 'unsupported') {
-          fail(mapped);
-          return;
-        }
-        if (best) {
-          finish(best);
-          return;
-        }
-        fail(mapped);
-      },
-      {
-        enableHighAccuracy,
-        maximumAge,
-        // watchPosition-da timeout hər yeniləmə üçündür; ümumi limit öz timer-imizdədir
-        timeout: Math.max(maxWaitMs, 10_000),
-      },
-    );
+    const kickTimer = window.setTimeout(() => {
+      if (settled || kicked || !gotCallback) return;
+      if (best?.accuracyM != null && best.accuracyM <= desiredAccuracyM) {
+        return;
+      }
+      kicked = true;
+      startWatch();
+    }, GEO_WATCH_KICK_MS);
+
+    if (signal) {
+      if (signal.aborted) {
+        fail(abortedError());
+        return;
+      }
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+
+    startWatch();
+
+    void queryGeolocationPermission().then((state) => {
+      if (settled) return;
+      if (state === 'denied') {
+        fail(new GeoPositionError('permission_denied', geoErrorMessage('permission_denied')));
+      }
+    });
   });
 }

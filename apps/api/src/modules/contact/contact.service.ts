@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { contactSubjectLabels } from '@xidmetal/shared';
 import { CaptchaService } from '../../common/captcha/captcha.service';
 import { MailService } from '../../common/mail/mail.service';
@@ -7,6 +7,8 @@ import { ContactMessageDto } from './dto';
 
 @Injectable()
 export class ContactService {
+  private readonly logger = new Logger(ContactService.name);
+
   constructor(
     private mailService: MailService,
     private captcha: CaptchaService,
@@ -24,23 +26,34 @@ export class ContactService {
     await this.captcha.assertValid(dto.captchaToken);
 
     const subjectLabel = contactSubjectLabels[dto.subject];
+    const name = dto.name.trim();
+    const email = dto.email.trim().toLowerCase();
+    const phone = dto.phone?.trim() || null;
+    const message = dto.message.trim();
+
     await this.prisma.contactMessage.create({
       data: {
-        name: dto.name.trim(),
-        email: dto.email.trim().toLowerCase(),
-        phone: dto.phone?.trim() || null,
+        name,
+        email,
+        phone,
         subject: subjectLabel,
-        message: dto.message.trim(),
+        message,
       },
     });
 
-    await this.mailService.sendContactMessage({
-      name: dto.name.trim(),
-      email: dto.email.trim().toLowerCase(),
-      phone: dto.phone?.trim() || undefined,
-      subjectLabel,
-      message: dto.message.trim(),
-    });
+    try {
+      await this.mailService.sendContactMessage({
+        name,
+        email,
+        phone: phone || undefined,
+        subjectLabel,
+        message,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Əlaqə mesajı saxlanıldı, e-poçt göndərilmədi: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
 
     return {
       message: 'Mesajınız uğurla göndərildi. Tezliklə sizinlə əlaqə saxlayacağıq.',

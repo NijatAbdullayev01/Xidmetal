@@ -34,7 +34,7 @@ export function getDashboardPath(role: UserRole): string {
 }
 
 export function getAdminAppUrl(): string {
-  return process.env.NEXT_PUBLIC_ADMIN_URL ?? 'http://localhost:3021';
+  return process.env.NEXT_PUBLIC_ADMIN_URL ?? 'http://localhost:3121';
 }
 
 /** Dev/test — qeydiyyat cavabındakı OTP-ni verify səhifəsinə ötürmək üçün */

@@ -11,13 +11,16 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json apps/api/
 COPY packages/shared/package.json packages/shared/
 COPY packages/database/package.json packages/database/
+COPY packages/typescript-config/package.json packages/typescript-config/
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
 COPY packages/shared packages/shared
 COPY packages/database packages/database
+COPY packages/typescript-config packages/typescript-config
 COPY apps/api apps/api
 RUN pnpm --filter @xidmetal/database generate \
+  && pnpm --filter @xidmetal/database build \
   && pnpm --filter @xidmetal/shared build \
   && pnpm --filter @xidmetal/api build
 

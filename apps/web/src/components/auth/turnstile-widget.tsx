@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { resolveTurnstileSiteKey } from '@xidmetal/shared';
 
-const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? '';
+const SITE_KEY = resolveTurnstileSiteKey(
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+);
 
 declare global {
   interface Window {
@@ -29,7 +32,8 @@ interface TurnstileWidgetProps {
 }
 
 /**
- * Cloudflare Turnstile — site key yoxdursa heç nə render etmir (dev).
+ * Cloudflare Turnstile — dummy/test və ya boş site key heç nə render etmir.
+ * Dummy açar «For testing only» banner göstərir və real bot qorunması vermir.
  */
 export function TurnstileWidget({ onToken, className }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);

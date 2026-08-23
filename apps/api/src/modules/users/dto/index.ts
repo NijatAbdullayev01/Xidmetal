@@ -28,7 +28,7 @@ export class UpdateProfileDto {
   @ApiPropertyOptional({ example: '+994501234567' })
   @IsOptional()
   @IsString()
-  @Matches(/^(\+994|0)[0-9]{9}$|^$/, {
+  @Matches(/^(\+994|0)[0-9]{9}$/, {
     message: 'Düzgün telefon nömrəsi daxil edin (+994XXXXXXXXX)',
   })
   phone?: string;
@@ -100,14 +100,6 @@ export class DeleteAccountDto {
   @IsString()
   @Matches(/^SIL$/i, { message: 'Təsdiq üçün Sil yazın' })
   confirmText!: string;
-}
-
-export class ConfirmPhoneDto {
-  @ApiProperty({ example: '12345678' })
-  @IsString()
-  @Length(8, 8, { message: 'Təsdiq kodu 8 rəqəm olmalıdır' })
-  @Matches(/^\d{8}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
-  code!: string;
 }
 
 export class SubmitKycDocumentDto {

@@ -1,0 +1,5 @@
+# Cloudflare Origin CA — commit etmə
+*.pem
+*.key
+*.crt
+!README.md

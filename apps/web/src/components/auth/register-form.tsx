@@ -5,8 +5,9 @@ import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { UserRole } from '@xidmetal/shared';
+import { ProviderAccountType, UserRole, type RegisterInput } from '@xidmetal/shared';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { ProviderAccountTypeSelector } from '@/components/auth/provider-account-type-selector';
 import { RoleSelector } from '@/components/auth/role-selector';
 import { registerFormSchema, type RegisterFormValues, type PublicUserRole } from '@/components/auth/register-schema';
 import { Button } from '@/components/ui/button';
@@ -38,19 +39,29 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
     register,
     control,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerFormSchema),
     defaultValues: {
       role: defaultRole,
+      providerAccountType:
+        defaultRole === UserRole.PROVIDER ? ProviderAccountType.INDIVIDUAL : undefined,
       firstName: '',
       lastName: '',
+      companyName: '',
       email: '',
       phone: '',
       password: '',
       confirmPassword: '',
     },
   });
+
+  const selectedRole = watch('role');
+  const selectedAccountType = watch('providerAccountType');
+  const isProvider = selectedRole === UserRole.PROVIDER;
+  const isCompany = isProvider && selectedAccountType === ProviderAccountType.COMPANY;
 
   const onSubmit = async (values: RegisterFormValues) => {
     setServerError(null);
@@ -61,13 +72,26 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
     }
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { confirmPassword: _confirmPassword, phone, ...rest } = values;
-      const payload = {
+      const { confirmPassword, phone, companyName, providerAccountType, firstName, lastName, ...rest } =
+        values;
+      void confirmPassword;
+      const isCompanyAccount =
+        rest.role === UserRole.PROVIDER &&
+        (providerAccountType ?? ProviderAccountType.INDIVIDUAL) === ProviderAccountType.COMPANY;
+      const payload: RegisterInput = {
         ...rest,
-        phone: phone?.trim() || undefined,
+        phone: phone.trim(),
         captchaToken: captchaToken ?? undefined,
+        ...(isCompanyAccount
+          ? {}
+          : { firstName: firstName?.trim(), lastName: lastName?.trim() }),
       };
+      if (rest.role === UserRole.PROVIDER) {
+        payload.providerAccountType = providerAccountType ?? ProviderAccountType.INDIVIDUAL;
+        if (payload.providerAccountType === ProviderAccountType.COMPANY) {
+          payload.companyName = companyName?.trim() || undefined;
+        }
+      }
       const response = await api.auth.register(payload);
 
       stashDevEmailCode(response.previewCode);
@@ -92,7 +116,18 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
           render={({ field }) => (
             <RoleSelector
               value={field.value}
-              onChange={field.onChange}
+              onChange={(role) => {
+                field.onChange(role);
+                if (role === UserRole.PROVIDER) {
+                  setValue(
+                    'providerAccountType',
+                    selectedAccountType ?? ProviderAccountType.INDIVIDUAL,
+                  );
+                } else {
+                  setValue('providerAccountType', undefined);
+                  setValue('companyName', '');
+                }
+              }}
               disabled={isSubmitting}
             />
           )}
@@ -104,41 +139,94 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 min-w-0 sm:gap-4">
-        <div className="min-w-0 space-y-2">
-          <Label htmlFor="firstName">Ad</Label>
-          <Input
-            id="firstName"
-            autoComplete="given-name"
-            placeholder="Əli"
-            error={!!errors.firstName}
-            disabled={isSubmitting}
-            {...register('firstName')}
+      {isProvider && (
+        <div className="space-y-2.5 sm:space-y-3">
+          <Label>Qeydiyyat növü</Label>
+          <Controller
+            name="providerAccountType"
+            control={control}
+            render={({ field }) => (
+              <ProviderAccountTypeSelector
+                value={field.value ?? ProviderAccountType.INDIVIDUAL}
+                onChange={(next) => {
+                  field.onChange(next);
+                  if (next === ProviderAccountType.COMPANY) {
+                    setValue('firstName', '');
+                    setValue('lastName', '');
+                  } else {
+                    setValue('companyName', '');
+                  }
+                }}
+                disabled={isSubmitting}
+              />
+            )}
           />
-          {errors.firstName && (
+          {errors.providerAccountType && (
             <p className="text-sm text-destructive" role="alert">
-              {errors.firstName.message}
+              {errors.providerAccountType.message}
             </p>
           )}
         </div>
+      )}
 
-        <div className="min-w-0 space-y-2">
-          <Label htmlFor="lastName">Soyad</Label>
+      {isCompany && (
+        <div className="space-y-2">
+          <Label htmlFor="companyName">Şirkətin adı</Label>
           <Input
-            id="lastName"
-            autoComplete="family-name"
-            placeholder="Məmmədov"
-            error={!!errors.lastName}
+            id="companyName"
+            autoComplete="organization"
+            placeholder="məs. Xidmətal MMC"
+            error={!!errors.companyName}
             disabled={isSubmitting}
-            {...register('lastName')}
+            {...register('companyName')}
           />
-          {errors.lastName && (
+          {errors.companyName ? (
             <p className="text-sm text-destructive" role="alert">
-              {errors.lastName.message}
+              {errors.companyName.message}
             </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">Xidmətlərdə bu ad görünəcək.</p>
           )}
         </div>
-      </div>
+      )}
+
+      {!isCompany && (
+        <div className="grid grid-cols-2 gap-3 min-w-0 sm:gap-4">
+          <div className="min-w-0 space-y-2">
+            <Label htmlFor="firstName">Ad</Label>
+            <Input
+              id="firstName"
+              autoComplete="given-name"
+              placeholder="Əli"
+              error={!!errors.firstName}
+              disabled={isSubmitting}
+              {...register('firstName')}
+            />
+            {errors.firstName && (
+              <p className="text-sm text-destructive" role="alert">
+                {errors.firstName.message}
+              </p>
+            )}
+          </div>
+
+          <div className="min-w-0 space-y-2">
+            <Label htmlFor="lastName">Soyad</Label>
+            <Input
+              id="lastName"
+              autoComplete="family-name"
+              placeholder="Məmmədov"
+              error={!!errors.lastName}
+              disabled={isSubmitting}
+              {...register('lastName')}
+            />
+            {errors.lastName && (
+              <p className="text-sm text-destructive" role="alert">
+                {errors.lastName.message}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 min-w-0 sm:gap-4">
         <div className="min-w-0 space-y-2">
@@ -160,9 +248,7 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
         </div>
 
         <div className="min-w-0 space-y-2">
-          <Label htmlFor="phone">
-            Telefon <span className="font-normal text-muted-foreground">(istəyə bağlı)</span>
-          </Label>
+          <Label htmlFor="phone">Telefon</Label>
           <Controller
             name="phone"
             control={control}
@@ -208,6 +294,11 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
           {errors.phone && (
             <p className="text-sm text-destructive" role="alert">
               {errors.phone.message}
+            </p>
+          )}
+          {!errors.phone && (
+            <p className="text-xs text-muted-foreground">
+              Nömrə dəstəyin sizinlə əlaqə saxlaması üçündür.
             </p>
           )}
         </div>

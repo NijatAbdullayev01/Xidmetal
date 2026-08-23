@@ -113,7 +113,7 @@ async function main() {
 
   console.log(`✅ ${categories.length} kateqoriya yaradıldı`);
 
-  const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@xidmetal.az';
+  const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@xidmetal.com';
   const isProduction = process.env.NODE_ENV === 'production';
   const adminPasswordEnv = process.env.ADMIN_PASSWORD?.trim();
 

@@ -1,3 +1,6 @@
+# Production infra (xidmetal.com). `docker compose down` canlı DB-ni dayandırır.
+# Lokal inkişaf: docker-compose.dev.yml — `pnpm docker:dev` (port 5435/6381).
+
 services:
   postgres:
     # PostGIS lazımdır (Faza 2 ST_DWithin). Köhnə postgres:16-alpine volume-u

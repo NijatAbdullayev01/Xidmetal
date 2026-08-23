@@ -156,7 +156,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-3 border-t border-border pt-2.5 text-center text-xs text-muted-foreground sm:mt-6 sm:pt-4 sm:text-sm">
+        <div className="mt-3 text-center text-xs text-muted-foreground sm:mt-6 sm:border-t sm:border-border sm:pt-4 sm:text-sm">
           © {new Date().getFullYear()} Xidmətal. Bütün hüquqlar qorunur.
         </div>
       </div>

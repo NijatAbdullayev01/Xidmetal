@@ -136,62 +136,76 @@ export class AnalyticsService {
     const durationMs = dto.durationMs ?? 0;
 
     try {
-      await this.prisma.$transaction(async (tx) => {
-        const existing = await tx.analyticsSession.findUnique({
-          where: { id: dto.sessionId },
-          select: {
-            id: true,
-            pageViews: true,
-            startedAt: true,
-          },
-        });
+      // Eyni sessionId ilə paralel beacon-lar P2002 yarada bilər; 2-ci cəhd update olur.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          await this.prisma.$transaction(async (tx) => {
+            const existing = await tx.analyticsSession.findUnique({
+              where: { id: dto.sessionId },
+              select: {
+                id: true,
+                pageViews: true,
+                startedAt: true,
+              },
+            });
 
-        if (!existing) {
-          const pageViews = pageViewPaths.length;
-          await tx.analyticsSession.create({
-            data: {
-              id: dto.sessionId,
-              anonymousId: dto.anonymousId,
-              userId: dto.userId ?? null,
-              startedAt: now,
-              lastSeenAt: now,
-              durationMs,
-              landingPath: landingPath ?? pageViewPaths[0] ?? null,
-              exitPath: lastPath ?? null,
-              referrer: referrer ?? null,
-              userAgent: ua ?? null,
-              language: language ?? null,
-              screenWidth: dto.screenWidth ?? null,
-              pageViews,
-              isBounce: pageViews <= 1,
-            },
-          });
-        } else {
-          const nextPageViews = existing.pageViews + pageViewPaths.length;
-          const computedDuration = Math.max(
-            durationMs,
-            Math.max(0, now.getTime() - existing.startedAt.getTime()),
-          );
-          await tx.analyticsSession.update({
-            where: { id: dto.sessionId },
-            data: {
-              lastSeenAt: now,
-              durationMs: computedDuration,
-              exitPath: lastPath ?? undefined,
-              pageViews: nextPageViews,
-              isBounce: nextPageViews <= 1,
-              ...(dto.userId ? { userId: dto.userId } : {}),
-              ...(referrer ? { referrer } : {}),
-              ...(language ? { language } : {}),
-              ...(dto.screenWidth != null ? { screenWidth: dto.screenWidth } : {}),
-            },
-          });
-        }
+            if (!existing) {
+              const pageViews = pageViewPaths.length;
+              await tx.analyticsSession.create({
+                data: {
+                  id: dto.sessionId,
+                  anonymousId: dto.anonymousId,
+                  userId: dto.userId ?? null,
+                  startedAt: now,
+                  lastSeenAt: now,
+                  durationMs,
+                  landingPath: landingPath ?? pageViewPaths[0] ?? null,
+                  exitPath: lastPath ?? null,
+                  referrer: referrer ?? null,
+                  userAgent: ua ?? null,
+                  language: language ?? null,
+                  screenWidth: dto.screenWidth ?? null,
+                  pageViews,
+                  isBounce: pageViews <= 1,
+                },
+              });
+            } else {
+              const nextPageViews = existing.pageViews + pageViewPaths.length;
+              const computedDuration = Math.max(
+                durationMs,
+                Math.max(0, now.getTime() - existing.startedAt.getTime()),
+              );
+              await tx.analyticsSession.update({
+                where: { id: dto.sessionId },
+                data: {
+                  lastSeenAt: now,
+                  durationMs: computedDuration,
+                  exitPath: lastPath ?? undefined,
+                  pageViews: nextPageViews,
+                  isBounce: nextPageViews <= 1,
+                  ...(dto.userId ? { userId: dto.userId } : {}),
+                  ...(referrer ? { referrer } : {}),
+                  ...(language ? { language } : {}),
+                  ...(dto.screenWidth != null ? { screenWidth: dto.screenWidth } : {}),
+                },
+              });
+            }
 
-        if (eventRows.length > 0) {
-          await tx.analyticsEvent.createMany({ data: eventRows });
+            if (eventRows.length > 0) {
+              await tx.analyticsEvent.createMany({ data: eventRows });
+            }
+          });
+          break;
+        } catch (error) {
+          const isUniqueRace =
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === 'P2002' &&
+            attempt === 0;
+          if (!isUniqueRace) {
+            throw error;
+          }
         }
-      });
+      }
     } catch (error) {
       this.logger.warn(
         `Beacon yazılmadı: ${error instanceof Error ? error.message : String(error)}`,

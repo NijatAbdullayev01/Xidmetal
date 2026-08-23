@@ -17,6 +17,19 @@ describe('canJoinBookingRoom', () => {
   it('admin qoşula bilər', () => {
     expect(canJoinBookingRoom({ id: 'a1', role: UserRole.ADMIN }, booking)).toBe(true);
   });
+
+  it('INSTANT PENDING seed provider otağa qoşula bilməz', () => {
+    const instant = {
+      customerId: 'c1',
+      providerId: 'catalog-owner',
+      type: 'INSTANT',
+      acceptedAt: null,
+    };
+    expect(
+      canJoinBookingRoom({ id: 'catalog-owner', role: UserRole.PROVIDER }, instant),
+    ).toBe(false);
+    expect(canJoinBookingRoom({ id: 'c1', role: UserRole.CUSTOMER }, instant)).toBe(true);
+  });
 });
 
 describe('canPushLocation', () => {
@@ -27,5 +40,14 @@ describe('canPushLocation', () => {
     expect(canPushLocation({ id: 'c1', role: UserRole.CUSTOMER }, { providerId: 'p1' })).toBe(
       false,
     );
+  });
+
+  it('INSTANT PENDING seed provider lokasiya göndərə bilməz', () => {
+    expect(
+      canPushLocation(
+        { id: 'catalog-owner', role: UserRole.PROVIDER },
+        { providerId: 'catalog-owner', type: 'INSTANT', acceptedAt: null },
+      ),
+    ).toBe(false);
   });
 });

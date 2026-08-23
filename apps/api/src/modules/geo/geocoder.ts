@@ -47,7 +47,7 @@ export class NominatimGeocoder implements GeocoderAdapter {
     ).replace(/\/$/, '');
     this.userAgent =
       this.config.get<string>('GEOCODER_USER_AGENT')?.trim() ||
-      'Xidmetal/1.0 (geo@xidmetal.az)';
+      'Xidmetal/1.0 (geo@xidmetal.com)';
     this.assertAllowedBaseUrl();
   }
 

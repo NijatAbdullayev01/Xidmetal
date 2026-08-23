@@ -44,15 +44,15 @@ pnpm install
 # Environment faylını yaradın
 cp .env.example .env
 
-# Verilənlər bazasını işə salın
-docker compose up -d
+# Verilənlər bazasını işə salın (dev — production 5434-ə toxunmur)
+pnpm docker:dev
 
-# Prisma migrate & seed
+# Prisma migrate & seed (dev DB :5435)
 pnpm db:generate
-pnpm db:push
-pnpm --filter @xidmetal/database seed
+pnpm db:migrate:apply
+pnpm db:seed
 
-# Development serverləri işə salın
+# Development serverləri işə salın (3120 / 3121 / 4100)
 pnpm dev
 ```
 
@@ -60,21 +60,23 @@ pnpm dev
 
 | Servis | URL |
 |--------|-----|
-| Web (Frontend) | http://localhost:3020 |
-| API (Backend) | http://localhost:4000/api/v1 |
-| Swagger Docs | http://localhost:4000/docs |
+| Web (dev) | http://127.0.0.1:3120 |
+| Admin (dev) | http://127.0.0.1:3121 |
+| API (dev) | http://127.0.0.1:4100/api/v1 |
+| Swagger (dev) | http://127.0.0.1:4100/docs |
+| Canlı sayt | https://xidmetal.com (portlar 3020/3021/4000) |
 | Prisma Studio | `pnpm db:studio` |
-| PostgreSQL (Docker) | `localhost:5434` |
-| Redis (Docker) | `localhost:6380` (throttler storage) |
+| PostgreSQL (dev Docker) | `127.0.0.1:5435` |
+| Redis (dev Docker) | `127.0.0.1:6381` |
 
 ## Layihə strukturu
 
 ```
 xidmetal/
 ├── apps/
-│   ├── web/          # Next.js marketplace (port 3020)
-│   ├── admin/        # Next.js admin panel (port 3021)
-│   └── api/          # NestJS backend (port 4000)
+│   ├── web/          # Next.js marketplace (prod 3020, dev 3120)
+│   ├── admin/        # Next.js admin panel (prod 3021, dev 3121)
+│   └── api/          # NestJS backend (prod 4000, dev 4100)
 ├── packages/
 │   ├── shared/       # Paylaşılan types, schemas, constants
 │   ├── database/     # Prisma schema & client
@@ -88,7 +90,8 @@ xidmetal/
 ## Skriptlər
 
 ```bash
-pnpm dev          # Bütün appları development rejimində işə sal
+pnpm docker:dev   # Dev Postgres/Redis (5435/6381) — canlı sayta toxunmur
+pnpm dev          # Bütün appları development rejimində işə sal (3120/3121/4100)
 pnpm build        # Production build
 pnpm lint         # Lint yoxlaması
 pnpm typecheck    # TypeScript yoxlaması

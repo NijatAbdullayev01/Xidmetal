@@ -12,6 +12,7 @@ import {
   googleMapsPlaceUrl,
   hasGoogleMapsApiKey,
   loadGoogleMapsApi,
+  marketplaceMapOptions,
 } from '@/lib/google-maps';
 import { cn } from '@/lib/utils';
 
@@ -135,22 +136,27 @@ export function LocationMapPreview({
         const maps = await loadGoogleMapsApi();
         if (cancelled || !containerRef.current) return;
 
-        const map = new maps.Map(containerRef.current, {
-          center: { lat: centerLat, lng: centerLng },
-          zoom: PREVIEW_ZOOM,
-          mapTypeId: 'roadmap',
-          disableDefaultUI: true,
-          zoomControl: false,
-          clickableIcons: false,
-          keyboardShortcuts: false,
-          gestureHandling: 'cooperative',
-          isFractionalZoomEnabled: true,
-        });
+        const map = new maps.Map(
+          containerRef.current,
+          marketplaceMapOptions(maps, {
+            center: { lat: centerLat, lng: centerLng },
+            zoom: PREVIEW_ZOOM,
+            mapTypeId: 'roadmap',
+            disableDefaultUI: true,
+            zoomControl: false,
+            clickableIcons: false,
+            keyboardShortcuts: false,
+            gestureHandling: 'cooperative',
+            isFractionalZoomEnabled: true,
+          }),
+        );
 
         const marker = new maps.Marker({
           map,
           position: { lat: centerLat, lng: centerLng },
           title,
+          clickable: false,
+          optimized: false,
           icon: {
             url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(brandPinSvg(pinGradientId))}`,
             scaledSize: new maps.Size(36, 48),

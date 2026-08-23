@@ -10,6 +10,7 @@ import { StorageService } from '../../common/storage/storage.service';
 import { assertProviderVerified } from '../../common/provider/assert-provider-verified';
 import { CreateServiceDto, UpdateServiceDto, ServiceQueryDto } from './dto';
 import {
+  formatProviderDisplayName,
   UserRole,
   PriceUnit,
   CargoRouteScope,
@@ -129,7 +130,7 @@ export class ServicesService {
               lastName: true,
               avatarUrl: true,
               providerProfile: {
-                select: { experience: true, availability: true },
+                select: { experience: true, availability: true, accountType: true, companyName: true },
               },
             },
           },
@@ -846,6 +847,8 @@ export class ServicesService {
       providerProfile?: {
         experience: number | null;
         availability?: string | null;
+        accountType?: string | null;
+        companyName?: string | null;
       } | null;
     };
     images?: Array<{
@@ -866,7 +869,7 @@ export class ServicesService {
       categoryName: service.category?.name ?? '',
       providerId: service.providerId,
       providerName: service.provider
-        ? `${service.provider.firstName} ${service.provider.lastName}`
+        ? formatProviderDisplayName(service.provider)
         : '',
       providerAvatarUrl: await this.storageService.toReadableMediaUrl(
         service.provider?.avatarUrl,

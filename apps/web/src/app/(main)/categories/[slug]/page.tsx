@@ -17,24 +17,25 @@ const loadCategoryData = cache(async (slug: string): Promise<{
   category: CategorySummary;
   services: ServiceSummary[];
 } | null> => {
+  let category: CategorySummary;
   try {
-    const category = await api.category(slug);
-
-    const servicesResponse = await api.services({
-      categoryId: category.id,
-      limit: '50',
-    });
-
-    return {
-      category,
-      services: servicesResponse.items,
-    };
+    category = await api.category(slug);
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       return null;
     }
-    // Şəbəkə / SSR xətalarını "tapılmadı" kimi gizlətmə — Next error boundary göstərsin
     throw error;
+  }
+
+  try {
+    const servicesResponse = await api.services({
+      categoryId: category.id,
+      limit: '50',
+    });
+    return { category, services: servicesResponse.items };
+  } catch {
+    // Kateqoriya tapıldı — xidmət siyahısı xətası səhifəni yıxmasın
+    return { category, services: [] };
   }
 });
 

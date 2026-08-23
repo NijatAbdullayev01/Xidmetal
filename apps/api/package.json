@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "nest build",
-    "dev": "nest start --watch",
+    "dev": "API_PORT=${API_PORT:-4100} nest start --watch",
     "start": "node dist/main",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,test}/**/*.ts\"",
@@ -37,6 +37,7 @@
     "cookie-parser": "^1.4.7",
     "helmet": "^8.1.0",
     "ioredis": "^6.0.0",
+    "multer": "^2.2.0",
     "nodemailer": "^9.0.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",

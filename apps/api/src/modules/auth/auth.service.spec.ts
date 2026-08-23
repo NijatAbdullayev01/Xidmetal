@@ -51,6 +51,7 @@ describe('AuthService.register', () => {
         password: 'Password1!',
         firstName: 'Ali',
         lastName: 'M',
+        phone: '+994501111111',
         role: UserRole.CUSTOMER,
         captchaToken: 'token',
       }),

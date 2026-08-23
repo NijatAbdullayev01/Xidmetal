@@ -12,6 +12,7 @@ import { RealtimeService } from '../realtime/realtime.service';
 import { CreateConversationDto, SendMessageDto } from './dto';
 import { clearTypingDb, isPeerTypingDb, setTypingDb } from './typing.store';
 import { UserRole, NotificationType } from '@xidmetal/shared';
+import { isBookingParticipant } from '../bookings/booking-access';
 import type {
   ConversationDetail,
   ConversationSummary,
@@ -434,7 +435,7 @@ export class MessagesService {
       if (!booking) {
         throw new NotFoundException('Sifariş tapılmadı');
       }
-      if (booking.customerId !== userId && booking.providerId !== userId) {
+      if (!isBookingParticipant(userId, role, booking)) {
         throw new ForbiddenException('Bu sifarişə giriş icazəniz yoxdur');
       }
       customerId = booking.customerId;

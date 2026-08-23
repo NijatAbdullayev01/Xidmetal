@@ -12,6 +12,7 @@ import {
   googleMapsPlaceUrl,
   hasGoogleMapsApiKey,
   loadGoogleMapsApi,
+  marketplaceMapOptions,
 } from '@/lib/google-maps';
 import { formatDistanceMeters, formatEta, cn } from '@/lib/utils';
 
@@ -107,17 +108,20 @@ export function LiveTrackingMap({
         const maps = await loadGoogleMapsApi();
         if (cancelled || !containerRef.current) return;
 
-        const map = new maps.Map(containerRef.current, {
-          center,
-          zoom: DEFAULT_ZOOM,
-          mapTypeId: 'roadmap',
-          disableDefaultUI: true,
-          zoomControl: true,
-          clickableIcons: false,
-          keyboardShortcuts: false,
-          gestureHandling: 'greedy',
-          isFractionalZoomEnabled: true,
-        });
+        const map = new maps.Map(
+          containerRef.current,
+          marketplaceMapOptions(maps, {
+            center,
+            zoom: DEFAULT_ZOOM,
+            mapTypeId: 'roadmap',
+            disableDefaultUI: true,
+            zoomControl: true,
+            clickableIcons: false,
+            keyboardShortcuts: false,
+            gestureHandling: 'greedy',
+            isFractionalZoomEnabled: true,
+          }),
+        );
 
         mapRef.current = map;
 
@@ -127,6 +131,7 @@ export function LiveTrackingMap({
             position: dest,
             title,
             zIndex: 1,
+            optimized: false,
             icon: {
               url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(destPinSvg(pinGradientId))}`,
               scaledSize: new maps.Size(36, 48),
@@ -141,6 +146,7 @@ export function LiveTrackingMap({
           title: 'Xidmət verən',
           zIndex: 2,
           visible: Boolean(provider),
+          optimized: false,
           icon: {
             url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(providerPinSvg())}`,
             scaledSize: new maps.Size(32, 32),

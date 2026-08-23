@@ -22,7 +22,6 @@ import {
   RequestEmailChangeDto,
   ConfirmEmailChangeDto,
   DeleteAccountDto,
-  ConfirmPhoneDto,
   SubmitKycDocumentDto,
 } from './dto';
 import { JwtAuthGuard, RolesGuard, EmailVerifiedGuard } from '../../common/guards';
@@ -91,20 +90,6 @@ export class UsersController {
     @Body() dto: ConfirmEmailChangeDto,
   ) {
     return this.usersService.confirmEmailChange(userId, dto);
-  }
-
-  @Post('me/phone/request-verify')
-  @Throttle({ default: { limit: 3, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Telefon üçün təsdiq kodu göndər (e-poçt + opsional SMS)' })
-  requestPhoneVerify(@CurrentUser('id') userId: string) {
-    return this.usersService.requestPhoneVerification(userId);
-  }
-
-  @Post('me/phone/confirm')
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Telefon təsdiq kodunu yoxla' })
-  confirmPhone(@CurrentUser('id') userId: string, @Body() dto: ConfirmPhoneDto) {
-    return this.usersService.confirmPhoneVerification(userId, dto);
   }
 
   @Get('me/kyc')

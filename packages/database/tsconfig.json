@@ -8,6 +8,7 @@
     "module": "CommonJS",
     "moduleResolution": "Node10",
     "types": ["node"],
+    "ignoreDeprecations": "6.0",
     "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
   "include": ["src/**/*"],

@@ -60,10 +60,10 @@ async function bootstrap() {
     app.set('trust proxy', 1);
   }
 
-  const port = configService.get<number>('API_PORT', 4000);
+  const port = configService.get<number>('API_PORT', 4100);
   const corsOriginRaw = configService.get<string>(
     'CORS_ORIGIN',
-    'http://localhost:3020,http://localhost:3021',
+    'http://localhost:3120,http://localhost:3121',
   );
   const corsOrigins = [
     ...corsOriginRaw.split(','),
@@ -125,8 +125,11 @@ async function bootstrap() {
   await redisIoAdapter.connectToRedis();
   app.useWebSocketAdapter(redisIoAdapter);
 
-  await app.listen(port);
-  logger.log(`API dinləyir: http://localhost:${port}${API.prefix}`, 'Bootstrap');
+  const listenHost =
+    configService.get<string>('API_LISTEN_HOST')?.trim() ||
+    (nodeEnv === 'production' ? '0.0.0.0' : '127.0.0.1');
+  await app.listen(port, listenHost);
+  logger.log(`API dinləyir: http://${listenHost}:${port}${API.prefix}`, 'Bootstrap');
   logger.log(`Socket.IO: http://localhost:${port}`, 'Bootstrap');
   if (swaggerEnabled) {
     logger.log(`Swagger: http://localhost:${port}/docs`, 'Bootstrap');

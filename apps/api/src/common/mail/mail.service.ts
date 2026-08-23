@@ -1,6 +1,14 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import {
+  isSmtpConnectFailure,
+  normalizeSmtpHost,
+  parseSmtpPort,
+} from './smtp-host';
+
+const MAIL_UNAVAILABLE_MESSAGE =
+  'E-poçt xidməti müvəqqəti əlçatan deyil. Bir az sonra yenidən cəhd edin.';
 
 export interface MailSendResult {
   delivered: boolean;
@@ -16,16 +24,18 @@ export class MailService {
 
   constructor(private config: ConfigService) {
     this.isProduction = this.config.get<string>('NODE_ENV') === 'production';
-    const host = this.config.get<string>('SMTP_HOST');
+    const host = normalizeSmtpHost(this.config.get<string>('SMTP_HOST'));
+    const user = this.config.get<string>('SMTP_USER')?.trim();
+    const pass = this.config.get<string>('SMTP_PASS')?.trim();
     if (host) {
       this.transporter = nodemailer.createTransport({
         host,
-        port: this.config.get<number>('SMTP_PORT', 587),
+        port: parseSmtpPort(this.config.get<string | number>('SMTP_PORT')),
         secure: this.config.get<string>('SMTP_SECURE') === 'true',
-        auth: {
-          user: this.config.get<string>('SMTP_USER'),
-          pass: this.config.get<string>('SMTP_PASS'),
-        },
+        auth: user && pass ? { user, pass } : undefined,
+        connectionTimeout: 8_000,
+        greetingTimeout: 8_000,
+        socketTimeout: 15_000,
       });
     } else {
       this.transporter = null;
@@ -54,15 +64,6 @@ export class MailService {
     );
   }
 
-  async sendPhoneVerificationCode(email: string, code: string): Promise<MailSendResult> {
-    return this.sendCodeMail(
-      email,
-      'Xidmətal — Telefon təsdiqi',
-      'Telefon nömrənizi təsdiqləmək üçün kodunuz',
-      code,
-    );
-  }
-
   async sendPasswordResetCode(email: string, code: string): Promise<MailSendResult> {
     return this.sendCodeMail(
       email,
@@ -81,8 +82,8 @@ export class MailService {
   }): Promise<MailSendResult> {
     const inbox =
       this.config.get<string>('CONTACT_INBOX_EMAIL')?.trim() ||
-      this.config.get<string>('SMTP_FROM', 'noreply@xidmetal.az');
-    const from = this.config.get<string>('SMTP_FROM', 'noreply@xidmetal.az');
+      this.config.get<string>('SMTP_FROM', 'noreply@xidmetal.com');
+    const from = this.config.get<string>('SMTP_FROM', 'noreply@xidmetal.com');
     const subject = `[Xidmətal] ${input.subjectLabel} — ${input.name}`;
     const text = [
       `Ad: ${input.name}`,
@@ -103,7 +104,16 @@ export class MailService {
       `<p><strong>Mövzu:</strong> ${escapeHtml(input.subjectLabel)}</p>` +
       `<hr/><p style="white-space:pre-wrap">${escapeHtml(input.message)}</p>`;
 
-    return this.dispatchMail({ from, to: inbox, replyTo: input.email, subject, text, html });
+    return this.dispatchMail({
+      from,
+      to: inbox,
+      replyTo: input.email,
+      subject,
+      text,
+      html,
+      // Inbox Prisma-dadır; SMTP down olsa belə forma 500 olmamalıdır
+      softFailInProduction: true,
+    });
   }
 
   /**
@@ -115,7 +125,7 @@ export class MailService {
     intro: string;
     body: string;
   }): Promise<MailSendResult> {
-    const from = this.config.get<string>('SMTP_FROM', 'noreply@xidmetal.az');
+    const from = this.config.get<string>('SMTP_FROM', 'noreply@xidmetal.com');
     const text = `${input.intro}\n\n${input.body}\n\n— Xidmətal`;
     const html =
       `<p>${escapeHtml(input.intro)}</p>` +
@@ -143,8 +153,8 @@ export class MailService {
   }): Promise<MailSendResult> {
     const inbox =
       this.config.get<string>('CONTACT_INBOX_EMAIL')?.trim() ||
-      this.config.get<string>('SMTP_FROM', 'noreply@xidmetal.az');
-    const from = this.config.get<string>('SMTP_FROM', 'noreply@xidmetal.az');
+      this.config.get<string>('SMTP_FROM', 'noreply@xidmetal.com');
+    const from = this.config.get<string>('SMTP_FROM', 'noreply@xidmetal.com');
     const subject = `[Xidmətal] Yeni şikayət — ${input.reasonLabel}`;
     const text = [
       `Şikayətçi: ${input.reporterName} <${input.reporterEmail}>`,
@@ -178,7 +188,7 @@ export class MailService {
     intro: string,
     code: string,
   ): Promise<MailSendResult> {
-    const from = this.config.get<string>('SMTP_FROM', 'noreply@xidmetal.az');
+    const from = this.config.get<string>('SMTP_FROM', 'noreply@xidmetal.com');
     const text =
       `${intro}: ${code}\n\n` +
       'Kod 15 dəqiqə ərzində etibarlıdır. Bu sorğunu siz göndərməmisinizsə, bu mesajı nəzərə almayın.';
@@ -205,13 +215,13 @@ export class MailService {
     html: string;
     replyTo?: string;
     previewCode?: string;
-    /** true → production-da SMTP yoxdursa throw etmə (best-effort) */
+    /** true → SMTP yoxdursa və ya göndərmə uğursuzdursa throw etmə (best-effort) */
     softFailInProduction?: boolean;
   }): Promise<MailSendResult> {
     if (!this.transporter) {
       if (this.isProduction && !input.softFailInProduction) {
         throw new ServiceUnavailableException(
-          'E-poçt xidməti müvəqqəti əlçatan deyil. Bir az sonra yenidən cəhd edin.',
+          MAIL_UNAVAILABLE_MESSAGE,
         );
       }
 
@@ -224,14 +234,39 @@ export class MailService {
       };
     }
 
-    await this.transporter.sendMail({
-      from: input.from,
-      to: input.to,
-      replyTo: input.replyTo,
-      subject: input.subject,
-      text: input.text,
-      html: input.html,
-    });
+    try {
+      await this.transporter.sendMail({
+        from: input.from,
+        to: input.to,
+        replyTo: input.replyTo,
+        subject: input.subject,
+        text: input.text,
+        html: input.html,
+      });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      const devConnectFallback =
+        !this.isProduction && isSmtpConnectFailure(err) && !input.softFailInProduction;
+      if (devConnectFallback) {
+        this.logger.warn(
+          `[DEV] SMTP əlçatan deyil (${detail}) — e-poçt loga yazıldı (${input.to}): ${input.text}`,
+        );
+        return {
+          delivered: false,
+          ...this.devPreview(input.previewCode),
+        };
+      }
+
+      this.logger.error(`SMTP göndərmə uğursuz (${input.to}): ${detail}`);
+      if (input.softFailInProduction) {
+        return {
+          delivered: false,
+          ...this.devPreview(input.previewCode),
+        };
+      }
+      throw new ServiceUnavailableException(MAIL_UNAVAILABLE_MESSAGE);
+    }
+
     return {
       delivered: true,
       // Test rejimində SMTP olsa belə kodu API cavabında qaytar (prod-da heç vaxt)

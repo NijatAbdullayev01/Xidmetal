@@ -26,6 +26,7 @@ Swagger / xarici klientlər Bearer header dəstəklənir. Access default: `15m`.
 Yeni istifadəçi. `role`: `CUSTOMER` | `PROVIDER` (`ADMIN` qeydiyyatı qadağandır).
 **Məhsul qərarı:** rol qeydiyyatda seçilir və dəyişmir; `CUSTOMER` → `PROVIDER` upgrade endpoint-i yoxdur (ayrı hesab lazımdır).
 Qeydiyyatdan sonra e-poçt təsdiq kodu göndərilir (`isVerified: false`). Marketplace kabinetinə keçid üçün e-poçt təsdiqi məcburidir (`/verify-email`); təsdiqlənənə qədər dashboard açıla bilməz.
+Telefon nömrəsi qeydiyyatda məcburidir (SMS təsdiqi tələb olunmur).
 Opsional `captchaToken` — `TURNSTILE_SECRET_KEY` setdirsə məcburidir.
 
 **Body:**

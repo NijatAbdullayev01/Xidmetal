@@ -47,6 +47,7 @@ import {
   hashIdempotencyPayload,
   normalizeIdempotencyKey,
 } from '../../common/idempotency/idempotency.helpers';
+import { isAssignedProvider } from './booking-access';
 
 const bookingSummaryInclude = {
   service: { select: { id: true, title: true } },
@@ -100,12 +101,10 @@ export class BookingsService {
       throw new NotFoundException('Sifariş tapılmadı');
     }
 
-    const isAssignedProvider =
-      booking.providerId === userId &&
-      (booking.type !== BookingType.INSTANT || booking.acceptedAt != null);
+    const isAssignedProviderUser = isAssignedProvider(userId, booking);
 
     const isParticipant =
-      booking.customerId === userId || isAssignedProvider;
+      booking.customerId === userId || isAssignedProviderUser;
 
     let dispatchOffer:
       | {
@@ -564,6 +563,11 @@ export class BookingsService {
     if (booking.providerId !== providerId) {
       throw new ForbiddenException('Bu sifarişi yenidən planlaşdırmaq icazəniz yoxdur');
     }
+    if (!isAssignedProvider(providerId, booking)) {
+      throw new ForbiddenException(
+        'Ani sifarişi yalnız qəbul etdikdən sonra yenidən planlaşdırmaq olar',
+      );
+    }
     if (booking.status !== BookingStatus.PENDING) {
       throw new BadRequestException('Yalnız gözləyən sifarişlər yenidən planlaşdırıla bilər');
     }
@@ -743,7 +747,7 @@ export class BookingsService {
     const booking = await this.prisma.booking.findUnique({ where: { id } });
     if (!booking) throw new NotFoundException('Sifariş tapılmadı');
 
-    const isProvider = booking.providerId === userId;
+    const isProvider = isAssignedProvider(userId, booking);
     const isCustomer = booking.customerId === userId;
     const isAdmin = role === UserRole.ADMIN;
 
@@ -819,9 +823,15 @@ export class BookingsService {
         now,
       );
 
-      const result = await tx.booking.update({
-        where: { id },
+      const changed = await tx.booking.updateMany({
+        where: { id, status: booking.status },
         data: { status: dto.status, ...cancelMeta, ...lifecycleMeta },
+      });
+      if (changed.count !== 1) {
+        throw new ConflictException('Sifariş statusu artıq dəyişib. Səhifəni yeniləyin');
+      }
+      const result = await tx.booking.findUniqueOrThrow({
+        where: { id },
         include: bookingSummaryInclude,
       });
 

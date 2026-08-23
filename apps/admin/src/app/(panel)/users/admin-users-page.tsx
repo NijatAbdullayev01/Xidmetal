@@ -66,7 +66,7 @@ export function AdminUsersPage() {
           <CardTitle className="text-base">Filtrlər</CardTitle>
           <div className="grid gap-3 sm:grid-cols-2">
             <Input
-              placeholder="Ad, soyad və ya e-poçt"
+              placeholder="Ad, soyad, e-poçt və ya telefon"
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -114,6 +114,13 @@ export function AdminUsersPage() {
                     </Badge>
                   </div>
                   <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+                  {user.phone ? (
+                    <p className="text-sm text-muted-foreground">
+                      <a href={`tel:${user.phone}`} className="hover:text-foreground">
+                        {user.phone}
+                      </a>
+                    </p>
+                  ) : null}
                   <p className="text-xs text-muted-foreground">
                     Qeydiyyat: {new Date(user.createdAt).toLocaleDateString('az-AZ')}
                   </p>

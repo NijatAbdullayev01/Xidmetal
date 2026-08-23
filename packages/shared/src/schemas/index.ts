@@ -8,6 +8,7 @@ import {
   BookingStatus,
   BookingType,
   ProviderAvailability,
+  ProviderAccountType,
   ReportReason,
   ReportTargetType,
   ReportStatus,
@@ -100,13 +101,88 @@ export const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+export const COMPANY_NAME_MAX_LENGTH = 120;
+
+export function isCompanyProviderRegistration(data: {
+  role?: UserRole;
+  providerAccountType?: ProviderAccountType;
+}): boolean {
+  return (
+    data.role === UserRole.PROVIDER &&
+    (data.providerAccountType ?? ProviderAccountType.INDIVIDUAL) === ProviderAccountType.COMPANY
+  );
+}
+
+export function applyProviderAccountRules(
+  data: {
+    role?: UserRole;
+    providerAccountType?: ProviderAccountType;
+    companyName?: string;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (!isCompanyProviderRegistration(data)) return;
+
+  const name = data.companyName?.trim() ?? '';
+  if (name.length < 2) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Şirkət adı minimum 2 simvol olmalıdır',
+      path: ['companyName'],
+    });
+    return;
+  }
+  if (name.length > COMPANY_NAME_MAX_LENGTH) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Şirkət adı maksimum ${COMPANY_NAME_MAX_LENGTH} simvol ola bilər`,
+      path: ['companyName'],
+    });
+  }
+}
+
+export function applyRegisterNameRules(
+  data: {
+    role?: UserRole;
+    providerAccountType?: ProviderAccountType;
+    firstName?: string;
+    lastName?: string;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (isCompanyProviderRegistration(data)) return;
+
+  const firstName = data.firstName?.trim() ?? '';
+  if (firstName.length < 2) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Ad minimum 2 simvol olmalıdır',
+      path: ['firstName'],
+    });
+  }
+
+  const lastName = data.lastName?.trim() ?? '';
+  if (lastName.length < 2) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Soyad minimum 2 simvol olmalıdır',
+      path: ['lastName'],
+    });
+  }
+}
+
 export const registerSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
-  firstName: z.string().min(2, 'Ad minimum 2 simvol olmalıdır'),
-  lastName: z.string().min(2, 'Soyad minimum 2 simvol olmalıdır'),
-  phone: phoneSchema.optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  phone: phoneSchema,
   role: z.nativeEnum(UserRole).default(UserRole.CUSTOMER),
+  providerAccountType: z.nativeEnum(ProviderAccountType).optional(),
+  companyName: z
+    .string()
+    .max(COMPANY_NAME_MAX_LENGTH, `Şirkət adı maksimum ${COMPANY_NAME_MAX_LENGTH} simvol ola bilər`)
+    .optional(),
   captchaToken: z.string().optional(),
 });
 
@@ -335,7 +411,7 @@ export const updateServiceSchema = z.object({
 export const updateProfileSchema = z.object({
   firstName: z.string().min(2, 'Ad minimum 2 simvol olmalıdır').optional(),
   lastName: z.string().min(2, 'Soyad minimum 2 simvol olmalıdır').optional(),
-  phone: z.union([phoneSchema, z.literal('')]).optional(),
+  phone: phoneSchema.optional(),
   avatarUrl: z.union([imageUrlSchema, z.literal(''), z.null()]).optional(),
   experience: z
     .number()
@@ -369,7 +445,14 @@ export const contactSubjectLabels: Record<(typeof contactSubjectValues)[number],
 };
 
 export const contactFormSchema = z.object({
-  name: z.string().min(2, 'Ad minimum 2 simvol olmalıdır').max(100),
+  firstName: z
+    .string()
+    .min(2, 'Ad minimum 2 simvol olmalıdır')
+    .max(50, 'Ad maksimum 50 simvol ola bilər'),
+  lastName: z
+    .string()
+    .min(2, 'Soyad minimum 2 simvol olmalıdır')
+    .max(50, 'Soyad maksimum 50 simvol ola bilər'),
   email: emailSchema,
   phone: z.string().max(30).optional(),
   subject: z.enum(contactSubjectValues, {
@@ -434,12 +517,6 @@ export const sendMessageSchema = z
       });
     }
   });
-
-export const requestPhoneVerificationSchema = z.object({});
-
-export const confirmPhoneVerificationSchema = z.object({
-  code: verificationCodeSchema,
-});
 
 export const submitKycDocumentSchema = z.object({
   type: z.nativeEnum(KycDocumentType),
@@ -666,7 +743,6 @@ export type RequestEmailChangeInput = z.infer<typeof requestEmailChangeSchema>;
 export type ConfirmEmailChangeInput = z.infer<typeof confirmEmailChangeSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
-export type ConfirmPhoneVerificationInput = z.infer<typeof confirmPhoneVerificationSchema>;
 export type SubmitKycDocumentInput = z.infer<typeof submitKycDocumentSchema>;
 export type AdminSetKycStatusInput = z.infer<typeof adminSetKycStatusSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;

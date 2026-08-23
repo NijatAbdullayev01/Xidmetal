@@ -115,7 +115,7 @@ describe('BookingsService.updateStatus', () => {
       service.updateStatus('b1', 'prov-1', UserRole.PROVIDER, {
         status: BookingStatus.CONFIRMED,
       }),
-    ).rejects.toThrow('Ani sifariş yalnız təklif qəbulu/rəddi ilə təsdiqlənir');
+    ).rejects.toThrow('Bu sifarişi idarə etmək icazəniz yoxdur');
   });
 });
 

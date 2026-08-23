@@ -48,7 +48,7 @@ const sections: {
       'Məxfilik və şəxsi məlumatlarla bağlı sorğularınızı aşağıdakı əlaqə vasitələri ilə ünvanlaya bilərsiniz:',
     ],
     list: [
-      'E-poçt: privacy@xidmetal.az',
+      'E-poçt: privacy@xidmetal.com',
       'Ünvan: Bakı, Azərbaycan',
       'Əlaqə forması: /contact səhifəsi vasitəsilə',
     ],
@@ -66,7 +66,7 @@ const sections: {
         list: [
           'Ad və soyad',
           'E-poçt ünvanı',
-          'Telefon nömrəsi (istəyə bağlı)',
+          'Telefon nömrəsi',
           'Parol (yalnız şifrələnmiş (hash) formada saxlanılır)',
           'İstifadəçi rolu (müştəri, xidmət verən və ya administrator)',
           'Profil şəkli (avatar)',
@@ -190,7 +190,7 @@ const sections: {
     title: '9. Məlumat subyektinin hüquqları',
     paragraphs: [
       'Azərbaycan Respublikasının qanunvericiliyinə uyğun olaraq aşağıdakı hüquqlara maliksiniz:',
-      'Hüquqlarınızı həyata keçirmək üçün privacy@xidmetal.az ünvanına yazın və ya əlaqə formasından istifadə edin. Sorğunuza 30 (otuz) təqvim günü ərzində cavab verəcəyik.',
+      'Hüquqlarınızı həyata keçirmək üçün privacy@xidmetal.com ünvanına yazın və ya əlaqə formasından istifadə edin. Sorğunuza 30 (otuz) təqvim günü ərzində cavab verəcəyik.',
       'Şəxsi məlumatlarınızın bir hissəsini hesab parametrləri bölməsindən birbaşa yeniləyə və ya silə bilərsiniz.',
     ],
     list: [
@@ -272,8 +272,8 @@ const sections: {
       'Müraciətlərinizə qanunvericiliklə müəyyən edilmiş müddətlərdə cavab veriləcəkdir.',
     ],
     list: [
-      'Məxfilik üzrə e-poçt: privacy@xidmetal.az',
-      'Ümumi əlaqə: info@xidmetal.az',
+      'Məxfilik üzrə e-poçt: privacy@xidmetal.com',
+      'Ümumi əlaqə: info@xidmetal.com',
       'Ünvan: Bakı, Azərbaycan',
     ],
   },
@@ -401,10 +401,10 @@ export default function PrivacyPage() {
                     <p className="mt-2 text-sm leading-relaxed text-brand-foreground/80">
                       Şəxsi məlumatlarınızın emalı barədə sual və ya müraciətinizi{' '}
                       <a
-                        href="mailto:privacy@xidmetal.az"
+                        href="mailto:privacy@xidmetal.com"
                         className="font-medium underline underline-offset-2 hover:text-brand-foreground"
                       >
-                        privacy@xidmetal.az
+                        privacy@xidmetal.com
                       </a>{' '}
                       ünvanına göndərə və ya{' '}
                       <Link

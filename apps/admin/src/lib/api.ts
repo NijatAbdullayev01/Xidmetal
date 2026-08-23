@@ -44,7 +44,7 @@ function resolveApiBaseUrl(): string {
   const internal =
     process.env.API_URL?.trim() ||
     process.env.INTERNAL_API_URL?.trim() ||
-    'http://localhost:4000';
+    'http://localhost:4100';
   return internal.replace(/\/$/, '');
 }
 

@@ -23,6 +23,17 @@ export enum BookingType {
   INSTANT = 'INSTANT',
 }
 
+/** Xidmət verən qeydiyyat növü — fərdi şəxs və ya şirkət */
+export enum ProviderAccountType {
+  INDIVIDUAL = 'INDIVIDUAL',
+  COMPANY = 'COMPANY',
+}
+
+export const PROVIDER_ACCOUNT_TYPE_LABELS: Record<ProviderAccountType, string> = {
+  [ProviderAccountType.INDIVIDUAL]: 'Fərdi',
+  [ProviderAccountType.COMPANY]: 'Şirkət',
+};
+
 /**
  * Provider domain əlçatanlığı (dispatch / yaxınlıq).
  * `User.lastSeenAt` presence heartbeat-indən ayrıdır — WS/heartbeat ilə sinxronlaşdırılır.

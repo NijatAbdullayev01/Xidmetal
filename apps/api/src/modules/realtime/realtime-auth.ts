@@ -1,4 +1,8 @@
 import { UserRole } from '@xidmetal/shared';
+import {
+  isAssignedProvider,
+  isBookingParticipant,
+} from '../bookings/booking-access';
 
 /** Socket.IO handshake sonrası client.data.user */
 export interface WsAuthenticatedUser {
@@ -14,15 +18,24 @@ export interface WsAuthenticatedUser {
 
 export function canJoinBookingRoom(
   user: Pick<WsAuthenticatedUser, 'id' | 'role'>,
-  booking: { customerId: string; providerId: string },
+  booking: {
+    customerId: string;
+    providerId: string;
+    type?: string;
+    acceptedAt?: Date | null;
+  },
 ): boolean {
-  if (user.role === UserRole.ADMIN) return true;
-  return user.id === booking.customerId || user.id === booking.providerId;
+  return isBookingParticipant(user.id, String(user.role), booking);
 }
 
 export function canPushLocation(
   user: Pick<WsAuthenticatedUser, 'id' | 'role'>,
-  booking: { providerId: string },
+  booking: { providerId: string; type?: string; acceptedAt?: Date | null },
 ): boolean {
-  return user.id === booking.providerId;
+  return isAssignedProvider(user.id, {
+    customerId: '',
+    providerId: booking.providerId,
+    type: booking.type,
+    acceptedAt: booking.acceptedAt,
+  });
 }

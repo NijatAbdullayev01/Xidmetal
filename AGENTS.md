@@ -26,15 +26,15 @@ Bu layihə xidmət verənlərlə xidmət alanları birləşdirən marketplace pl
 
 - Backend: Controller → Service → Prisma (Clean Architecture)
 - Modullar domain-ə görə ayrılıb: auth, users, services, categories, availability, bookings, reviews, messages, notifications, health, contact, reports, geo, realtime, tracking, dispatch, payments (flag), devices, uploads
-- RBAC: CUSTOMER, PROVIDER, ADMIN rolları (admin UI: ayrı `apps/admin` app, port 3021)
+- RBAC: CUSTOMER, PROVIDER, ADMIN rolları (admin UI: ayrı `apps/admin` app; prod `3021`, `pnpm dev` `3121`)
 - **Məhsul qərarı:** bir hesab = bir rol; CUSTOMER→PROVIDER upgrade / dual-role yoxdur və əlavə edilməsin — xidmət verən üçün ayrı hesab (bax: `docs/ARCHITECTURE.md`)
 - JWT auth + refresh token rotation
 - API prefix: `/api/v1`
 
 ## Frontend
 
-- **Marketplace:** `apps/web` — Next.js 15 App Router, Tailwind CSS 4, TypeScript (port 3020)
-- **Admin:** `apps/admin` — ayrı Next.js app (port 3021); marketplace daxilində admin UI yoxdur
+- **Marketplace:** `apps/web` — Next.js 15 App Router, Tailwind CSS 4, TypeScript (prod `3020`, `pnpm dev` `3120`)
+- **Admin:** `apps/admin` — ayrı Next.js app (prod `3021`, `pnpm dev` `3121`); marketplace daxilində admin UI yoxdur
 - Server Components default, `'use client'` yalnız interaktiv UI üçün
 - Tailwind brend rəngləri: `bg-brand`, `text-brand-foreground`, `hover:bg-brand-dark`
 - State: Zustand (auth), TanStack Query (server data)
@@ -73,12 +73,12 @@ apps/web/src/app/{route}/page.tsx
 ## Faydalı əmrlər
 
 ```bash
-pnpm dev              # Development
+pnpm docker:dev       # Dev Postgres/Redis (5435/6381) — canlı sayta toxunmur
+pnpm dev              # Development (3120/3121/4100)
 pnpm build            # Build
 pnpm typecheck        # TypeScript check
 pnpm db:generate      # Prisma generate
-pnpm db:push          # DB schema push
-docker compose up -d  # PostgreSQL + Redis
+pnpm db:migrate:apply # Dev DB migrate deploy (:5435)
 ```
 
 ## Sənədlər

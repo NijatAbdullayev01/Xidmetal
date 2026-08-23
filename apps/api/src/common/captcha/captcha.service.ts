@@ -4,6 +4,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { isTurnstileDummySecret } from '@xidmetal/shared';
 
 interface TurnstileVerifyResponse {
   success: boolean;
@@ -17,11 +18,23 @@ interface TurnstileVerifyResponse {
 @Injectable()
 export class CaptchaService {
   private readonly logger = new Logger(CaptchaService.name);
+  private dummySecretWarned = false;
 
   constructor(private config: ConfigService) {}
 
   private secret(): string | null {
-    return this.config.get<string>('TURNSTILE_SECRET_KEY')?.trim() || null;
+    const value = this.config.get<string>('TURNSTILE_SECRET_KEY')?.trim() || null;
+    if (!value) return null;
+    if (isTurnstileDummySecret(value)) {
+      if (!this.dummySecretWarned) {
+        this.dummySecretWarned = true;
+        this.logger.warn(
+          'TURNSTILE_SECRET_KEY Cloudflare dummy/test açarıdır — captcha skip. Real widget: ops/cloudflare/provision-turnstile.sh',
+        );
+      }
+      return null;
+    }
+    return value;
   }
 
   isEnabled(): boolean {

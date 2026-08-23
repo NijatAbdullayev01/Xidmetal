@@ -5,11 +5,17 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  MaxLength,
   Matches,
   Length,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { UserRole } from '@xidmetal/shared';
+import {
+  COMPANY_NAME_MAX_LENGTH,
+  ProviderAccountType,
+  UserRole,
+} from '@xidmetal/shared';
 
 export class RegisterDto {
   @ApiProperty({ example: 'user@example.com' })
@@ -23,28 +29,52 @@ export class RegisterDto {
   @Matches(/[0-9]/, { message: 'Şifrədə ən azı bir rəqəm olmalıdır' })
   password!: string;
 
-  @ApiProperty({ example: 'Əli' })
+  @ApiPropertyOptional({ example: 'Əli' })
+  @ValidateIf(
+    (dto: RegisterDto) =>
+      !(dto.role === UserRole.PROVIDER && dto.providerAccountType === ProviderAccountType.COMPANY),
+  )
   @IsString()
-  @MinLength(2)
-  firstName!: string;
+  @MinLength(2, { message: 'Ad minimum 2 simvol olmalıdır' })
+  firstName?: string;
 
-  @ApiProperty({ example: 'Məmmədov' })
+  @ApiPropertyOptional({ example: 'Məmmədov' })
+  @ValidateIf(
+    (dto: RegisterDto) =>
+      !(dto.role === UserRole.PROVIDER && dto.providerAccountType === ProviderAccountType.COMPANY),
+  )
   @IsString()
-  @MinLength(2)
-  lastName!: string;
+  @MinLength(2, { message: 'Soyad minimum 2 simvol olmalıdır' })
+  lastName?: string;
 
-  @ApiPropertyOptional({ example: '+994501234567' })
-  @IsOptional()
+  @ApiProperty({ example: '+994501234567' })
   @IsString()
   @Matches(/^(\+994|0)[0-9]{9}$/, {
     message: 'Düzgün telefon nömrəsi daxil edin (+994XXXXXXXXX)',
   })
-  phone?: string;
+  phone!: string;
 
   @ApiPropertyOptional({ enum: UserRole, default: UserRole.CUSTOMER })
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
+
+  @ApiPropertyOptional({
+    enum: ProviderAccountType,
+    description: 'Yalnız xidmət verən — fərdi və ya şirkət',
+  })
+  @IsOptional()
+  @IsEnum(ProviderAccountType)
+  providerAccountType?: ProviderAccountType;
+
+  @ApiPropertyOptional({ example: 'Xidmətal MMC' })
+  @ValidateIf((dto: RegisterDto) => dto.providerAccountType === ProviderAccountType.COMPANY)
+  @IsString({ message: 'Şirkət adı tələb olunur' })
+  @MinLength(2, { message: 'Şirkət adı minimum 2 simvol olmalıdır' })
+  @MaxLength(COMPANY_NAME_MAX_LENGTH, {
+    message: `Şirkət adı maksimum ${COMPANY_NAME_MAX_LENGTH} simvol ola bilər`,
+  })
+  companyName?: string;
 
   @ApiPropertyOptional({ description: 'Cloudflare Turnstile token' })
   @IsOptional()

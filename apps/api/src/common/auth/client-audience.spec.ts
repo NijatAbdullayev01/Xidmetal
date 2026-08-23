@@ -112,6 +112,17 @@ describe('assertSessionAudience', () => {
     ).not.toThrow();
   });
 
+  it('header və aud yoxdursa rədd', () => {
+    expect(() =>
+      assertSessionAudience({
+        headerApp: undefined,
+        tokenAud: undefined,
+        role: UserRole.PROVIDER,
+        mode: 'http',
+      }),
+    ).toThrow(ForbiddenException);
+  });
+
   it('uyğun aud yoxdursa header ilə rol yoxlanır', () => {
     expect(() =>
       assertSessionAudience({

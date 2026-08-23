@@ -35,6 +35,7 @@ import {
   PAYMENTS_DISABLED_MESSAGE,
 } from './payments-flag';
 import { MetricsService } from '../../common/metrics/metrics.service';
+import { isBookingParticipant } from '../bookings/booking-access';
 
 const AMOUNT_TOLERANCE = 0.01;
 
@@ -407,7 +408,12 @@ export class PaymentsService {
 
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      select: { customerId: true, providerId: true },
+      select: {
+        customerId: true,
+        providerId: true,
+        type: true,
+        acceptedAt: true,
+      },
     });
     if (!booking) {
       throw new NotFoundException('Sifariş tapılmadı');
@@ -424,7 +430,7 @@ export class PaymentsService {
       return;
     }
 
-    if (booking.customerId !== userId && booking.providerId !== userId) {
+    if (!isBookingParticipant(userId, role, booking)) {
       throw new NotFoundException('Ödəniş tapılmadı');
     }
   }

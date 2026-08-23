@@ -15,6 +15,12 @@ describe('CaptchaService', () => {
     expect(svc.isEnabled()).toBe(false);
   });
 
+  it('skips Cloudflare dummy/test secret', async () => {
+    const svc = makeService('1x0000000000000000000000000000000AA');
+    await expect(svc.assertValid(undefined)).resolves.toBeUndefined();
+    expect(svc.isEnabled()).toBe(false);
+  });
+
   it('requires token when secret set', async () => {
     const svc = makeService('test-secret');
     expect(svc.isEnabled()).toBe(true);

@@ -22,7 +22,6 @@ import type {
   CreateReportInput,
   RequestEmailChangeInput,
   ConfirmEmailChangeInput,
-  ConfirmPhoneVerificationInput,
   SubmitKycDocumentInput,
   KycDocumentSummary,
   ConversationSummary,
@@ -55,6 +54,7 @@ import type {
 } from '@xidmetal/shared';
 import { BookingStatus, CLIENT_APP, CLIENT_APP_HEADER } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
+import { userFacingApiMessage } from './api-error';
 
 /**
  * Brauzer: boş base → eyni origin (next.config rewrite → API) — cookie üçün vacibdir.
@@ -69,7 +69,7 @@ function resolveApiBaseUrl(): string {
   const internal =
     process.env.API_URL?.trim() ||
     process.env.INTERNAL_API_URL?.trim() ||
-    'http://localhost:4000';
+    'http://localhost:4100';
   return internal.replace(/\/$/, '');
 }
 
@@ -163,14 +163,7 @@ export async function apiClient<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Xəta baş verdi' }));
-    const rawMessage = error.message;
-    let message = Array.isArray(rawMessage)
-      ? rawMessage.join(', ')
-      : (rawMessage ?? 'Xəta baş verdi');
-    if (response.status === 413) {
-      message = 'Şəkil çox böyükdür. Daha kiçik fayl seçin.';
-    }
-    throw new ApiError(message, response.status);
+    throw new ApiError(userFacingApiMessage(response.status, error.message), response.status);
   }
 
   if (response.status === 204) {
@@ -292,18 +285,6 @@ export const api = {
         token,
         body: JSON.stringify(data),
       }),
-    requestPhoneVerify: (token: string) =>
-      apiClient<{ message: string; previewCode?: string }>('/users/me/phone/request-verify', {
-        method: 'POST',
-        token,
-        body: JSON.stringify({}),
-      }),
-    confirmPhone: (token: string, data: ConfirmPhoneVerificationInput) =>
-      apiClient<UserProfile>('/users/me/phone/confirm', {
-        method: 'POST',
-        token,
-        body: JSON.stringify(data),
-      }),
     kyc: (token: string) => apiClient<KycDocumentSummary[]>('/users/me/kyc', { token }),
     submitKyc: (token: string, data: SubmitKycDocumentInput) =>
       apiClient<KycDocumentSummary>('/users/me/kyc', {
@@ -324,7 +305,11 @@ export const api = {
 
   contact: {
     submit: (
-      data: ContactFormInput & { website?: string; captchaToken?: string },
+      data: Omit<ContactFormInput, 'firstName' | 'lastName'> & {
+        name: string;
+        website?: string;
+        captchaToken?: string;
+      },
     ) =>
       apiClient<{ message: string }>('/contact', {
         method: 'POST',

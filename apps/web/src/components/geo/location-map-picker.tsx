@@ -4,14 +4,21 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Loader2, LocateFixed, Minus, Plus } from 'lucide-react';
 import { api } from '@/lib/api';
 import {
+  createSelectionPinMarker,
   hasGoogleMapsApiKey,
   isHumanReadableAddress,
   loadGoogleMapsApi,
+  marketplaceMapOptions,
 } from '@/lib/google-maps';
 import {
   GeoPositionError,
+  defaultHighAccuracyWaitMs,
+  geoAccuracyHint,
+  isWebKitGeolocationEngine,
   readCachedPosition,
   readCurrentPositionWithFallback,
+  shouldAutoRequestGeolocation,
+  shouldPrimeWithNetworkLocation,
 } from '@/lib/geolocation';
 import { cn } from '@/lib/utils';
 
@@ -19,7 +26,10 @@ import { cn } from '@/lib/utils';
 const DEFAULT_CENTER = { lat: 40.4093, lng: 49.8671 } as const;
 
 /** Proqrammatik mərkəzləşdirmədən sonra idle commit-i nə qədər susdur (ms) */
-const PROGRAMMATIC_IDLE_SUPPRESS_MS = 900;
+const PROGRAMMATIC_IDLE_SUPPRESS_MS = isWebKitGeolocationEngine() ? 1_200 : 900;
+
+/** Resize/viewport relayout debounce — Safari ünvan çubuğu çox event atır */
+const RELAYOUT_DEBOUNCE_MS = 80;
 
 /** Parent ↔ map sync üçün koordinat eyni sayılır */
 const COORD_EPS = 1e-5;
@@ -68,6 +78,7 @@ type LocatedReading = {
 type ResolveLocationOptions = {
   allowQuickReading: boolean;
   highAccuracyWaitMs: number;
+  signal?: AbortSignal;
 };
 
 function shouldAdoptReading(
@@ -118,27 +129,31 @@ async function waitForParentAnimation(container: HTMLDivElement): Promise<void> 
   const totalAnimationMs =
     parseCssTimeMs(styles.animationDuration) + parseCssTimeMs(styles.animationDelay);
 
-  if (totalAnimationMs <= 0) return;
+  if (totalAnimationMs > 0) {
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        dialog.removeEventListener('animationend', finish);
+        dialog.removeEventListener('animationcancel', finish);
+        window.clearTimeout(timeoutId);
+        resolve();
+      };
 
-  await new Promise<void>((resolve) => {
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      dialog.removeEventListener('animationend', finish);
-      dialog.removeEventListener('animationcancel', finish);
-      window.clearTimeout(timeoutId);
-      resolve();
-    };
+      const timeoutId = window.setTimeout(
+        finish,
+        totalAnimationMs + MAP_INIT_ANIMATION_BUFFER_MS,
+      );
 
-    const timeoutId = window.setTimeout(
-      finish,
-      totalAnimationMs + MAP_INIT_ANIMATION_BUFFER_MS,
-    );
+      dialog.addEventListener('animationend', finish, { once: true });
+      dialog.addEventListener('animationcancel', finish, { once: true });
+    });
+  }
 
-    dialog.addEventListener('animationend', finish, { once: true });
-    dialog.addEventListener('animationcancel', finish, { once: true });
-  });
+  // Safari: animasiya bitəndən sonra belə transform containing block qala bilər —
+  // Google Maps proyeksiyası CSS pin-dən sürüşür.
+  dialog.style.transform = 'none';
 }
 
 async function waitForStableContainerLayout(container: HTMLDivElement): Promise<void> {
@@ -190,6 +205,7 @@ export function LocationMapPicker({
 }: LocationMapPickerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
+  const pinMarkerRef = useRef<google.maps.Marker | null>(null);
   const accuracyCircleRef = useRef<google.maps.Circle | null>(null);
   const listenersRef = useRef<google.maps.MapsEventListener[]>([]);
   const onChangeRef = useRef(onChange);
@@ -205,6 +221,12 @@ export function LocationMapPicker({
   const pendingCenterRef = useRef<{ lat: number; lng: number } | null>(null);
   /** Locate nəsil — köhnə async nəticəni atmaq üçün */
   const locateGenRef = useRef(0);
+  const locateAbortRef = useRef<AbortController | null>(null);
+  const geoHintTimerRef = useRef<number | null>(null);
+  /** Son hədəf mərkəz — Safari resize `getCenter()` drift-ini əvəz edir */
+  const desiredCenterRef = useRef<{ lat: number; lng: number } | null>(null);
+  /** İstifadəçi pan/klik edəndən sonra idle GPS-i əvəz edə bilər */
+  const userAdjustedRef = useRef(false);
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinGradientId = useId().replace(/:/g, '');
 
@@ -212,6 +234,7 @@ export function LocationMapPicker({
   const [error, setError] = useState<string | null>(null);
   const [reverseBusy, setReverseBusy] = useState(false);
   const [geoBusy, setGeoBusy] = useState(false);
+  const [geoHint, setGeoHint] = useState<string | null>(null);
   const [pinLifted, setPinLifted] = useState(false);
   const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
   const [accuracyM, setAccuracyM] = useState<number | null>(null);
@@ -299,6 +322,7 @@ export function LocationMapPicker({
       clearSettleTimer();
       programmaticRef.current = true;
       pendingCenterRef.current = { lat: nextLat, lng: nextLng };
+      desiredCenterRef.current = { lat: nextLat, lng: nextLng };
       suppressIdleUntilRef.current = Date.now() + PROGRAMMATIC_IDLE_SUPPRESS_MS;
       setPinLifted(true);
 
@@ -312,27 +336,56 @@ export function LocationMapPicker({
   );
 
   const applyLocatedReading = useCallback(
-    async (pos: LocatedReading) => {
+    async (pos: LocatedReading, reverseGeocode = true) => {
+      userAdjustedRef.current = false;
       setAccuracyM(pos.accuracyM);
       setViewProgrammatic(pos.lat, pos.lng, 18);
       updateAccuracyCircle(pos.lat, pos.lng, pos.accuracyM);
-      await applyCoords(pos.lat, pos.lng);
+      if (reverseGeocode) {
+        await applyCoords(pos.lat, pos.lng);
+        return;
+      }
+      onChangeRef.current({ lat: pos.lat, lng: pos.lng });
     },
     [applyCoords, setViewProgrammatic, updateAccuracyCircle],
   );
+
+  const clearGeoHint = useCallback(() => {
+    if (geoHintTimerRef.current != null) {
+      window.clearTimeout(geoHintTimerRef.current);
+      geoHintTimerRef.current = null;
+    }
+    setGeoHint(null);
+  }, []);
+
+  const armGeoHint = useCallback(() => {
+    clearGeoHint();
+    geoHintTimerRef.current = window.setTimeout(() => {
+      setGeoHint(
+        'Brauzerin məkan sorğusuna icazə verin — ünvan çubuğundakı ikona basın',
+      );
+    }, 8_000);
+  }, [clearGeoHint]);
+
+  const beginLocateSignal = useCallback(() => {
+    locateAbortRef.current?.abort();
+    const controller = new AbortController();
+    locateAbortRef.current = controller;
+    return controller;
+  }, []);
 
   const resolveUserLocation = useCallback(
     async (
       gen: number,
       cancelled: () => boolean = () => false,
       options: ResolveLocationOptions = {
-        allowQuickReading: true,
-        highAccuracyWaitMs: 12_000,
+        allowQuickReading: shouldPrimeWithNetworkLocation(),
+        highAccuracyWaitMs: defaultHighAccuracyWaitMs(),
       },
     ) => {
       let adopted: LocatedReading | null = null;
 
-      if (options.allowQuickReading) {
+      if (options.allowQuickReading && shouldPrimeWithNetworkLocation()) {
         try {
           const quick = await readCachedPosition({
             maximumAgeMs: 60_000,
@@ -353,15 +406,25 @@ export function LocationMapPicker({
         const precise = await readCurrentPositionWithFallback({
           desiredAccuracyM: 35,
           highAccuracyWaitMs: options.highAccuracyWaitMs,
+          signal: options.signal,
+          onReading: (reading) => {
+            if (cancelled() || gen !== locateGenRef.current) return;
+            if (userAdjustedRef.current) return;
+            if (!shouldAdoptReading(reading, adopted)) return;
+            adopted = reading;
+            void applyLocatedReading(reading, false);
+          },
         });
         if (cancelled() || gen !== locateGenRef.current) return;
+        if (userAdjustedRef.current) return;
 
         if (shouldAdoptReading(precise, adopted)) {
           adopted = precise;
-          await applyLocatedReading(precise);
+          await applyLocatedReading(precise, true);
         } else {
           setAccuracyM(precise.accuracyM);
           updateAccuracyCircle(precise.lat, precise.lng, precise.accuracyM);
+          await applyCoords(precise.lat, precise.lng);
         }
 
         if (!cancelled() && gen === locateGenRef.current) {
@@ -374,30 +437,49 @@ export function LocationMapPicker({
         return;
       } catch (err) {
         if (cancelled() || gen !== locateGenRef.current) return;
+        if (err instanceof GeoPositionError && err.code === 'aborted') return;
         if (adopted) return;
         throw err;
       }
     },
-    [applyLocatedReading, setViewProgrammatic, updateAccuracyCircle],
+    [applyCoords, applyLocatedReading, setViewProgrammatic, updateAccuracyCircle],
   );
 
-  const locateMe = useCallback(async () => {
+  const locateMe = useCallback(() => {
     if (disabled) return;
+    const controller = beginLocateSignal();
     const gen = ++locateGenRef.current;
+    userAdjustedRef.current = false;
     setGeoBusy(true);
     setError(null);
-    try {
-      await resolveUserLocation(gen, undefined, {
-        allowQuickReading: false,
-        highAccuracyWaitMs: 25_000,
+    armGeoHint();
+    // Safari: watchPosition klikin eyni tick-ində başlamalıdır (await jesti yandırır)
+    void resolveUserLocation(gen, () => controller.signal.aborted, {
+      allowQuickReading: false,
+      highAccuracyWaitMs: Math.max(25_000, defaultHighAccuracyWaitMs()),
+      signal: controller.signal,
+    })
+      .catch((err: unknown) => {
+        if (gen !== locateGenRef.current) return;
+        if (err instanceof GeoPositionError && err.code === 'aborted') return;
+        setError(err instanceof GeoPositionError ? err.message : 'Mövqe alınmadı');
+      })
+      .finally(() => {
+        if (gen === locateGenRef.current) {
+          clearGeoHint();
+          setGeoBusy(false);
+        }
       });
-    } catch (err) {
-      if (gen !== locateGenRef.current) return;
-      setError(err instanceof GeoPositionError ? err.message : 'Mövqe alınmadı');
-    } finally {
-      if (gen === locateGenRef.current) setGeoBusy(false);
-    }
-  }, [disabled, resolveUserLocation]);
+  }, [armGeoHint, beginLocateSignal, clearGeoHint, disabled, resolveUserLocation]);
+
+  useEffect(() => {
+    return () => {
+      locateAbortRef.current?.abort();
+      if (geoHintTimerRef.current != null) {
+        window.clearTimeout(geoHintTimerRef.current);
+      }
+    };
+  }, []);
 
   // Google Maps quraşdırılması
   useEffect(() => {
@@ -405,6 +487,9 @@ export function LocationMapPicker({
 
     let cancelled = false;
     let resizeObserver: ResizeObserver | null = null;
+    let onViewportChange: (() => void) | null = null;
+    let relayoutTimer: number | null = null;
+    const initTimers: number[] = [];
 
     void (async () => {
       try {
@@ -418,27 +503,34 @@ export function LocationMapPicker({
         const centerLat = lat ?? DEFAULT_CENTER.lat;
         const centerLng = lng ?? DEFAULT_CENTER.lng;
 
-        const map = new maps.Map(containerRef.current, {
-          center: { lat: centerLat, lng: centerLng },
-          zoom: hasSelection ? 16 : 13,
-          mapTypeId: 'roadmap',
-          disableDefaultUI: true,
-          clickableIcons: false,
-          keyboardShortcuts: false,
-          gestureHandling: 'greedy',
-          scrollwheel: true,
-          isFractionalZoomEnabled: true,
-        });
+        const map = new maps.Map(
+          containerRef.current,
+          marketplaceMapOptions(
+            maps,
+            {
+              center: { lat: centerLat, lng: centerLng },
+              zoom: hasSelection ? 16 : 13,
+              mapTypeId: 'roadmap',
+              disableDefaultUI: true,
+              clickableIcons: false,
+              keyboardShortcuts: false,
+              gestureHandling: 'greedy',
+              scrollwheel: true,
+              isFractionalZoomEnabled: false,
+            },
+            { forceRaster: true },
+          ),
+        );
 
         // İlk idle (yüklənmə) form-u Bakı ilə doldurmasın
         programmaticRef.current = true;
         suppressIdleUntilRef.current = Date.now() + PROGRAMMATIC_IDLE_SUPPRESS_MS;
 
         const onDragStart = () => {
-          if (programmaticRef.current) return;
+          userAdjustedRef.current = true;
+          programmaticRef.current = false;
           pendingCenterRef.current = null;
           setPinLifted(true);
-          // İstifadəçi dartanda accuracy dairəsini gizlət
           accuracyCircleRef.current?.setMap(null);
           accuracyCircleRef.current = null;
           setAccuracyM(null);
@@ -446,17 +538,17 @@ export function LocationMapPicker({
 
         const onIdle = () => {
           const pending = pendingCenterRef.current;
-          if (pending) {
+          if (pending && !userAdjustedRef.current) {
             const center = map.getCenter();
             if (
               center &&
-              coordsNear(center.lat(), center.lng(), pending.lat, pending.lng)
+              coordsNear(center.lat(), center.lng(), pending.lat, pending.lng, 1e-4)
             ) {
               pendingCenterRef.current = null;
+              desiredCenterRef.current = pending;
               programmaticRef.current = false;
               setPinLifted(false);
             } else if (center) {
-              // Hələ hədəfdə deyil (resize/offset) — yenidən kilidlə
               map.setCenter({ lat: pending.lat, lng: pending.lng });
               suppressIdleUntilRef.current =
                 Date.now() + PROGRAMMATIC_IDLE_SUPPRESS_MS;
@@ -470,24 +562,29 @@ export function LocationMapPicker({
             programmaticRef.current = false;
             return;
           }
+          if (!userAdjustedRef.current) return;
           if (Date.now() < suppressIdleUntilRef.current) return;
           if (disabledRef.current) return;
 
           clearSettleTimer();
           settleTimerRef.current = setTimeout(() => {
+            if (!userAdjustedRef.current) return;
             if (pendingCenterRef.current) return;
             if (Date.now() < suppressIdleUntilRef.current) return;
             const center = map.getCenter();
             if (!center) return;
+            const settled = { lat: center.lat(), lng: center.lng() };
+            desiredCenterRef.current = settled;
             setAccuracyM(null);
             accuracyCircleRef.current?.setMap(null);
             accuracyCircleRef.current = null;
-            void applyCoordsRef.current(center.lat(), center.lng());
+            void applyCoordsRef.current(settled.lat, settled.lng);
           }, 180);
         };
 
         const onClick = (e: google.maps.MapMouseEvent) => {
           if (disabledRef.current || !e.latLng) return;
+          userAdjustedRef.current = true;
           pendingCenterRef.current = null;
           accuracyCircleRef.current?.setMap(null);
           accuracyCircleRef.current = null;
@@ -504,28 +601,49 @@ export function LocationMapPicker({
 
         mapRef.current = map;
 
-        const relayout = () => {
-          // Resize mərkəzi dəyişdirməsin deyə programmatic + pending saxla
-          const pending = pendingCenterRef.current;
-          const before = map.getCenter();
-          programmaticRef.current = true;
-          suppressIdleUntilRef.current = Date.now() + PROGRAMMATIC_IDLE_SUPPRESS_MS;
+        const pinMarker = createSelectionPinMarker(maps, map, pinGradientId);
+        pinMarkerRef.current = pinMarker;
+        listenersRef.current.push(
+          map.addListener('center_changed', () => {
+            const center = map.getCenter();
+            if (center) pinMarker.setPosition(center);
+          }),
+        );
+
+        if (hasSelection && lat != null && lng != null) {
+          desiredCenterRef.current = { lat, lng };
+        }
+
+        const applyRelayout = () => {
+          if (cancelled) return;
           maps.event.trigger(map, 'resize');
-          if (pending) {
-            map.setCenter({ lat: pending.lat, lng: pending.lng });
-          } else if (before) {
-            map.setCenter(before);
+          if (userAdjustedRef.current) return;
+          const target = pendingCenterRef.current ?? desiredCenterRef.current;
+          if (target) {
+            map.setCenter({ lat: target.lat, lng: target.lng });
           }
         };
-        requestAnimationFrame(relayout);
-        window.setTimeout(relayout, 80);
-        window.setTimeout(relayout, 320);
-        window.setTimeout(relayout, 560);
+        const scheduleRelayout = () => {
+          if (relayoutTimer != null) window.clearTimeout(relayoutTimer);
+          relayoutTimer = window.setTimeout(() => {
+            relayoutTimer = null;
+            applyRelayout();
+          }, RELAYOUT_DEBOUNCE_MS);
+        };
+
+        requestAnimationFrame(applyRelayout);
+        initTimers.push(window.setTimeout(applyRelayout, 80));
+        initTimers.push(window.setTimeout(applyRelayout, 320));
+        initTimers.push(window.setTimeout(applyRelayout, 560));
 
         if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
-          resizeObserver = new ResizeObserver(() => relayout());
+          resizeObserver = new ResizeObserver(() => scheduleRelayout());
           resizeObserver.observe(containerRef.current);
         }
+
+        onViewportChange = () => scheduleRelayout();
+        window.visualViewport?.addEventListener('resize', onViewportChange);
+        window.visualViewport?.addEventListener('scroll', onViewportChange);
 
         if (!cancelled) setReady(true);
       } catch (err) {
@@ -543,7 +661,15 @@ export function LocationMapPicker({
     return () => {
       cancelled = true;
       clearSettleTimer();
+      for (const id of initTimers) window.clearTimeout(id);
+      if (relayoutTimer != null) window.clearTimeout(relayoutTimer);
       resizeObserver?.disconnect();
+      if (onViewportChange) {
+        window.visualViewport?.removeEventListener('resize', onViewportChange);
+        window.visualViewport?.removeEventListener('scroll', onViewportChange);
+      }
+      pinMarkerRef.current?.setMap(null);
+      pinMarkerRef.current = null;
       for (const listener of listenersRef.current) {
         listener.remove();
       }
@@ -559,6 +685,7 @@ export function LocationMapPicker({
   useEffect(() => {
     if (!ready || !mapRef.current) return;
     if (lat == null || lng == null) return;
+    if (userAdjustedRef.current) return;
     if (pendingCenterRef.current) {
       const pending = pendingCenterRef.current;
       if (coordsNear(pending.lat, pending.lng, lat, lng)) return;
@@ -584,41 +711,50 @@ export function LocationMapPicker({
     if (lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng)) {
       return;
     }
+    // Safari: useEffect jest sayılmır → PERMISSION_DENIED, bəzən səhifə boyu zəhərlənir
+    if (!shouldAutoRequestGeolocation()) return;
 
+    const controller = beginLocateSignal();
     const gen = ++locateGenRef.current;
     let cancelled = false;
+    userAdjustedRef.current = false;
 
     void (async () => {
       setGeoBusy(true);
       setError(null);
+      armGeoHint();
       try {
         await resolveUserLocation(gen, () => cancelled, {
-          allowQuickReading: true,
-          highAccuracyWaitMs: 15_000,
+          allowQuickReading: false,
+          highAccuracyWaitMs: Math.max(15_000, defaultHighAccuracyWaitMs()),
+          signal: controller.signal,
         });
       } catch (err) {
         if (cancelled || gen !== locateGenRef.current) return;
+        if (err instanceof GeoPositionError && err.code === 'permission_denied') {
+          return;
+        }
+        if (err instanceof GeoPositionError && err.code === 'aborted') {
+          return;
+        }
         setError(err instanceof GeoPositionError ? err.message : 'Mövqe alınmadı');
       } finally {
-        if (!cancelled && gen === locateGenRef.current) setGeoBusy(false);
+        if (!cancelled && gen === locateGenRef.current) {
+          clearGeoHint();
+          setGeoBusy(false);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLocate, disabled, ready, resolveUserLocation]);
 
   const addressLabel = resolvedAddress?.trim() || (hasSelection ? 'Seçilmiş mövqe' : null);
-  const accuracyHint =
-    accuracyM == null
-      ? null
-      : accuracyM > 300
-        ? 'GPS dəqiqliyi zəifdir — pini xəritədə əl ilə düzəldin'
-        : accuracyM > 100
-          ? 'Siqnal zəifdir — açıq yerdə yenidən cəhd edin'
-          : 'GPS dəqiqliyi yaxşıdır';
+  const accuracyHint = geoAccuracyHint(accuracyM);
 
   if (!hasApiKey) {
     return (
@@ -655,68 +791,10 @@ export function LocationMapPicker({
 
         <div
           ref={containerRef}
-          className="location-map-canvas z-0 h-[260px] w-full touch-manipulation sm:h-[300px]"
+          className="location-map-canvas z-0 h-[260px] w-full sm:h-[300px]"
           role="application"
           aria-label="Mövqe seçimi xəritəsi"
         />
-
-        {/* Mərkəz pin — ucu dəqiq mərkəzdə (Bolt) */}
-        <div
-          className="pointer-events-none absolute left-1/2 top-1/2 z-[3]"
-          aria-hidden
-        >
-          <div
-            className={cn(
-              'relative -translate-x-1/2',
-              'origin-bottom transition-transform duration-200 ease-out motion-reduce:transition-none',
-              pinLifted
-                ? '-translate-y-[calc(100%+12px)] scale-110'
-                : '-translate-y-full scale-100',
-            )}
-          >
-            {!pinLifted && hasSelection ? (
-              <span className="absolute bottom-0 left-1/2 h-3.5 w-3.5 -translate-x-1/2 translate-y-1/2 animate-ping rounded-full bg-brand/40 motion-reduce:animate-none" />
-            ) : null}
-
-            <svg
-              width="36"
-              height="48"
-              viewBox="0 0 36 48"
-              fill="none"
-              className={cn(
-                'relative z-[1] drop-shadow-[0_6px_10px_rgba(0,0,0,0.28)]',
-                'transition-[filter] duration-200',
-                pinLifted && 'drop-shadow-[0_14px_18px_rgba(0,0,0,0.38)]',
-              )}
-            >
-              <defs>
-                <linearGradient id={pinGradientId} x1="0" y1="0" x2="36" y2="48">
-                  <stop stopColor="#fff" stopOpacity="0.55" />
-                  <stop offset="1" stopColor="#fff" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M18 0C8.059 0 0 8.059 0 18c0 12.75 18 30 18 30s18-17.25 18-30C36 8.059 27.941 0 18 0z"
-                fill="#FFCC00"
-              />
-              <path
-                d="M18 0C8.059 0 0 8.059 0 18c0 12.75 18 30 18 30s18-17.25 18-30C36 8.059 27.941 0 18 0z"
-                fill={`url(#${pinGradientId})`}
-                fillOpacity="0.35"
-              />
-              <circle cx="18" cy="18" r="7" fill="#1A1A1A" />
-              <circle cx="18" cy="18" r="3.25" fill="#FFCC00" />
-            </svg>
-
-            <span
-              className={cn(
-                'absolute left-1/2 top-full z-0 mt-0.5 block h-1.5 -translate-x-1/2 rounded-full bg-black/30 blur-[1px]',
-                'transition-all duration-200 ease-out',
-                pinLifted ? 'w-5 opacity-25' : 'w-2.5 opacity-55',
-              )}
-            />
-          </div>
-        </div>
 
         <div className="absolute right-3 top-3 z-[4] flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card/95 shadow-md backdrop-blur-sm">
           <button
@@ -756,7 +834,7 @@ export function LocationMapPicker({
         <button
           type="button"
           disabled={disabled || geoBusy || !ready}
-          onClick={() => void locateMe()}
+          onClick={() => locateMe()}
           aria-label="Mənim mövqeyimə get"
           aria-busy={geoBusy}
           className={cn(
@@ -766,6 +844,10 @@ export function LocationMapPicker({
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
             'disabled:pointer-events-none disabled:opacity-50',
             'sm:bottom-[5.25rem]',
+            !hasSelection &&
+              !geoBusy &&
+              !shouldAutoRequestGeolocation() &&
+              'bg-brand text-brand-foreground ring-2 ring-brand',
           )}
         >
           {geoBusy ? (
@@ -788,7 +870,9 @@ export function LocationMapPicker({
             {reverseBusy || geoBusy ? (
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
-                {geoBusy ? 'Dəqiq mövqe axtarılır…' : 'Yazılı ünvan dəqiqləşdirilir…'}
+                {geoBusy
+                  ? (geoHint ?? 'Dəqiq mövqe axtarılır…')
+                  : 'Yazılı ünvan dəqiqləşdirilir…'}
               </p>
             ) : addressLabel ? (
               <div className="min-w-0">
@@ -808,7 +892,9 @@ export function LocationMapPicker({
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Xəritəni sürüşdürün — pin dəqiq yeri göstərir
+                {!shouldAutoRequestGeolocation() && !hasSelection
+                  ? 'Mövqeyiniz üçün sağdakı sarı düyməyə basın'
+                  : 'Xəritəni sürüşdürün — pin dəqiq yeri göstərir'}
               </p>
             )}
           </div>

@@ -8,7 +8,7 @@ import {
   type UserProfile,
 } from '@xidmetal/shared';
 import { api, ApiError } from '@/lib/api';
-import { geoErrorMessage, type GeoCoords } from '@/lib/geolocation';
+import { buildWatchPositionOptions, geoErrorMessage, type GeoCoords } from '@/lib/geolocation';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { useAuthStore } from '@/store/auth.store';
 import { useProviderDutyLocationStore } from '@/store/provider-duty-location.store';
@@ -154,20 +154,21 @@ export function useProviderDutyLocation(enabled = true) {
         });
       },
       (err) => {
+        if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
+          return;
+        }
         const mapped =
           err.code === err.PERMISSION_DENIED
             ? geoErrorMessage('permission_denied')
-            : err.code === err.TIMEOUT
-              ? geoErrorMessage('timeout')
-              : geoErrorMessage('position_unavailable');
+            : geoErrorMessage('position_unavailable');
         setGeoError(mapped);
         setSharing(false);
       },
-      {
+      buildWatchPositionOptions({
         enableHighAccuracy: true,
         maximumAge: LOCATION_GEO_SYNC_INTERVAL_MS,
-        timeout: 20_000,
-      },
+        timeoutMs: 20_000,
+      }),
     );
 
     return () => {

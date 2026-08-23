@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ProviderAvailability, UserRole } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
 import { api } from '@/lib/api';
+import { disconnectSharedSocket } from '@/hooks/use-socket';
 
 /**
  * Serverdə httpOnly cookie sessiyasını ləğv edir, sonra lokal state + keşi sıfırlayır.
@@ -17,6 +18,7 @@ export function useLogout(): () => void {
     const user = useAuthStore.getState().user;
 
     const finish = () => {
+      disconnectSharedSocket();
       void api.auth.logout().catch(() => {
         // Şəbəkə xətası çıxışı bloklamamalıdır
       });

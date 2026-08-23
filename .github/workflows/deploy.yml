@@ -123,8 +123,12 @@ jobs:
             export XIDMETAL_API_IMAGE="ghcr.io/${IMAGE_OWNER}/xidmetal-api:${IMAGE_TAG}"
             export XIDMETAL_WEB_IMAGE="ghcr.io/${IMAGE_OWNER}/xidmetal-web:${IMAGE_TAG}"
             export XIDMETAL_ADMIN_IMAGE="ghcr.io/${IMAGE_OWNER}/xidmetal-admin:${IMAGE_TAG}"
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans --scale api="${API_REPLICAS:-3}"
+            COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml"
+            if [ -f docker-compose.cloudflare.yml ] && grep -qE '^WEB_HOST=.+' .env 2>/dev/null; then
+              COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.cloudflare.yml"
+            fi
+            docker compose $COMPOSE_FILES pull
+            docker compose $COMPOSE_FILES up -d --remove-orphans --scale api="${API_REPLICAS:-3}"
             docker image prune -f
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}

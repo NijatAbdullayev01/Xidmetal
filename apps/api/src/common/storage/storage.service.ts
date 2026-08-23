@@ -59,7 +59,7 @@ export class StorageService implements OnModuleInit {
     }
 
     const rootDir = this.config.get<string>('STORAGE_LOCAL_DIR', './uploads');
-    const apiUrl = this.config.get<string>('API_URL', 'http://localhost:4000');
+    const apiUrl = this.config.get<string>('API_URL', 'http://localhost:4100');
     const publicBaseUrl = this.config.get<string>(
       'STORAGE_PUBLIC_BASE_URL',
       `${apiUrl.replace(/\/$/, '')}/uploads`,

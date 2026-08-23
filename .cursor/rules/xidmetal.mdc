@@ -9,7 +9,7 @@ alwaysApply: true
 ## Kontekst
 
 Xidmət verən (PROVIDER) və xidmət alan (CUSTOMER) rollarını birləşdirən veb marketplace.
-Monorepo: `apps/web` (Next.js 15, port 3020), `apps/admin` (ayrı admin panel, port 3021), `apps/api` (NestJS 11), `packages/shared`, `packages/database`.
+Monorepo: `apps/web` (Next.js 15; prod 3020 / `pnpm dev` 3120), `apps/admin` (ayrı admin panel; prod 3021 / dev 3121), `apps/api` (NestJS 11; prod 4000 / dev 4100), `packages/shared`, `packages/database`.
 Admin UI marketplace daxilində olmamalıdır — yalnız `apps/admin`.
 
 ## Məhsul qərarı — rollar

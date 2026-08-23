@@ -1,3 +1,4 @@
+import { isLoopbackSmtpHost, normalizeSmtpHost } from '../mail/smtp-host';
 import { isPaymentsEnabled } from '../../modules/payments/payments-flag';
 
 export type ProductionGuardEnv = {
@@ -35,12 +36,19 @@ export function assertProductionRuntimeConfig(env: ProductionGuardEnv): void {
     }
   }
 
-  if (!env.smtpHost?.trim()) {
+  const smtpHost = normalizeSmtpHost(env.smtpHost);
+  if (!smtpHost) {
     missing.push('SMTP_HOST (verify/reset/contact e-poçt)');
+  } else if (isLoopbackSmtpHost(smtpHost)) {
+    missing.push(
+      'SMTP_HOST (localhost/127.0.0.1 production-da e-poçt göndərmir — real SMTP provider)',
+    );
   }
   if (!env.turnstileSecret?.trim()) {
     missing.push('TURNSTILE_SECRET_KEY (auth/contact captcha)');
   }
+  // Cloudflare dummy/test secret boot-u dayandırmır: CaptchaService skip edir,
+  // frontend widget göstərmir. Real widget: ops/cloudflare/provision-turnstile.sh
   if (!env.redisUrl?.trim()) {
     missing.push('REDIS_URL (ready/WS/dispatch/throttle)');
   }

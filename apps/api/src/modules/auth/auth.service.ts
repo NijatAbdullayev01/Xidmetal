@@ -18,7 +18,8 @@ import {
   ResetPasswordDto,
   ConfirmEmailVerificationDto,
 } from './dto';
-import { CLIENT_APP, ProviderAvailability, UserRole, type ClientApp } from '@xidmetal/shared';
+import { CLIENT_APP, ProviderAccountType, ProviderAvailability, UserRole, type ClientApp } from '@xidmetal/shared';
+import { resolveProviderProfileCreate, resolveRegisterPersonNames } from './provider-account';
 import { parseDurationMs } from '../../common/auth/auth-cookies';
 import { assertValidEmailCode } from '../../common/auth/email-verification-codes';
 import { generateNumericOtp } from '../../common/auth/otp';
@@ -64,10 +65,7 @@ export class AuthService {
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findFirst({
       where: {
-        OR: [
-          { email },
-          ...(dto.phone ? [{ phone: dto.phone }] : []),
-        ],
+        OR: [{ email }, { phone: dto.phone }],
       },
       select: { email: true, phone: true },
     });
@@ -85,6 +83,18 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
+    const providerProfile = resolveProviderProfileCreate({
+      role,
+      providerAccountType: dto.providerAccountType,
+      companyName: dto.companyName,
+    });
+    const personNames = resolveRegisterPersonNames({
+      role,
+      providerAccountType: dto.providerAccountType,
+      companyName: dto.companyName,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+    });
 
     let user;
     try {
@@ -92,13 +102,13 @@ export class AuthService {
         data: {
           email,
           passwordHash,
-          firstName: dto.firstName,
-          lastName: dto.lastName,
+          firstName: personNames.firstName,
+          lastName: personNames.lastName,
           phone: dto.phone,
           role,
           isVerified: false,
-          ...(role === UserRole.PROVIDER && {
-            providerProfile: { create: {} },
+          ...(providerProfile && {
+            providerProfile: { create: providerProfile },
           }),
         },
         include: { providerProfile: true },
@@ -500,6 +510,8 @@ export class AuthService {
       bio: string | null;
       experience: number | null;
       location: string | null;
+      accountType: string;
+      companyName: string | null;
       isVerified: boolean;
       rating: number;
       reviewCount: number;
@@ -527,6 +539,8 @@ export class AuthService {
             bio: user.providerProfile.bio ?? undefined,
             experience: user.providerProfile.experience ?? undefined,
             location: user.providerProfile.location ?? undefined,
+            accountType: user.providerProfile.accountType as ProviderAccountType,
+            companyName: user.providerProfile.companyName ?? null,
             isVerified: user.providerProfile.isVerified,
             rating: user.providerProfile.rating,
             reviewCount: user.providerProfile.reviewCount,

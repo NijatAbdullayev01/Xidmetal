@@ -58,7 +58,9 @@ export function assertSessionAudience(options: {
   }
 
   const effectiveApp = headerApp ?? tokenAud;
-  if (!effectiveApp) return;
+  if (!effectiveApp) {
+    reject('Sessiya bu tətbiq üçün etibarsızdır');
+  }
 
   if (effectiveApp === CLIENT_APP.MARKETPLACE && role === UserRole.ADMIN) {
     reject('Sessiya bu tətbiq üçün etibarsızdır');

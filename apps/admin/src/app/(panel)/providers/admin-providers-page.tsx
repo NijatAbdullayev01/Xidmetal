@@ -3,10 +3,13 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  formatProviderDisplayName,
   KycDocumentStatus,
   KYC_DOCUMENT_STATUS_LABELS,
   KYC_DOCUMENT_TYPE_LABELS,
   KycDocumentType,
+  PROVIDER_ACCOUNT_TYPE_LABELS,
+  ProviderAccountType,
   UserRole,
 } from '@xidmetal/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -91,7 +94,7 @@ export function AdminProvidersPage() {
         <CardHeader className="gap-4 space-y-0">
           <CardTitle className="text-base">Axtarış</CardTitle>
           <Input
-            placeholder="Ad, soyad və ya e-poçt"
+            placeholder="Ad, soyad, e-poçt və ya telefon"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -125,15 +128,30 @@ export function AdminProvidersPage() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">
-                        {user.firstName} {user.lastName}
-                      </p>
+                      <p className="font-medium">{formatProviderDisplayName(user)}</p>
+                      {user.providerProfile?.accountType && (
+                        <Badge variant="muted">
+                          {PROVIDER_ACCOUNT_TYPE_LABELS[user.providerProfile.accountType]}
+                        </Badge>
+                      )}
                       <Badge variant={verified ? 'success' : 'warning'}>
                         {verified ? 'Təsdiqlənib' : 'Gözləyir'}
                       </Badge>
                       {!user.isActive && <Badge variant="destructive">Deaktiv</Badge>}
                     </div>
+                    {user.providerProfile?.accountType === ProviderAccountType.COMPANY && (
+                      <p className="text-sm text-muted-foreground">
+                        {user.firstName} {user.lastName}
+                      </p>
+                    )}
                     <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+                    {user.phone ? (
+                      <p className="text-sm text-muted-foreground">
+                        <a href={`tel:${user.phone}`} className="hover:text-foreground">
+                          {user.phone}
+                        </a>
+                      </p>
+                    ) : null}
                     <p className="text-xs text-muted-foreground">
                       {user.providerProfile?.location ?? 'Ünvan yoxdur'} · Reytinq{' '}
                       {(user.providerProfile?.rating ?? 0).toFixed(1)} (

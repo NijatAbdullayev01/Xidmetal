@@ -1,6 +1,5 @@
 import {
   Injectable,
-  Logger,
   NotFoundException,
   UnauthorizedException,
   BadRequestException,
@@ -8,7 +7,6 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
-import { ConfigService } from '@nestjs/config';
 import {
   EmailVerificationPurpose,
   UserRole,
@@ -21,6 +19,7 @@ import {
 } from '@prisma/client';
 import {
   ACTIVE_BOOKING_STATUSES,
+  ProviderAccountType,
   ProviderAvailability,
   type KycDocumentSummary,
 } from '@xidmetal/shared';
@@ -35,7 +34,6 @@ import {
   RequestEmailChangeDto,
   ConfirmEmailChangeDto,
   DeleteAccountDto,
-  ConfirmPhoneDto,
   SubmitKycDocumentDto,
 } from './dto';
 
@@ -43,13 +41,10 @@ const EMAIL_CODE_EXPIRY_MS = 15 * 60 * 1000;
 
 @Injectable()
 export class UsersService {
-  private readonly logger = new Logger(UsersService.name);
-
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
     private storageService: StorageService,
-    private config: ConfigService,
   ) {}
 
   async findById(id: string) {
@@ -162,7 +157,10 @@ export class UsersService {
       );
     }
 
-    const phone = dto.phone?.trim() || null;
+    const phone = dto.phone?.trim();
+    if (dto.phone !== undefined && !phone) {
+      throw new BadRequestException('Telefon nömrəsi tələb olunur');
+    }
     if (phone) {
       const phoneTaken = await this.prisma.user.findFirst({
         where: { phone, NOT: { id: userId } },
@@ -192,10 +190,12 @@ export class UsersService {
       data: {
         ...(dto.firstName !== undefined && { firstName: dto.firstName }),
         ...(dto.lastName !== undefined && { lastName: dto.lastName }),
-        ...(dto.phone !== undefined && {
-          phone,
-          phoneVerifiedAt: phone !== existing.phone ? null : undefined,
-        }),
+        ...(dto.phone !== undefined && phone
+          ? {
+              phone,
+              phoneVerifiedAt: phone !== existing.phone ? null : undefined,
+            }
+          : {}),
         ...(dto.avatarUrl !== undefined && {
           avatarUrl: normalizedAvatarUrl || null,
         }),
@@ -263,103 +263,6 @@ export class UsersService {
     return { message: 'Şifrə uğurla dəyişdirildi' };
   }
 
-  async requestPhoneVerification(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, email: true, phone: true, phoneVerifiedAt: true },
-    });
-    if (!user) throw new NotFoundException('İstifadəçi tapılmadı');
-    if (!user.phone) {
-      throw new BadRequestException('Əvvəlcə telefon nömrəsini profilə yazın');
-    }
-    if (user.phoneVerifiedAt) {
-      return { message: 'Telefon artıq təsdiqlənib' };
-    }
-
-    const code = generateNumericOtp();
-    const codeHash = await bcrypt.hash(code, 10);
-    const expiresAt = new Date(Date.now() + EMAIL_CODE_EXPIRY_MS);
-
-    await this.prisma.emailVerificationCode.deleteMany({
-      where: { userId, purpose: EmailVerificationPurpose.PHONE_VERIFY },
-    });
-    await this.prisma.emailVerificationCode.create({
-      data: {
-        userId,
-        email: user.phone,
-        codeHash,
-        purpose: EmailVerificationPurpose.PHONE_VERIFY,
-        expiresAt,
-      },
-    });
-
-    const mail = await this.mailService.sendPhoneVerificationCode(user.email, code);
-    await this.trySendSmsOtp(user.phone, code);
-
-    return {
-      message: 'Təsdiq kodu e-poçtunuza göndərildi',
-      ...(mail.previewCode ? { previewCode: mail.previewCode } : {}),
-    };
-  }
-
-  async confirmPhoneVerification(userId: string, dto: ConfirmPhoneDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        avatarUrl: true,
-        role: true,
-        isVerified: true,
-        createdAt: true,
-        phoneVerifiedAt: true,
-        providerProfile: true,
-      },
-    });
-    if (!user) throw new NotFoundException('İstifadəçi tapılmadı');
-    if (!user.phone) {
-      throw new BadRequestException('Telefon nömrəsi tapılmadı');
-    }
-    if (user.phoneVerifiedAt) {
-      return this.mapUserProfile(user);
-    }
-
-    await assertValidEmailCode(this.prisma, {
-      userId,
-      email: user.phone,
-      purpose: EmailVerificationPurpose.PHONE_VERIFY,
-      code: dto.code,
-    });
-
-    const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.emailVerificationCode.deleteMany({
-        where: { userId, purpose: EmailVerificationPurpose.PHONE_VERIFY },
-      });
-      return tx.user.update({
-        where: { id: userId },
-        data: { phoneVerifiedAt: new Date() },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
-          avatarUrl: true,
-          role: true,
-          isVerified: true,
-          createdAt: true,
-          phoneVerifiedAt: true,
-          providerProfile: true,
-        },
-      });
-    });
-
-    return this.mapUserProfile(updated);
-  }
-
   async listMyKyc(userId: string): Promise<KycDocumentSummary[]> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -391,28 +294,6 @@ export class UsersService {
       data: { userId, type, url, status: KycDocumentStatus.PENDING },
     });
     return this.mapKyc(created);
-  }
-
-  private async trySendSmsOtp(phone: string, code: string): Promise<void> {
-    const smsUrl = this.config.get<string>('SMS_HTTP_URL')?.trim();
-    if (!smsUrl) return;
-    const token = this.config.get<string>('SMS_HTTP_TOKEN')?.trim();
-    try {
-      await fetch(smsUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          phone,
-          code,
-          message: `Xidmətal təsdiq kodu: ${code}`,
-        }),
-      });
-    } catch {
-      this.logger.warn('SMS OTP göndərilmədi');
-    }
   }
 
   private async mapKyc(row: {
@@ -672,6 +553,8 @@ export class UsersService {
       bio: string | null;
       experience: number | null;
       location: string | null;
+      accountType?: string;
+      companyName?: string | null;
       isVerified: boolean;
       rating: number;
       reviewCount: number;
@@ -699,6 +582,10 @@ export class UsersService {
             bio: user.providerProfile.bio ?? undefined,
             experience: user.providerProfile.experience ?? undefined,
             location: user.providerProfile.location ?? undefined,
+            accountType:
+              (user.providerProfile.accountType as ProviderAccountType | undefined) ??
+              ProviderAccountType.INDIVIDUAL,
+            companyName: user.providerProfile.companyName ?? null,
             isVerified: user.providerProfile.isVerified,
             rating: user.providerProfile.rating,
             reviewCount: user.providerProfile.reviewCount,

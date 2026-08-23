@@ -9,7 +9,7 @@ import {
   type LocationPushPayload,
 } from '@xidmetal/shared';
 import { api } from '@/lib/api';
-import { geoErrorMessage, type GeoCoords } from '@/lib/geolocation';
+import { buildWatchPositionOptions, geoErrorMessage, type GeoCoords } from '@/lib/geolocation';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { getSharedSocket, useSocket } from '@/hooks/use-socket';
 
@@ -84,15 +84,17 @@ export function useProviderTripLocation(enabled = true) {
               : null,
         });
       },
-      () => {
-        // İcazə yoxdursa növbə GPS kartı izah edir — burada səssiz keç
+      (err) => {
+        if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
+          return;
+        }
         void geoErrorMessage('permission_denied');
       },
-      {
+      buildWatchPositionOptions({
         enableHighAccuracy: true,
         maximumAge: LOCATION_PUSH_MIN_INTERVAL_MS,
-        timeout: 20_000,
-      },
+        timeoutMs: 20_000,
+      }),
     );
 
     return () => {

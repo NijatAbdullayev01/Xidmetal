@@ -3,19 +3,53 @@ import type { NextConfig } from 'next';
 
 // Monorepo root .env — NEXT_PUBLIC_* dəyişənləri (next-in daxili dotenv)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+const dotenv = require('dotenv') as {
+  config: (opts: { path: string }) => void;
+};
+const envDir = path.join(__dirname, '../..');
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: path.join(envDir, '.env.development') });
+}
+dotenv.config({ path: path.join(envDir, '.env') });
 
 const apiOrigin =
   process.env.API_URL?.trim() || process.env.NEXT_PUBLIC_API_URL?.trim() || '';
+const publicApiOrigin = process.env.NEXT_PUBLIC_API_URL?.trim() || '';
 const wsOrigin = process.env.NEXT_PUBLIC_WS_URL?.trim() || '';
 type RemotePattern = NonNullable<NonNullable<NextConfig['images']>['remotePatterns']>[number];
+
+function localDevApiOrigin(): string {
+  const fromEnv = process.env.API_URL?.trim() || process.env.NEXT_PUBLIC_WS_URL?.trim();
+  if (fromEnv) {
+    try {
+      return new URL(fromEnv).origin;
+    } catch {
+      return 'http://localhost:4100';
+    }
+  }
+  return 'http://localhost:4100';
+}
+
+function isLocalPublicHost(url: string | undefined): boolean {
+  const value = url?.trim() ?? '';
+  if (!value) return process.env.NODE_ENV !== 'production';
+  try {
+    const { hostname } = new URL(value);
+    return hostname === 'localhost' || hostname === '127.0.0.1';
+  } catch {
+    return process.env.NODE_ENV !== 'production';
+  }
+}
+
+const localPublicApp = isLocalPublicHost(process.env.NEXT_PUBLIC_APP_URL);
+const localApiOrigin = localDevApiOrigin();
 
 function buildImageRemotePatterns(): RemotePattern[] {
   const sources = [
     process.env.STORAGE_PUBLIC_BASE_URL,
     process.env.S3_PUBLIC_URL,
     apiOrigin ? `${apiOrigin.replace(/\/$/, '')}/uploads` : '',
-    process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000/uploads',
+    localPublicApp ? `${localApiOrigin}/uploads` : '',
   ];
 
   return sources
@@ -36,15 +70,16 @@ function buildImageRemotePatterns(): RemotePattern[] {
 function buildSecurityHeaders() {
   const connectSrc = [
     "'self'",
-    apiOrigin.replace(/\/$/, ''),
+    publicApiOrigin.replace(/\/$/, ''),
     wsOrigin.replace(/\/$/, ''),
-    process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000',
-    process.env.NODE_ENV === 'production' ? '' : 'ws://localhost:4000',
+    localPublicApp ? localApiOrigin : '',
+    localPublicApp ? localApiOrigin.replace(/^http/, 'ws') : '',
     // Google Maps JavaScript API (konum seçici + canlı tracking)
     'https://maps.googleapis.com',
     'https://maps.gstatic.com',
     'https://*.googleapis.com',
     'https://*.gstatic.com',
+    'https://challenges.cloudflare.com',
   ].filter(Boolean);
 
   const csp = [
@@ -58,7 +93,8 @@ function buildSecurityHeaders() {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "script-src 'self' 'unsafe-inline'" +
       (process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'") +
-      ' https://maps.googleapis.com https://maps.gstatic.com',
+      ' https://maps.googleapis.com https://maps.gstatic.com https://challenges.cloudflare.com',
+    "frame-src 'self' https://challenges.cloudflare.com",
     "worker-src 'self' blob:",
     `connect-src ${connectSrc.join(' ')}`,
   ];
@@ -69,7 +105,8 @@ function buildSecurityHeaders() {
 
   return [
     { key: 'Content-Security-Policy', value: csp.join('; ') },
-    { key: 'Permissions-Policy', value: 'geolocation=(self)' },
+    // Safari `(self)` / Feature-Policy-ni PERMISSION_DENIED kimi oxuyur
+    { key: 'Permissions-Policy', value: 'geolocation=*' },
     { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
     { key: 'X-Content-Type-Options', value: 'nosniff' },
     { key: 'X-Frame-Options', value: 'DENY' },
