@@ -12,6 +12,7 @@ import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { getCategoryIcon } from '@/lib/category-icons';
 import type { AdminCategorySummary } from '@xidmetal/shared';
+import { refreshAdminQueries } from '@/lib/admin-queries';
 
 export function AdminCategoriesPage() {
   const token = useAuthToken();
@@ -68,8 +69,7 @@ export function AdminCategoriesPage() {
     onSuccess: async () => {
       setError(null);
       resetForm();
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'categories'] });
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      await refreshAdminQueries(queryClient, ['admin', 'categories']);
     },
     onError: (err: unknown) => {
       setError(err instanceof ApiError ? err.message : 'Saxlama uğursuz oldu');
@@ -81,8 +81,7 @@ export function AdminCategoriesPage() {
       api.admin.updateCategory(token!, cat.id, { isActive: !cat.isActive }),
     onSuccess: async () => {
       setError(null);
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'categories'] });
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      await refreshAdminQueries(queryClient, ['admin', 'categories']);
     },
     onError: (err: unknown) => {
       setError(err instanceof ApiError ? err.message : 'Əməliyyat uğursuz oldu');

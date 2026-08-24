@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { formatPrice } from '@/lib/utils';
+import { adminListQueryOptions, refreshAdminQueries } from '@/lib/admin-queries';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Bütün statuslar' },
@@ -87,6 +88,7 @@ export function AdminBookingsPage() {
     queryKey: ['admin', 'bookings', params],
     queryFn: () => api.admin.bookings(token!, params),
     enabled: !!token,
+    ...adminListQueryOptions,
   });
 
   const updateStatus = useMutation({
@@ -100,7 +102,7 @@ export function AdminBookingsPage() {
       reason?: string;
     }) => api.updateBookingStatus(token!, id, next, { cancelReason: reason }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['admin', 'bookings'] });
+      void refreshAdminQueries(queryClient, ['admin', 'bookings']);
       setError(null);
       setCancelTarget(null);
       setCancelReason('');

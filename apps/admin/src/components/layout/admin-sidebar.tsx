@@ -28,6 +28,9 @@ import { useAuthStore } from '@/store/auth.store';
 import { useLogout } from '@/hooks/use-logout';
 import { cn } from '@/lib/utils';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
+import { useAdminNavAttention } from '@/hooks/use-admin-nav-attention';
+import { formatNavAttentionAria, navAttentionCount } from '@/lib/nav-attention';
+import { NavAttentionIndicator } from '@/components/layout/nav-attention-indicator';
 
 interface NavItem {
   href: string;
@@ -57,6 +60,7 @@ export function AdminSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const user = useAuthStore((state) => state.user);
   const logout = useLogout();
+  const { counts: attentionCounts, liveMessage } = useAdminNavAttention();
 
   useScrollLock(mobileOpen);
 
@@ -95,14 +99,23 @@ export function AdminSidebar() {
 
   const navContent = (
     <nav className="flex flex-1 flex-col gap-1 p-4" aria-label="Admin naviqasiyası">
+      {liveMessage ? (
+        <p className="sr-only" aria-live="polite">
+          {liveMessage}
+        </p>
+      ) : null}
       {ADMIN_NAV.map((item) => {
         const Icon = item.icon;
         const active = item.href === activeHref;
+        const attention = navAttentionCount(item.href, attentionCounts);
+        const attentionLabel = formatNavAttentionAria(item.label, attention);
         return (
           <Link
             key={item.href}
             href={item.href}
             onClick={closeMobile}
+            aria-label={attentionLabel}
+            title={attentionLabel}
             className={cn(
               'flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
               active
@@ -112,6 +125,7 @@ export function AdminSidebar() {
           >
             <Icon className="h-4 w-4 shrink-0" />
             <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            <NavAttentionIndicator count={attention} />
           </Link>
         );
       })}

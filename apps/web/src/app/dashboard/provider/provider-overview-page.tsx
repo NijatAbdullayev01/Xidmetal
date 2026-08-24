@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Briefcase, ClipboardList, Star, PlusCircle, ArrowRight, MessageSquare } from 'lucide-react';
-import type { ProviderDashboardStats } from '@xidmetal/shared';
+import { ServiceStatus, type ProviderDashboardStats } from '@xidmetal/shared';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { buttonStyles } from '@/components/ui/button';
 import { api } from '@/lib/api';
@@ -11,7 +11,7 @@ import { useAuthToken } from '@/hooks/use-auth-token';
 import { formatPrice } from '@/lib/utils';
 import { DispatchOffersCard } from '@/components/dispatch/dispatch-offers-card';
 import { ProviderVerificationBanner } from '@/components/provider/provider-verification-banner';
-import { DASHBOARD_LIST_POLL_MS } from '@/lib/live-attention';
+import { DASHBOARD_LIST_POLL_MS, PROVIDER_VERIFICATION_POLL_MS } from '@/lib/live-attention';
 
 export function ProviderOverviewPage() {
   const token = useAuthToken();
@@ -28,6 +28,18 @@ export function ProviderOverviewPage() {
     queryKey: ['services', 'mine'],
     queryFn: () => api.myServices(token!, { limit: '10' }),
     enabled: !!token,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => {
+      const items = query.state.data?.items;
+      if (!items?.length) return false;
+      const waitingReview = items.some(
+        (service) =>
+          service.status === ServiceStatus.PENDING_REVIEW ||
+          service.status === ServiceStatus.NEEDS_REVISION,
+      );
+      return waitingReview ? PROVIDER_VERIFICATION_POLL_MS : false;
+    },
   });
 
   const { data: bookings } = useQuery({

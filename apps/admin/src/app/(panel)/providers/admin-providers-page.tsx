@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { adminListQueryOptions, refreshAdminQueries } from '@/lib/admin-queries';
 
 export function AdminProvidersPage() {
   const token = useAuthToken();
@@ -40,12 +41,14 @@ export function AdminProvidersPage() {
     queryKey: ['admin', 'providers', params],
     queryFn: () => api.admin.users(token!, params),
     enabled: !!token,
+    ...adminListQueryOptions,
   });
 
   const { data: kycDocs, isLoading: kycLoading } = useQuery({
     queryKey: ['admin', 'providers', kycUserId, 'kyc'],
     queryFn: () => api.admin.providerKyc(token!, kycUserId!),
     enabled: !!token && !!kycUserId,
+    ...adminListQueryOptions,
   });
 
   const verify = useMutation({
@@ -53,8 +56,7 @@ export function AdminProvidersPage() {
       api.admin.setProviderVerified(token!, userId, { isVerified: next }),
     onSuccess: async () => {
       setError(null);
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'providers'] });
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      await refreshAdminQueries(queryClient, ['admin', 'providers']);
     },
     onError: (err: unknown) => {
       setError(err instanceof ApiError ? err.message : 'Əməliyyat uğursuz oldu');
@@ -73,7 +75,7 @@ export function AdminProvidersPage() {
     }) => api.admin.setKycStatus(token!, id, { status, adminNote }),
     onSuccess: async () => {
       setError(null);
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'providers'] });
+      await refreshAdminQueries(queryClient, ['admin', 'providers']);
     },
     onError: (err: unknown) => {
       setError(err instanceof ApiError ? err.message : 'KYC yoxlanışı uğursuz oldu');

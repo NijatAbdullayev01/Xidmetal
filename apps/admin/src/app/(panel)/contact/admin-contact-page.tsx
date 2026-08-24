@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { adminListQueryOptions, refreshAdminQueries } from '@/lib/admin-queries';
 
 export function AdminContactPage() {
   const token = useAuthToken();
@@ -24,13 +25,14 @@ export function AdminContactPage() {
     queryKey: ['admin', 'contact', params],
     queryFn: () => api.admin.contact(token!, params),
     enabled: !!token,
+    ...adminListQueryOptions,
   });
 
   const markRead = useMutation({
     mutationFn: (id: string) => api.admin.markContactRead(token!, id),
     onSuccess: async () => {
       setError(null);
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'contact'] });
+      await refreshAdminQueries(queryClient, ['admin', 'contact']);
     },
     onError: (err: unknown) => {
       setError(err instanceof ApiError ? err.message : 'Əməliyyat uğursuz oldu');

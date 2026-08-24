@@ -17,6 +17,9 @@ export const WS_CONNECTED_FALLBACK_POLL_MS = 90_000;
 /** Dashboard siyahıları (overview / bookings) — WS invalidate + seyrək poll */
 export const DASHBOARD_LIST_POLL_MS = 20_000;
 
+/** Admin təsdiqi gözləyən xidmət verən kabineti */
+export const PROVIDER_VERIFICATION_POLL_MS = 10_000;
+
 export function livePollIntervalMs(visibleMs: number, hiddenMs: number): number {
   if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
     return hiddenMs;

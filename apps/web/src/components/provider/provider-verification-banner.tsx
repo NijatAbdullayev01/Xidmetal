@@ -9,6 +9,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { cn } from '@/lib/utils';
+import { PROVIDER_VERIFICATION_POLL_MS } from '@/lib/live-attention';
 
 /**
  * Xidmət verən admin təsdiqi gözləyirsə dashboard-da göstərilir.
@@ -23,7 +24,13 @@ export function ProviderVerificationBanner({ className }: { className?: string }
     queryKey: ['users', 'me'],
     queryFn: () => api.users.me(token!),
     enabled: !!token,
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => {
+      const profile = query.state.data?.providerProfile;
+      if (profile && !profile.isVerified) return PROVIDER_VERIFICATION_POLL_MS;
+      return false;
+    },
   });
 
   useEffect(() => {

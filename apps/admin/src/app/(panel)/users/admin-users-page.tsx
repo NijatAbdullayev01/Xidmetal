@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { adminListQueryOptions, refreshAdminQueries } from '@/lib/admin-queries';
 
 const ACTIVE_OPTIONS = [
   { value: '', label: 'Hamısı' },
@@ -37,6 +38,7 @@ export function AdminUsersPage() {
     queryKey: ['admin', 'users', params],
     queryFn: () => api.admin.users(token!, params),
     enabled: !!token,
+    ...adminListQueryOptions,
   });
 
   const toggleActive = useMutation({
@@ -44,8 +46,7 @@ export function AdminUsersPage() {
       api.admin.setUserActive(token!, id, { isActive: next }),
     onSuccess: async () => {
       setError(null);
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      await refreshAdminQueries(queryClient, ['admin', 'users']);
     },
     onError: (err: unknown) => {
       setError(err instanceof ApiError ? err.message : 'Əməliyyat uğursuz oldu');

@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { buttonStyles } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { ADMIN_LIST_POLL_MS } from '@/lib/admin-queries';
 
 interface StatCard {
   label: string;
@@ -71,7 +72,7 @@ export function AdminOverviewPage() {
     queryKey: ['admin', 'stats'],
     queryFn: () => api.admin.stats(token!),
     enabled: !!token,
-    refetchInterval: 30_000,
+    refetchInterval: ADMIN_LIST_POLL_MS,
   });
 
   const inactiveServices =

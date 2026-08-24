@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { adminListQueryOptions } from '@/lib/admin-queries';
 
 const ACTION_LABELS: Record<string, string> = {
   USER_ACTIVE: 'İstifadəçi aktivliyi',
@@ -23,6 +24,7 @@ export function AdminAuditPage() {
     queryKey: ['admin', 'audit', params],
     queryFn: () => api.admin.audit(token!, params),
     enabled: !!token,
+    ...adminListQueryOptions,
   });
 
   return (

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { adminListQueryOptions, refreshAdminQueries } from '@/lib/admin-queries';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Bütün statuslar' },
@@ -43,6 +44,7 @@ export function AdminReviewsPage() {
     queryKey: ['admin', 'reviews', params],
     queryFn: () => api.admin.reviews(token!, params),
     enabled: !!token,
+    ...adminListQueryOptions,
   });
 
   const moderate = useMutation({
@@ -55,8 +57,7 @@ export function AdminReviewsPage() {
     }) => api.admin.setReviewStatus(token!, id, { status: next }),
     onSuccess: async () => {
       setError(null);
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'reviews'] });
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      await refreshAdminQueries(queryClient, ['admin', 'reviews']);
     },
     onError: (err: unknown) => {
       setError(err instanceof ApiError ? err.message : 'Əməliyyat uğursuz oldu');

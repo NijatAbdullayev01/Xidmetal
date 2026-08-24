@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/select';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { formatPrice } from '@/lib/utils';
+import { adminListQueryOptions, refreshAdminQueries } from '@/lib/admin-queries';
 
 const STATUS_OPTIONS = [
   { value: ServiceStatus.PENDING_REVIEW, label: 'Yoxlama gözləyir' },
@@ -59,12 +60,12 @@ export function AdminServicesPage() {
     queryKey: ['admin', 'services', params],
     queryFn: () => api.admin.services(token!, params),
     enabled: !!token,
+    ...adminListQueryOptions,
   });
 
   const invalidate = async () => {
     setError(null);
-    await queryClient.invalidateQueries({ queryKey: ['admin', 'services'] });
-    await queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+    await refreshAdminQueries(queryClient, ['admin', 'services']);
   };
 
   const approve = useMutation({

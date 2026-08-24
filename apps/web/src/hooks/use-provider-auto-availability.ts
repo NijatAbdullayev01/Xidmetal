@@ -12,6 +12,7 @@ import {
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { useAuthStore } from '@/store/auth.store';
+import { PROVIDER_VERIFICATION_POLL_MS } from '@/lib/live-attention';
 
 const ONLINE_REFRESH_MS = 20_000;
 
@@ -49,8 +50,19 @@ export function useProviderAutoAvailability(enabled = true) {
     queryKey: ['users', 'me'],
     queryFn: () => api.users.me(token!),
     enabled: enabled && !!token && role === UserRole.PROVIDER,
-    staleTime: 15_000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => {
+      const profile = query.state.data?.providerProfile;
+      if (profile && !profile.isVerified) return PROVIDER_VERIFICATION_POLL_MS;
+      return false;
+    },
   });
+
+  useEffect(() => {
+    if (!me?.providerProfile) return;
+    updateUser({ providerProfile: me.providerProfile });
+  }, [me, updateUser]);
 
   const profile = me?.providerProfile;
   const isVerified = profile?.isVerified === true;

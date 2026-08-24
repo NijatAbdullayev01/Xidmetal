@@ -18,6 +18,7 @@ import {
 } from '@/lib/provider-labels';
 import { useState } from 'react';
 import { ProviderVerificationBanner } from '@/components/provider/provider-verification-banner';
+import { PROVIDER_VERIFICATION_POLL_MS } from '@/lib/live-attention';
 
 interface DeleteTarget {
   id: string;
@@ -43,6 +44,18 @@ export function MyServicesPage() {
     queryKey: ['services', 'mine'],
     queryFn: () => api.myServices(token!, { limit: '50' }),
     enabled: !!token,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => {
+      const items = query.state.data?.items;
+      if (!items?.length) return false;
+      const waitingReview = items.some(
+        (service) =>
+          service.status === ServiceStatus.PENDING_REVIEW ||
+          service.status === ServiceStatus.NEEDS_REVISION,
+      );
+      return waitingReview ? PROVIDER_VERIFICATION_POLL_MS : false;
+    },
   });
 
   const updateMutation = useMutation({

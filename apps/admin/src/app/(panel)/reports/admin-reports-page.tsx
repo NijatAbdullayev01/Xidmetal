@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { adminListQueryOptions, refreshAdminQueries } from '@/lib/admin-queries';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Bütün statuslar' },
@@ -58,6 +59,7 @@ export function AdminReportsPage() {
     queryKey: ['admin', 'reports', params],
     queryFn: () => api.admin.reports(token!, params),
     enabled: !!token,
+    ...adminListQueryOptions,
   });
 
   const moderate = useMutation({
@@ -81,8 +83,7 @@ export function AdminReportsPage() {
         delete next[vars.id];
         return next;
       });
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'reports'] });
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      await refreshAdminQueries(queryClient, ['admin', 'reports']);
     },
     onError: (err: unknown) => {
       setError(err instanceof ApiError ? err.message : 'Əməliyyat uğursuz oldu');
