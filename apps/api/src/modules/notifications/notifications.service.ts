@@ -98,12 +98,22 @@ export class NotificationsService {
     };
   }
 
-  /** Admin/platforma oxunmamış sayı — zəng ikonu */
+  /** Admin/platforma oxunmamış sayı — zəng ikonu + səs */
   async getUnreadCount(userId: string): Promise<UnreadNotificationsSummary> {
-    const count = await this.prisma.notification.count({
-      where: { userId, isRead: false, type: { in: inboxTypes } },
-    });
-    return { count };
+    const where = { userId, isRead: false, type: { in: inboxTypes } };
+    const [count, latest] = await Promise.all([
+      this.prisma.notification.count({ where }),
+      this.prisma.notification.findFirst({
+        where,
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, createdAt: true },
+      }),
+    ]);
+    return {
+      count,
+      latestUnreadId: latest?.id ?? null,
+      latestUnreadAt: latest?.createdAt.toISOString() ?? null,
+    };
   }
 
   /** Sifariş hadisələri — naviqasiya badge-i və səs siqnalı üçün */

@@ -70,6 +70,21 @@ describe('resolveNotificationHref', () => {
     ).toBe('/dashboard/customer/settings');
   });
 
+  it('xidmət düzəlişi href-ini edit səhifəsinə aparır', () => {
+    expect(
+      resolveNotificationHref(
+        {
+          type: NotificationType.ADMIN_ANNOUNCEMENT,
+          data: {
+            href: '/dashboard/provider/services/svc-1/edit',
+            serviceNeedsRevision: true,
+          },
+        },
+        UserRole.PROVIDER,
+      ),
+    ).toBe('/dashboard/provider/services/svc-1/edit');
+  });
+
   it('open redirect-i bloklayır', () => {
     expect(
       resolveNotificationHref(

@@ -1,6 +1,6 @@
 import { UserRole } from '@xidmetal/shared';
 
-export type LiveAttentionKind = 'message' | 'booking';
+export type LiveAttentionKind = 'message' | 'booking' | 'admin';
 
 /** Görünən tabda daha tez, arxa planda da dayandırılmadan poll */
 export const LIVE_POLL_VISIBLE_MS = 4_000;
@@ -49,12 +49,24 @@ export function dashboardBookingsPath(role: string | undefined): string {
   return '/dashboard';
 }
 
+export function dashboardNotificationsPath(role: string | undefined): string {
+  if (role === UserRole.PROVIDER) return '/dashboard/provider/notifications';
+  if (role === UserRole.CUSTOMER) return '/dashboard/customer/notifications';
+  return '/dashboard';
+}
+
+export function dashboardServicesPath(): string {
+  return '/dashboard/provider/services';
+}
+
 /** Mobil cihazlarda qısa vibrasiya (dəstəklənirsə). */
 export function vibrateAttention(kind: LiveAttentionKind): void {
   if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
   try {
     if (kind === 'booking') {
       navigator.vibrate([80, 40, 80, 40, 120]);
+    } else if (kind === 'admin') {
+      navigator.vibrate([100, 50, 100]);
     } else {
       navigator.vibrate([60, 30, 60]);
     }

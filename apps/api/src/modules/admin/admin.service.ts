@@ -576,8 +576,8 @@ export class AdminService {
       include: this.serviceAdminInclude(),
     });
 
-    const title = 'Xidmət düzəlişə göndərildi';
-    const body = `«${updated.title}» xidmətiniz düzəliş tələb edir: ${note}`;
+    const title = 'Xidmətiniz düzəliş gözləyir';
+    const body = `«${updated.title}» xidmətinə admin düzəliş istədi: ${note}`;
     const href = `/dashboard/provider/services/${updated.id}/edit`;
     const notification = await this.prisma.notification.create({
       data: {

@@ -83,11 +83,21 @@ export class UsersService {
     }
 
     const now = new Date();
-    const [totalServices, activeServices, scheduledPending, offerPending, completedBookings] =
+    const [
+      totalServices,
+      activeServices,
+      servicesNeedingRevision,
+      scheduledPending,
+      offerPending,
+      completedBookings,
+    ] =
       await Promise.all([
         this.prisma.service.count({ where: { providerId: userId } }),
         this.prisma.service.count({
           where: { providerId: userId, status: ServiceStatus.ACTIVE },
+        }),
+        this.prisma.service.count({
+          where: { providerId: userId, status: ServiceStatus.NEEDS_REVISION },
         }),
         // Seed PENDING INSTANT sayılmır — yalnız planlı gözləyənlər
         this.prisma.booking.count({
@@ -122,6 +132,7 @@ export class UsersService {
       completedBookings,
       rating: user.providerProfile?.rating ?? 0,
       reviewCount: user.providerProfile?.reviewCount ?? 0,
+      servicesNeedingRevision,
     };
   }
 

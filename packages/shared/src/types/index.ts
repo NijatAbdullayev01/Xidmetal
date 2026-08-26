@@ -192,6 +192,8 @@ export interface ProviderDashboardStats {
   completedBookings: number;
   rating: number;
   reviewCount: number;
+  /** Admin düzəliş növbəsindəki xidmətlər */
+  servicesNeedingRevision: number;
 }
 
 /** Admin panel — platforma icmalı */
@@ -377,6 +379,9 @@ export interface NotificationSummary {
 
 export interface UnreadNotificationsSummary {
   count: number;
+  /** Səs/toast üçün — ən son oxunmamış admin bildirişi */
+  latestUnreadId?: string | null;
+  latestUnreadAt?: string | null;
 }
 
 /** Sifarişlər bölməsi üzərindəki diqqət badge-i */

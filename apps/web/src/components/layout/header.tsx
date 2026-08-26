@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useMessageNotifications } from '@/hooks/use-message-notifications';
 import { useBookingNotifications } from '@/hooks/use-booking-notifications';
+import { useNotifications } from '@/hooks/use-notifications';
 
 /** Profil düyməsinin küncündə yanıb-sönən diqqət siqnalı */
 function AttentionSignal({ active, label }: { active: boolean; label: string }) {
@@ -43,13 +44,16 @@ export function Header() {
 
   const { unreadCount } = useMessageNotifications(authed);
   const { attentionCount } = useBookingNotifications(authed);
-  const hasAttention = unreadCount + attentionCount > 0;
+  const { unreadCount: adminUnread } = useNotifications(authed);
+  const hasAttention = unreadCount + attentionCount + adminUnread > 0;
   const attentionLabel =
     unreadCount > 0 && attentionCount > 0
       ? 'Yeni mesaj və sifariş bildirişi var'
       : unreadCount > 0
         ? 'Yeni mesajınız var'
-        : 'Yeni sifariş bildirişiniz var';
+        : attentionCount > 0
+          ? 'Yeni sifariş bildirişiniz var'
+          : 'Yeni bildirişiniz var';
 
   const profileHref = authed
     ? user

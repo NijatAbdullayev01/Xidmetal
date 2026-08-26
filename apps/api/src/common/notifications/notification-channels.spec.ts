@@ -30,4 +30,33 @@ describe('NotificationChannelsService', () => {
     });
     expect(push.sendToUser).toHaveBeenCalled();
   });
+
+  it('data.href varsa WS payload-a əlavə edir', () => {
+    const push = { sendToUser: vi.fn().mockResolvedValue(undefined) };
+    const realtime = {
+      emitNotificationNew: vi.fn(),
+    };
+
+    const service = new NotificationChannelsService(
+      push as never,
+      realtime as never,
+    );
+
+    service.deliverAfterInApp({
+      userId: 'user-1',
+      notificationId: 'n-2',
+      title: 'Düzəliş',
+      body: 'Qeyd',
+      type: NotificationType.ADMIN_ANNOUNCEMENT,
+      data: { href: '/dashboard/provider/services/s1/edit' },
+    });
+
+    expect(realtime.emitNotificationNew).toHaveBeenCalledWith('user-1', {
+      id: 'n-2',
+      type: NotificationType.ADMIN_ANNOUNCEMENT,
+      title: 'Düzəliş',
+      body: 'Qeyd',
+      href: '/dashboard/provider/services/s1/edit',
+    });
+  });
 });

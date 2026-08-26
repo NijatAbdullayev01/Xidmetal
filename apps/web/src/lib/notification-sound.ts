@@ -92,3 +92,11 @@ export async function playBookingNotificationSound(): Promise<void> {
     { freq: 783.99, offset: 0.26, duration: 0.2, gain: 0.1 },
   ]);
 }
+
+/** Admin / platforma bildirişi — düzəliş, təsdiq, elan. */
+export async function playAdminNotificationSound(): Promise<void> {
+  await playChime([
+    { freq: 698.46, offset: 0, duration: 0.16, gain: 0.12 },
+    { freq: 880, offset: 0.14, duration: 0.2, gain: 0.1 },
+  ]);
+}

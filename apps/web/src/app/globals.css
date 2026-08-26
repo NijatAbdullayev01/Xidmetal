@@ -180,3 +180,28 @@
     outline-offset: -2px;
   }
 }
+
+@keyframes nav-attention-blink {
+  0%,
+  45% {
+    opacity: 1;
+    box-shadow: 0 0 6px 2px color-mix(in oklab, var(--color-destructive) 80%, transparent);
+  }
+  55%,
+  100% {
+    opacity: 0.12;
+    box-shadow: none;
+  }
+}
+
+.nav-attention-light {
+  animation: nav-attention-blink 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-attention-light {
+    animation: none;
+    opacity: 1;
+    box-shadow: 0 0 4px 1px color-mix(in oklab, var(--color-destructive) 70%, transparent);
+  }
+}

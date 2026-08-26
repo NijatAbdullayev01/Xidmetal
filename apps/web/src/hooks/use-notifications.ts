@@ -27,5 +27,7 @@ export function useNotifications(enabled = true) {
 
   return {
     unreadCount: unreadQuery.data?.count ?? 0,
+    latestUnreadId: unreadQuery.data?.latestUnreadId ?? null,
+    latestUnreadAt: unreadQuery.data?.latestUnreadAt ?? null,
   };
 }

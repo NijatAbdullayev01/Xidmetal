@@ -41,13 +41,16 @@ export class NotificationChannelsService {
     body: string;
     type: NotificationType | string;
     notificationId?: string;
+    data?: Record<string, unknown> | null;
   }): void {
     try {
+      const href = input.data?.href;
       this.realtime?.emitNotificationNew(input.userId, {
         id: input.notificationId ?? randomUUID(),
         type: String(input.type),
         title: input.title,
         body: input.body,
+        ...(typeof href === 'string' ? { href } : {}),
       });
     } catch (error) {
       this.logger.warn(

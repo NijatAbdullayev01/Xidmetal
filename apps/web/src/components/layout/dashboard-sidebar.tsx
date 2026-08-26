@@ -29,8 +29,12 @@ import { useLogout } from '@/hooks/use-logout';
 import { useMessageNotifications } from '@/hooks/use-message-notifications';
 import { useBookingNotifications } from '@/hooks/use-booking-notifications';
 import { useReviewNotifications } from '@/hooks/use-review-notifications';
+import { useNotifications } from '@/hooks/use-notifications';
+import { useProviderServiceAttention } from '@/hooks/use-provider-service-attention';
 import { cn } from '@/lib/utils';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
+import { formatNavAttentionAria } from '@/lib/nav-attention';
+import { NavAttentionIndicator } from '@/components/layout/nav-attention-indicator';
 
 type DashboardVariant = 'provider' | 'customer';
 
@@ -85,30 +89,12 @@ function isRatingsNavItem(href: string) {
   return href.endsWith('/ratings');
 }
 
-function NavBadge({
-  count,
-  active,
-  label,
-}: {
-  count: number;
-  active: boolean;
-  label: string;
-}) {
-  if (count <= 0) return null;
+function isNotificationsNavItem(href: string) {
+  return href.endsWith('/notifications');
+}
 
-  return (
-    <span
-      className={cn(
-        'ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-semibold',
-        active
-          ? 'bg-brand-foreground/15 text-brand-foreground'
-          : 'bg-brand text-brand-foreground',
-      )}
-      aria-label={label}
-    >
-      {count > 99 ? '99+' : count}
-    </span>
-  );
+function isMyServicesNavItem(href: string) {
+  return href === '/dashboard/provider/services';
 }
 
 export function DashboardSidebar({ variant }: DashboardSidebarProps) {
@@ -121,6 +107,10 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
   const { unreadCount: unreadMessages } = useMessageNotifications(!!user);
   const { attentionCount: bookingAttention } = useBookingNotifications(!!user);
   const { attentionCount: reviewAttention } = useReviewNotifications(
+    !!user && variant === 'provider',
+  );
+  const { unreadCount: adminUnread } = useNotifications(!!user);
+  const { needsRevisionCount } = useProviderServiceAttention(
     !!user && variant === 'provider',
   );
 
@@ -192,19 +182,40 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
     return best;
   }, null);
 
+  const liveParts: string[] = [];
+  if (unreadMessages > 0) liveParts.push(`${unreadMessages} oxunmamış mesaj`);
+  if (bookingAttention > 0) liveParts.push(`${bookingAttention} sifariş bildirişi`);
+  if (reviewAttention > 0) liveParts.push(`${reviewAttention} yeni rəy`);
+  if (adminUnread > 0) liveParts.push(`${adminUnread} platforma bildirişi`);
+  if (needsRevisionCount > 0) {
+    liveParts.push(`${needsRevisionCount} xidmət düzəliş gözləyir`);
+  }
+  const liveMessage = liveParts.join('. ');
+
   const navContent = (
     <nav className="flex flex-1 flex-col gap-1 p-4" aria-label="Kabinet naviqasiyası">
+      {liveMessage ? (
+        <p className="sr-only" aria-live="polite">
+          {liveMessage}
+        </p>
+      ) : null}
       {navItems.map((item) => {
         const Icon = item.icon;
         const active = item.href === activeHref;
-        const messageBadge = isMessagesNavItem(item.href);
-        const bookingBadge = isBookingsNavItem(item.href);
-        const ratingsBadge = isRatingsNavItem(item.href);
+        let attention = 0;
+        if (isMessagesNavItem(item.href)) attention = unreadMessages;
+        else if (isBookingsNavItem(item.href)) attention = bookingAttention;
+        else if (isRatingsNavItem(item.href)) attention = reviewAttention;
+        else if (isNotificationsNavItem(item.href)) attention = adminUnread;
+        else if (isMyServicesNavItem(item.href)) attention = needsRevisionCount;
+        const attentionLabel = formatNavAttentionAria(item.label, attention);
         return (
           <Link
             key={item.href}
             href={item.href}
             onClick={closeMobile}
+            aria-label={attentionLabel}
+            title={attentionLabel}
             className={cn(
               'flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
               active
@@ -214,27 +225,7 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
           >
             <Icon className="h-4 w-4 shrink-0" />
             <span className="min-w-0 flex-1 truncate">{item.label}</span>
-            {messageBadge && (
-              <NavBadge
-                count={unreadMessages}
-                active={active}
-                label={`${unreadMessages} oxunmamış mesaj`}
-              />
-            )}
-            {bookingBadge && (
-              <NavBadge
-                count={bookingAttention}
-                active={active}
-                label={`${bookingAttention} yeni sifariş bildirişi`}
-              />
-            )}
-            {ratingsBadge && (
-              <NavBadge
-                count={reviewAttention}
-                active={active}
-                label={`${reviewAttention} yeni rəy`}
-              />
-            )}
+            <NavAttentionIndicator count={attention} />
           </Link>
         );
       })}

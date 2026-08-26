@@ -63,6 +63,8 @@ export interface NotificationNewPayload {
   type: string;
   title: string;
   body: string;
+  /** Daxili path — məs. xidmət düzəlişi */
+  href?: string;
 }
 
 /** Server → user:{recipientId} — canlı chat */
