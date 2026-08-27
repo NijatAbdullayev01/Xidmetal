@@ -1,51 +1,53 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  ArrowLeft,
-  CalendarClock,
-  Flag,
-  Loader2,
-  MessageSquare,
-  Star,
-} from 'lucide-react';
+import { ArrowLeft, CalendarClock, Flag, Loader2, Star } from 'lucide-react';
 import {
   BookingStatus,
   BookingType,
+  DISPATCH,
   UserRole,
+  isBookingPriceVisibleToCustomer,
+  isBookingProviderRatingVisible,
   isCancellableBookingStatus,
-  isTrackableBookingStatus,
+  isInstantProviderSkippable,
+  toDisplayMediaUrl,
+  formatBookingDateTime,
 } from '@xidmetal/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BookingAddressBlock } from '@/components/bookings/booking-address-block';
-import { LiveTrackingMap } from '@/components/bookings/live-tracking-map';
 import { ReviewDialog } from '@/components/bookings/review-dialog';
 import { CancelBookingDialog } from '@/components/bookings/cancel-booking-dialog';
 import { InstantWaitingCard } from '@/components/bookings/instant-waiting-card';
-import { useLiveBookingTracking } from '@/hooks/use-live-booking-tracking';
+import { InstantSkipProviderCard } from '@/components/bookings/instant-skip-provider-card';
+import {
+  BookingMessageButton,
+  BOOKING_MESSAGE_PENDING_HINT,
+} from '@/components/bookings/booking-message-button';
+import { BookingOrderNumber } from '@/components/bookings/booking-order-number';
+import { BookingProviderName } from '@/components/bookings/booking-provider-name';
+import { BookingStatusBadge } from '@/components/bookings/booking-status-badge';
 import { useBookingsRealtimeInvalidation } from '@/hooks/use-booking-tracking';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { formatDateTime, formatPrice, cn } from '@/lib/utils';
-import {
-  BOOKING_STATUS_LABELS,
-  BOOKING_STATUS_TEXT_CLASSES,
-  BOOKING_TYPE_LABELS,
-} from '@/lib/provider-labels';
+import { BOOKING_TYPE_LABELS } from '@/lib/provider-labels';
 
 type Role = UserRole.CUSTOMER | UserRole.PROVIDER;
 
 export function BookingDetailPage({
   bookingId,
   role,
+  openReview = false,
 }: {
   bookingId: string;
   role: Role;
+  openReview?: boolean;
 }) {
   const token = useAuthToken();
   const router = useRouter();
@@ -63,6 +65,7 @@ export function BookingDetailPage({
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const autoOpenedReview = useRef(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [messageLoading, setMessageLoading] = useState(false);
 
@@ -71,13 +74,6 @@ export function BookingDetailPage({
     queryFn: () => api.booking(token!, bookingId),
     enabled: !!token && !!bookingId,
     refetchInterval: 15_000,
-  });
-
-  const trackable = booking ? isTrackableBookingStatus(booking.status) : false;
-  const { connected, location } = useLiveBookingTracking({
-    bookingId,
-    status: booking?.status,
-    enabled: !!booking && trackable,
   });
 
   const statusMutation = useMutation({
@@ -105,10 +101,39 @@ export function BookingDetailPage({
     },
   });
 
+  const skipProviderMutation = useMutation({
+    mutationFn: () => api.skipBookingProvider(token!, bookingId),
+    onSuccess: async () => {
+      setActionError(null);
+      await queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    },
+    onError: (err: unknown) => {
+      setActionError(
+        err instanceof ApiError
+          ? err.message
+          : 'Başqa xidmət verən axtarılarkən xəta baş verdi',
+      );
+    },
+  });
+
   const handleStatus = (status: BookingStatus, cancelReason?: string) => {
     setActionError(null);
     statusMutation.mutate({ status, cancelReason });
   };
+
+  useEffect(() => {
+    if (autoOpenedReview.current) return;
+    if (
+      !openReview ||
+      role !== UserRole.CUSTOMER ||
+      booking?.status !== BookingStatus.COMPLETED ||
+      booking?.hasReview
+    ) {
+      return;
+    }
+    autoOpenedReview.current = true;
+    setReviewOpen(true);
+  }, [openReview, role, booking?.status, booking?.hasReview]);
 
   if (isLoading) {
     return (
@@ -139,7 +164,11 @@ export function BookingDetailPage({
 
   const isInstantPending =
     booking.type === BookingType.INSTANT && booking.status === BookingStatus.PENDING;
-  const busy = statusMutation.isPending;
+  const isInstantUnassigned = isInstantPending && !booking.acceptedAt;
+  const canSkipProvider =
+    role === UserRole.CUSTOMER &&
+    isInstantProviderSkippable(booking.type, booking.status);
+  const busy = statusMutation.isPending || skipProviderMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -153,9 +182,28 @@ export function BookingDetailPage({
             Sifarişlərə qayıt
           </Link>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">{booking.serviceTitle}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {role === UserRole.CUSTOMER ? booking.providerName : booking.customerName}
-          </p>
+          <div className="mt-1 text-sm text-muted-foreground">
+            {role === UserRole.CUSTOMER ? (
+              isInstantUnassigned ? (
+                'Onlayn xidmət verən axtarılır'
+              ) : (
+                <BookingProviderName
+                  providerId={booking.providerId}
+                  providerName={booking.providerName}
+                  rating={booking.providerRating}
+                  reviewCount={booking.providerReviewCount}
+                  showRating={isBookingProviderRatingVisible(
+                    booking.type,
+                    booking.acceptedAt,
+                  )}
+                  labeled={false}
+                />
+              )
+            ) : (
+              booking.customerName
+            )}
+          </div>
+          <BookingOrderNumber value={booking.orderNumber} className="mt-2" />
         </div>
         <div className="flex flex-wrap gap-2">
           {booking.type === BookingType.INSTANT ? (
@@ -165,9 +213,7 @@ export function BookingDetailPage({
           ) : (
             <Badge variant="muted">{BOOKING_TYPE_LABELS[booking.type]}</Badge>
           )}
-          <span className={cn('self-center text-sm font-medium', BOOKING_STATUS_TEXT_CLASSES[booking.status])}>
-            {BOOKING_STATUS_LABELS[booking.status]}
-          </span>
+          <BookingStatusBadge booking={booking} className="self-center" />
         </div>
       </div>
 
@@ -177,47 +223,39 @@ export function BookingDetailPage({
         </div>
       )}
 
+      <BookingAddressBlock
+        address={booking.address}
+        destLat={booking.destLat}
+        destLng={booking.destLng}
+      />
+
       {isInstantPending && role === UserRole.CUSTOMER && (
         <InstantWaitingCard
           createdAt={booking.createdAt}
+          searchStartedAt={booking.dispatchWindowStartedAt}
           onCancel={() => setCancelOpen(true)}
           cancelDisabled={busy}
-          cancelPending={busy}
-        />
-      )}
-
-      {trackable && (
-        <LiveTrackingMap
-          destLat={booking.destLat}
-          destLng={booking.destLng}
-          address={booking.address}
-          location={location}
-          connected={connected}
-          showDirections={role === UserRole.PROVIDER}
-        />
-      )}
-
-      {!trackable && (
-        <BookingAddressBlock
-          address={booking.address}
-          destLat={booking.destLat}
-          destLng={booking.destLng}
-          showDirections={role === UserRole.PROVIDER}
+          cancelPending={statusMutation.isPending}
         />
       )}
 
       <Card>
         <CardContent className="space-y-3 p-6 text-sm">
-          {booking.type !== BookingType.INSTANT && (
-            <p>
-              <span className="text-foreground">Tarix: </span>
-              <span className="text-muted-foreground">{formatDateTime(booking.scheduledAt)}</span>
-            </p>
-          )}
           <p>
-            <span className="text-foreground">Qiymət: </span>
-            <span className="text-muted-foreground">{formatPrice(booking.totalPrice)}</span>
+            <span className="text-foreground">Tarix və saat: </span>
+            <span className="text-muted-foreground">
+              {formatBookingDateTime(booking)}
+            </span>
           </p>
+          {role === UserRole.CUSTOMER &&
+            isBookingPriceVisibleToCustomer(booking.status, booking.acceptedAt) && (
+              <p>
+                <span className="text-foreground">Qiymət: </span>
+                <span className="text-muted-foreground">
+                  {formatPrice(booking.totalPrice)}
+                </span>
+              </p>
+            )}
           {booking.notes ? (
             <p>
               <span className="text-foreground">Qeyd: </span>
@@ -228,7 +266,7 @@ export function BookingDetailPage({
             <div className="flex items-start gap-2 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 dark:border-amber-700/50 dark:bg-amber-950/30">
               <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
               <p className="text-amber-900 dark:text-amber-100">
-                Təklif olunan tarix: {formatDateTime(booking.proposedScheduledAt)}
+                Təklif olunan tarix və saat: {formatDateTime(booking.proposedScheduledAt)}
               </p>
             </div>
           )}
@@ -243,7 +281,7 @@ export function BookingDetailPage({
           {booking.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={booking.imageUrl}
+              src={toDisplayMediaUrl(booking.imageUrl)}
               alt="Görüləcək işin şəkli"
               className="max-h-48 max-w-full rounded-xl border border-border object-contain"
             />
@@ -251,7 +289,22 @@ export function BookingDetailPage({
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-2">
+      {canSkipProvider && (
+        <InstantSkipProviderCard
+          providerId={booking.providerId}
+          providerName={booking.providerName}
+          providerRating={booking.providerRating}
+          providerReviewCount={booking.providerReviewCount}
+          skipCount={booking.dispatchSkipCount}
+          maxSkips={DISPATCH.MAX_CUSTOMER_PROVIDER_SKIPS}
+          pending={skipProviderMutation.isPending}
+          disabled={busy}
+          onSkip={() => skipProviderMutation.mutate()}
+        />
+      )}
+
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
         {role === UserRole.PROVIDER && booking.status === BookingStatus.PENDING && !isInstantPending && (
           <>
             <Button size="sm" disabled={busy} onClick={() => handleStatus(BookingStatus.CONFIRMED)}>
@@ -300,24 +353,14 @@ export function BookingDetailPage({
               Rəy yaz
             </Button>
           )}
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={messageLoading || startConversation.isPending}
+        <BookingMessageButton
+          status={booking.status}
+          loading={messageLoading || startConversation.isPending}
           onClick={() => {
             setMessageLoading(true);
             startConversation.mutate();
           }}
-        >
-          {messageLoading || startConversation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <>
-              <MessageSquare className="h-4 w-4" />
-              Mesaj yaz
-            </>
-          )}
-        </Button>
+        />
         {role === UserRole.CUSTOMER && (
           <Link
             href={`/dashboard/customer/report?targetType=BOOKING&targetId=${encodeURIComponent(booking.id)}`}
@@ -341,6 +384,10 @@ export function BookingDetailPage({
             <Flag className="h-4 w-4" />
             Şikayət et
           </Link>
+        )}
+        </div>
+        {booking.status === BookingStatus.PENDING && (
+          <p className="text-xs text-muted-foreground">{BOOKING_MESSAGE_PENDING_HINT}</p>
         )}
       </div>
 

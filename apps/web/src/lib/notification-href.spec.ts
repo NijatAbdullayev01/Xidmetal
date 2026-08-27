@@ -85,6 +85,27 @@ describe('resolveNotificationHref', () => {
     ).toBe('/dashboard/provider/services/svc-1/edit');
   });
 
+  it('xidmət təsdiqini Xidmətlərim-ə aparır', () => {
+    expect(
+      resolveNotificationHref(
+        { type: NotificationType.SERVICE_APPROVED, data: { serviceId: 'svc-2' } },
+        UserRole.PROVIDER,
+      ),
+    ).toBe('/dashboard/provider/services');
+  });
+
+  it('xidmət düzəliş tipini edit səhifəsinə aparır', () => {
+    expect(
+      resolveNotificationHref(
+        {
+          type: NotificationType.SERVICE_NEEDS_REVISION,
+          data: { serviceId: 'svc-3' },
+        },
+        UserRole.PROVIDER,
+      ),
+    ).toBe('/dashboard/provider/services/svc-3/edit');
+  });
+
   it('open redirect-i bloklayır', () => {
     expect(
       resolveNotificationHref(

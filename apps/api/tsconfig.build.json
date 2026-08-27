@@ -6,7 +6,9 @@
     "rootDir": "./src",
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@xidmetal/shared": ["../../packages/shared/dist/index.d.ts"],
+      "@xidmetal/database": ["../../packages/database/dist/index.d.ts"]
     }
   },
   "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]

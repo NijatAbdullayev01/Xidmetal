@@ -6,6 +6,10 @@ import type { Request } from 'express';
 import { PrismaService } from '../../../common/database/prisma.service';
 import { readAccessTokenFromCookies } from '../../../common/auth/auth-cookies';
 import {
+  getOrLoadJwtUser,
+  JWT_AUTH_USER_SELECT,
+} from '../../../common/auth/jwt-user-cache';
+import {
   assertSessionAudience,
   normalizeTokenAudience,
   readClientAppFromRequest,
@@ -42,20 +46,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(req: Request, payload: JwtPayload) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isActive: true,
-        isVerified: true,
-        deletedAt: true,
-        passwordChangedAt: true,
-      },
-    });
+    const user = await getOrLoadJwtUser(payload.sub, () =>
+      this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: JWT_AUTH_USER_SELECT,
+      }),
+    );
 
     if (!user || !user.isActive || user.deletedAt) {
       throw new UnauthorizedException('İstifadəçi tapılmadı');

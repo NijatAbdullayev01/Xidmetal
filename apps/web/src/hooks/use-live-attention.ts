@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { UserRole } from '@xidmetal/shared';
+import { APP, UserRole } from '@xidmetal/shared';
 import {
   BOOKING_ATTENTION_QUERY_KEY,
   useBookingNotifications,
@@ -16,7 +16,16 @@ import {
   UNREAD_NOTIFICATIONS_QUERY_KEY,
   useNotifications,
 } from '@/hooks/use-notifications';
+import {
+  REVIEW_ATTENTION_QUERY_KEY,
+  useReviewNotifications,
+} from '@/hooks/use-review-notifications';
+import {
+  SERVICE_ATTENTION_QUERY_KEY,
+  useServiceNotifications,
+} from '@/hooks/use-service-notifications';
 import { useTabAttention } from '@/hooks/use-tab-attention';
+import { marketplaceTabPrefix } from '@/lib/tab-attention';
 import {
   playAdminNotificationSound,
   playBookingNotificationSound,
@@ -24,9 +33,11 @@ import {
   unlockNotificationAudio,
 } from '@/lib/notification-sound';
 import {
+  bookingAttentionGroupKey,
   dashboardBookingsPath,
   dashboardMessagesPath,
   dashboardNotificationsPath,
+  dashboardServicesPath,
   showOsNotification,
   vibrateAttention,
 } from '@/lib/live-attention';
@@ -50,27 +61,47 @@ export function useLiveAttention(enabled: boolean) {
     attentionCount,
     latestUnreadId: latestBookingId,
     latestUnreadAt: latestBookingAt,
+    latestTitle: latestBookingTitle,
+    latestBody: latestBookingBody,
   } = useBookingNotifications(enabled);
   const {
+    unreadCount: announcementCount,
     latestUnreadId: latestAdminId,
     latestUnreadAt: latestAdminAt,
+    latestTitle: latestAdminTitle,
   } = useNotifications(enabled);
+  const {
+    attentionCount: reviewCount,
+    latestUnreadAt: latestReviewAt,
+    latestTitle: latestReviewTitle,
+  } = useReviewNotifications(enabled && role === UserRole.PROVIDER);
+  const {
+    attentionCount: serviceCount,
+    latestUnreadId: latestServiceId,
+    latestUnreadAt: latestServiceAt,
+    latestTitle: latestServiceTitle,
+    latestBody: latestServiceBody,
+  } = useServiceNotifications(enabled && role === UserRole.PROVIDER);
 
   const messagePrimedRef = useRef(false);
   const bookingPrimedRef = useRef(false);
   const adminPrimedRef = useRef(false);
+  const servicePrimedRef = useRef(false);
   const lastMessageRef = useRef<AttentionSnapshot>({ id: null, at: null });
   const lastBookingRef = useRef<AttentionSnapshot>({ id: null, at: null });
   const lastAdminRef = useRef<AttentionSnapshot>({ id: null, at: null });
+  const lastServiceRef = useRef<AttentionSnapshot>({ id: null, at: null });
 
   useEffect(() => {
     if (enabled) return;
     messagePrimedRef.current = false;
     bookingPrimedRef.current = false;
     adminPrimedRef.current = false;
+    servicePrimedRef.current = false;
     lastMessageRef.current = { id: null, at: null };
     lastBookingRef.current = { id: null, at: null };
     lastAdminRef.current = { id: null, at: null };
+    lastServiceRef.current = { id: null, at: null };
     setToasts([]);
   }, [enabled]);
 
@@ -80,14 +111,20 @@ export function useLiveAttention(enabled: boolean) {
 
   const pushToast = useCallback((toast: Omit<LiveToastItem, 'id'> & { id?: string }) => {
     const id = toast.id ?? `${toast.kind}-${Date.now()}`;
-    setToasts((prev) => [...prev.filter((item) => item.kind !== toast.kind), { ...toast, id }]);
+    setToasts((prev) => {
+      const keep =
+        toast.kind === 'booking'
+          ? prev.filter((item) => item.id !== id)
+          : prev.filter((item) => item.kind !== toast.kind);
+      return [...keep, { ...toast, id }];
+    });
     window.setTimeout(() => {
       setToasts((prev) => prev.filter((item) => item.id !== id));
     }, TOAST_TTL_MS);
   }, []);
 
   const refreshRelatedQueries = useCallback(
-    (kind: 'message' | 'booking' | 'admin') => {
+    (kind: 'message' | 'booking' | 'admin' | 'service') => {
       if (kind === 'message') {
         void queryClient.invalidateQueries({ queryKey: ['conversations'] });
         void queryClient.invalidateQueries({ queryKey: ['conversation'] });
@@ -95,8 +132,11 @@ export function useLiveAttention(enabled: boolean) {
       } else if (kind === 'booking') {
         void queryClient.invalidateQueries({ queryKey: ['bookings'] });
         void queryClient.invalidateQueries({ queryKey: BOOKING_ATTENTION_QUERY_KEY });
-      } else {
+      } else if (kind === 'service') {
         void queryClient.invalidateQueries({ queryKey: ['services', 'mine'] });
+        void queryClient.invalidateQueries({ queryKey: ['users', 'dashboard-stats'] });
+        void queryClient.invalidateQueries({ queryKey: SERVICE_ATTENTION_QUERY_KEY });
+      } else {
         void queryClient.invalidateQueries({ queryKey: ['users', 'dashboard-stats'] });
       }
       void queryClient.invalidateQueries({ queryKey: UNREAD_NOTIFICATIONS_QUERY_KEY });
@@ -130,6 +170,8 @@ export function useLiveAttention(enabled: boolean) {
       if (document.visibilityState !== 'visible') return;
       void queryClient.invalidateQueries({ queryKey: UNREAD_MESSAGES_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: BOOKING_ATTENTION_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: REVIEW_ATTENTION_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: SERVICE_ATTENTION_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: UNREAD_NOTIFICATIONS_QUERY_KEY });
     };
 
@@ -215,11 +257,20 @@ export function useLiveAttention(enabled: boolean) {
     refreshRelatedQueries('booking');
 
     const href = dashboardBookingsPath(role);
+    const bookingHeadline = latestBookingTitle?.trim() || 'Yeni sifariş bildirişi';
+    const bookingBody =
+      latestBookingBody?.trim() ||
+      'Yeni sifariş və ya status dəyişikliyi var. Kabinetdən baxın.';
+    const bookingGroupKey = bookingAttentionGroupKey(
+      latestBookingTitle,
+      latestBookingBody,
+      next.id,
+    );
     pushToast({
-      id: `booking-${next.id}`,
+      id: bookingGroupKey,
       kind: 'booking',
-      title: 'Yeni sifariş bildirişi',
-      body: 'Yeni sifariş və ya status dəyişikliyi var. Kabinetdən baxın.',
+      title: bookingHeadline,
+      body: bookingBody,
       href,
     });
 
@@ -227,14 +278,23 @@ export function useLiveAttention(enabled: boolean) {
       typeof document !== 'undefined' && document.visibilityState === 'hidden';
     if (tabHidden) {
       showOsNotification({
-        title: 'Yeni sifariş',
-        body: 'Yeni sifariş bildirişiniz var. Kabinetinizdən baxa bilərsiniz.',
-        tag: `booking-${next.id}`,
+        title: bookingHeadline,
+        body: bookingBody,
+        tag: bookingGroupKey,
       });
     }
-  }, [enabled, latestBookingId, latestBookingAt, role, pushToast, refreshRelatedQueries]);
+  }, [
+    enabled,
+    latestBookingId,
+    latestBookingAt,
+    latestBookingTitle,
+    latestBookingBody,
+    role,
+    pushToast,
+    refreshRelatedQueries,
+  ]);
 
-  // Admin / platforma bildirişi (düzəliş, təsdiq, elan)
+  // Admin / platforma elanı (xidmət yoxlaması buraya düşmür)
   useEffect(() => {
     if (!enabled) return;
 
@@ -260,14 +320,12 @@ export function useLiveAttention(enabled: boolean) {
     refreshRelatedQueries('admin');
 
     const href = dashboardNotificationsPath(role);
+    const announcementHeadline = latestAdminTitle?.trim() || 'Yeni bildiriş';
     pushToast({
       id: `admin-${next.id}`,
       kind: 'admin',
-      title: 'Yeni bildiriş',
-      body:
-        role === UserRole.PROVIDER
-          ? 'Admin xidmətinizə baxdı və ya yeni elan göndərdi. Kabinetdən oxuyun.'
-          : 'Sizə yeni platforma bildirişi gəldi.',
+      title: announcementHeadline,
+      body: 'Sizə yeni platforma bildirişi gəldi.',
       href,
     });
 
@@ -275,7 +333,7 @@ export function useLiveAttention(enabled: boolean) {
       typeof document !== 'undefined' && document.visibilityState === 'hidden';
     if (tabHidden) {
       showOsNotification({
-        title: 'Yeni bildiriş',
+        title: announcementHeadline,
         body: 'Kabinetinizdə yeni bildiriş var.',
         tag: `admin-${next.id}`,
       });
@@ -284,15 +342,116 @@ export function useLiveAttention(enabled: boolean) {
     enabled,
     latestAdminId,
     latestAdminAt,
+    latestAdminTitle,
     role,
     pushToast,
     refreshRelatedQueries,
   ]);
 
+  // Xidmət təsdiqi / düzəliş — Xidmətlərim
+  useEffect(() => {
+    if (!enabled || role !== UserRole.PROVIDER) return;
+
+    const next: AttentionSnapshot = {
+      id: latestServiceId,
+      at: latestServiceAt,
+    };
+
+    if (!servicePrimedRef.current) {
+      lastServiceRef.current = next;
+      servicePrimedRef.current = true;
+      return;
+    }
+
+    if (!isNewerAttentionEvent(lastServiceRef.current, next)) {
+      lastServiceRef.current = next;
+      return;
+    }
+
+    lastServiceRef.current = next;
+    void playAdminNotificationSound();
+    vibrateAttention('service');
+    refreshRelatedQueries('service');
+
+    const href = dashboardServicesPath();
+    const serviceHeadline = latestServiceTitle?.trim() || 'Xidmət yeniləməsi';
+    pushToast({
+      id: `service-${next.id}`,
+      kind: 'service',
+      title: serviceHeadline,
+      body:
+        latestServiceBody?.trim() ||
+        'Xidmətinizin statusu dəyişdi. Xidmətlərim bölməsindən baxın.',
+      href,
+    });
+
+    const tabHidden =
+      typeof document !== 'undefined' && document.visibilityState === 'hidden';
+    if (tabHidden) {
+      showOsNotification({
+        title: serviceHeadline,
+        body: 'Xidmətlərim bölməsində yeni bildiriş var.',
+        tag: `service-${next.id}`,
+      });
+    }
+  }, [
+    enabled,
+    role,
+    latestServiceId,
+    latestServiceAt,
+    latestServiceTitle,
+    latestServiceBody,
+    pushToast,
+    refreshRelatedQueries,
+  ]);
+
+  const tabAttentionLabel = useMemo(
+    () =>
+      marketplaceTabPrefix({
+        messages: { count: unreadCount, at: latestUnreadAt },
+        bookings: {
+          count: attentionCount,
+          at: latestBookingAt,
+          latestTitle: latestBookingTitle,
+        },
+        reviews: {
+          count: reviewCount,
+          at: latestReviewAt,
+          latestTitle: latestReviewTitle,
+        },
+        announcements: {
+          count: announcementCount,
+          at: latestAdminAt,
+          latestTitle: latestAdminTitle,
+        },
+        services: {
+          count: serviceCount,
+          at: latestServiceAt,
+          latestTitle: latestServiceTitle,
+        },
+      }),
+    [
+      unreadCount,
+      latestUnreadAt,
+      attentionCount,
+      latestBookingAt,
+      latestBookingTitle,
+      reviewCount,
+      latestReviewAt,
+      latestReviewTitle,
+      announcementCount,
+      latestAdminAt,
+      latestAdminTitle,
+      serviceCount,
+      latestServiceAt,
+      latestServiceTitle,
+    ],
+  );
+
   useTabAttention({
     enabled,
-    unreadMessages: unreadCount,
-    bookingAttention: attentionCount,
+    attentionLabel: tabAttentionLabel,
+    fallbackTitle: APP.name,
   });
 
   return { toasts, dismissToast };

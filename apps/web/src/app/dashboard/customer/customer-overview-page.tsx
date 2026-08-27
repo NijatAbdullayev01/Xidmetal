@@ -1,39 +1,44 @@
 'use client';
 
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ClipboardList, MessageSquare, Search, ArrowRight } from 'lucide-react';
-import { BookingStatus, ACTIVE_BOOKING_STATUSES } from '@xidmetal/shared';
+import {
+  BookingStatus,
+  ACTIVE_BOOKING_STATUSES,
+  isBookingPriceVisibleToCustomer,
+} from '@xidmetal/shared';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { buttonStyles } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { BookingStatusBadge } from '@/components/bookings/booking-status-badge';
+import { DashboardListSkeleton } from '@/components/ui/page-skeletons';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { useAuthStore } from '@/store/auth.store';
 import { formatPrice } from '@/lib/utils';
-import { BOOKING_STATUS_LABELS, BOOKING_STATUS_VARIANTS } from '@/lib/provider-labels';
 import { DASHBOARD_LIST_POLL_MS } from '@/lib/live-attention';
+import { DEFAULT_BOOKING_LIST_PARAMS } from '@/lib/booking-list-query';
 
 export function CustomerOverviewPage() {
   const token = useAuthToken();
   const user = useAuthStore((state) => state.user);
 
-  const { data: bookings } = useQuery({
-    queryKey: ['bookings', 'all'],
-    queryFn: () => api.bookings(token!, { limit: '100' }),
+  const { data: bookings, isLoading: bookingsLoading } = useQuery({
+    queryKey: ['bookings', DEFAULT_BOOKING_LIST_PARAMS],
+    queryFn: () => api.bookings(token!, DEFAULT_BOOKING_LIST_PARAMS),
     enabled: !!token,
+    placeholderData: keepPreviousData,
     refetchInterval: DASHBOARD_LIST_POLL_MS,
     refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
   });
 
-  const { data: conversations } = useQuery({
+  const { data: conversations, isLoading: conversationsLoading } = useQuery({
     queryKey: ['conversations'],
     queryFn: () => api.messages.conversations(token!, { limit: '100' }),
     enabled: !!token,
+    placeholderData: keepPreviousData,
     refetchInterval: DASHBOARD_LIST_POLL_MS,
     refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
   });
 
   const activeSet = new Set<string>(ACTIVE_BOOKING_STATUSES);
@@ -118,30 +123,38 @@ export function CustomerOverviewPage() {
             </Link>
           </CardHeader>
           <CardContent>
-            {bookings?.items.length === 0 && (
+            {bookingsLoading && !bookings ? (
+              <DashboardListSkeleton />
+            ) : bookings?.items.length === 0 ? (
               <div className="py-8 text-center">
                 <p className="text-sm text-muted-foreground">Hələ sifariş yoxdur</p>
                 <Link href="/" className={buttonStyles('default', 'sm') + ' mt-3'}>
                   Xidmət tap
                 </Link>
               </div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {bookings?.items.slice(0, 5).map((booking) => (
+                  <li key={booking.id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{booking.serviceTitle}</p>
+                      <p className="text-xs text-muted-foreground">{booking.providerName}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <BookingStatusBadge booking={booking} className="text-xs" />
+                      {isBookingPriceVisibleToCustomer(
+                        booking.status,
+                        booking.acceptedAt,
+                      ) && (
+                        <p className="text-sm font-medium">
+                          {formatPrice(booking.totalPrice)}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
-            <ul className="divide-y divide-border">
-              {bookings?.items.slice(0, 5).map((booking) => (
-                <li key={booking.id} className="flex items-center justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{booking.serviceTitle}</p>
-                    <p className="text-xs text-muted-foreground">{booking.providerName}</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Badge variant={BOOKING_STATUS_VARIANTS[booking.status]} className="text-xs">
-                      {BOOKING_STATUS_LABELS[booking.status]}
-                    </Badge>
-                    <p className="text-sm font-medium">{formatPrice(booking.totalPrice)}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
           </CardContent>
         </Card>
 
@@ -157,33 +170,36 @@ export function CustomerOverviewPage() {
             </Link>
           </CardHeader>
           <CardContent>
-            {conversations?.items.length === 0 && (
+            {conversationsLoading && !conversations ? (
+              <DashboardListSkeleton />
+            ) : conversations?.items.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 Hələ mesaj yoxdur
               </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {conversations?.items.slice(0, 5).map((conv) => (
+                  <li key={conv.id}>
+                    <Link
+                      href={`/dashboard/customer/messages?conversationId=${conv.id}`}
+                      className="flex min-h-[44px] items-center justify-between gap-3 py-3 transition-colors hover:text-foreground"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{conv.providerName}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {conv.lastMessage ?? 'Yeni söhbət'}
+                        </p>
+                      </div>
+                      {conv.unreadCount > 0 && (
+                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-medium text-brand-foreground">
+                          {conv.unreadCount}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             )}
-            <ul className="divide-y divide-border">
-              {conversations?.items.slice(0, 5).map((conv) => (
-                <li key={conv.id}>
-                  <Link
-                    href={`/dashboard/customer/messages?conversationId=${conv.id}`}
-                    className="flex min-h-[44px] items-center justify-between gap-3 py-3 transition-colors hover:text-foreground"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{conv.providerName}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {conv.lastMessage ?? 'Yeni söhbət'}
-                      </p>
-                    </div>
-                    {conv.unreadCount > 0 && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-medium text-brand-foreground">
-                        {conv.unreadCount}
-                      </span>
-                    )}
-                  </Link>
-                </li>
-              ))}
-            </ul>
           </CardContent>
         </Card>
       </div>

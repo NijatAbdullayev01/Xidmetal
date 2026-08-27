@@ -25,7 +25,7 @@ export class NotificationsController {
 
   @Get()
   @ApiOperation({
-    summary: 'Admin/platforma bildirişləri (sifariş və mesaj daxil deyil)',
+    summary: 'Admin/platforma bildirişləri (sifariş, mesaj və xidmət yoxlaması daxil deyil)',
   })
   findAll(
     @CurrentUser('id') userId: string,
@@ -64,6 +64,20 @@ export class NotificationsController {
   @Roles(UserRole.PROVIDER)
   markReviewReadAll(@CurrentUser('id') userId: string) {
     return this.notificationsService.markReviewNotificationsRead(userId);
+  }
+
+  @Get('service-unread-count')
+  @ApiOperation({ summary: 'Xidmət yoxlaması bildirişləri (Xidmətlərim badge)' })
+  @Roles(UserRole.PROVIDER)
+  getServiceUnreadCount(@CurrentUser('id') userId: string) {
+    return this.notificationsService.getServiceAttentionCount(userId);
+  }
+
+  @Post('service-read-all')
+  @ApiOperation({ summary: 'Xidmət yoxlaması bildirişlərini oxundu et' })
+  @Roles(UserRole.PROVIDER)
+  markServiceReadAll(@CurrentUser('id') userId: string) {
+    return this.notificationsService.markServiceNotificationsRead(userId);
   }
 
   @Patch(':id/read')

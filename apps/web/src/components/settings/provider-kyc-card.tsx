@@ -8,6 +8,7 @@ import {
   KYC_DOCUMENT_STATUS_LABELS,
   KYC_DOCUMENT_TYPE_LABELS,
   type KycDocumentSummary,
+  toDisplayMediaUrl,
 } from '@xidmetal/shared';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -121,7 +122,7 @@ export function ProviderKycCard() {
                   {latest?.url && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={latest.url}
+                      src={toDisplayMediaUrl(latest.url)}
                       alt={KYC_DOCUMENT_TYPE_LABELS[type]}
                       className="mt-2 h-20 w-auto rounded-md border border-border object-cover"
                     />

@@ -5,6 +5,7 @@ import { UserRole } from '@xidmetal/shared';
 import { RequireRole } from '@/components/auth/require-role';
 import { DashboardSidebar } from '@/components/layout/dashboard-sidebar';
 import { usePresenceHeartbeat } from '@/hooks/use-presence-heartbeat';
+import { useDashboardPrefetch } from '@/hooks/use-dashboard-prefetch';
 import { cn } from '@/lib/utils';
 
 const FILL_VIEWPORT_ROUTES = ['/dashboard/customer/messages'];
@@ -12,6 +13,7 @@ const FILL_VIEWPORT_ROUTES = ['/dashboard/customer/messages'];
 export function CustomerDashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   usePresenceHeartbeat(true);
+  useDashboardPrefetch('customer');
   const isFillViewport = FILL_VIEWPORT_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
   );

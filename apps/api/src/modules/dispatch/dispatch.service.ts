@@ -18,10 +18,12 @@ import {
   ProviderAvailability,
   REALTIME_EVENTS,
   computeDispatchScore,
+  dispatchSearchWindowStart,
   haversineDistanceMeters,
   isDispatchSearchWindowOpen,
   isValidCoordinates,
   locationLabelsForCity,
+  parseDispatchPrefs,
   providerRoom,
   providersExcludedFromRedispatch,
   rankDispatchCandidates,
@@ -30,8 +32,10 @@ import {
   type DispatchOfferPayload,
   type DispatchOfferResultPayload,
 } from '@xidmetal/shared';
-import { ServiceStatus } from '@prisma/client';
+import { Prisma, ServiceStatus } from '@prisma/client';
 import { PrismaService } from '../../common/database/prisma.service';
+import { MailService } from '../../common/mail/mail.service';
+import { buildBookingMailContent } from '../../common/mail/booking-mail';
 import { RealtimeService } from '../realtime/realtime.service';
 import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
 import {
@@ -84,6 +88,7 @@ export class DispatchService implements OnModuleInit {
     private queue: DispatchQueueService,
     private config: ConfigService,
     private metrics: MetricsService,
+    private mailService: MailService,
     @Optional() private realtime?: RealtimeService,
     @Optional() private channels?: NotificationChannelsService,
   ) {}
@@ -130,6 +135,35 @@ export class DispatchService implements OnModuleInit {
     this.dispatchPrefs.delete(bookingId);
   }
 
+  private hydratePrefs(bookingId: string, stored: unknown): DispatchStartPrefs | undefined {
+    const memory = this.dispatchPrefs.get(bookingId);
+    if (memory && Object.keys(memory).length > 0) return memory;
+    const parsed = parseDispatchPrefs(stored);
+    if (parsed) {
+      this.dispatchPrefs.set(bookingId, parsed);
+      return parsed;
+    }
+    return undefined;
+  }
+
+  private async persistPrefs(
+    bookingId: string,
+    prefs: DispatchStartPrefs,
+  ): Promise<void> {
+    try {
+      await this.prisma.booking.update({
+        where: { id: bookingId },
+        data: { dispatchPrefs: prefs as Prisma.InputJsonValue },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Dispatch prefs persist booking=${bookingId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+
   private searchWindowExpiresAt(createdAt: Date): Date {
     return new Date(createdAt.getTime() + this.searchWindowSec() * 1000);
   }
@@ -169,6 +203,7 @@ export class DispatchService implements OnModuleInit {
       }
       if (Object.keys(cleaned).length > 0) {
         this.dispatchPrefs.set(bookingId, cleaned);
+        await this.persistPrefs(bookingId, cleaned);
       }
     }
 
@@ -194,18 +229,15 @@ export class DispatchService implements OnModuleInit {
       return;
     }
 
-    if (booking.destLat == null || booking.destLng == null) {
-      await this.failDispatch(
-        booking.id,
-        booking.customerId,
-        'Ani sifariş üçün təyinat koordinatları yoxdur',
-      );
-      return;
-    }
+    this.hydratePrefs(bookingId, booking.dispatchPrefs);
 
+    const windowStart = dispatchSearchWindowStart(
+      booking.createdAt,
+      booking.dispatchWindowStartedAt,
+    );
     const delayMs = Math.max(
       0,
-      this.searchWindowExpiresAt(booking.createdAt).getTime() - Date.now(),
+      this.searchWindowExpiresAt(windowStart).getTime() - Date.now(),
     );
     try {
       await this.queue.scheduleSearchWindowEnd({ bookingId }, delayMs);
@@ -279,7 +311,9 @@ export class DispatchService implements OnModuleInit {
         throw new ConflictException('Sifariş artıq təyin olunub və ya ləğv edilib');
       }
 
-      const prefs = this.dispatchPrefs.get(booking.id);
+      const prefs =
+        this.dispatchPrefs.get(booking.id) ??
+        this.hydratePrefs(booking.id, booking.dispatchPrefs);
       const serviceCityRaw =
         prefs?.serviceCity?.trim() || booking.service.location?.trim() || '';
       const locationLabels = serviceCityRaw
@@ -387,7 +421,7 @@ export class DispatchService implements OnModuleInit {
           userId: booking.customerId,
           type: NotificationType.BOOKING_CONFIRMED,
           title: 'Sifariş təsdiqləndi',
-          body: `«${matchingService.title}» üçün ani sifarişiniz qəbul edildi.`,
+          body: `«${matchingService.title}» üçün təcili sifarişiniz qəbul edildi.`,
           data: { bookingId: booking.id },
         },
       });
@@ -416,10 +450,17 @@ export class DispatchService implements OnModuleInit {
     this.channels?.deliverAfterInApp({
       userId: result.booking.customerId,
       title: 'Sifariş təsdiqləndi',
-      body: `«${result.booking.service.title}» üçün ani sifarişiniz qəbul edildi.`,
+      body: `«${result.booking.service.title}» üçün təcili sifarişiniz qəbul edildi.`,
       type: NotificationType.BOOKING_CONFIRMED,
       data: { bookingId: result.booking.id },
       serviceTitle: result.booking.service.title,
+    });
+    void this.safeSendBookingMail({
+      to: result.booking.customer.email,
+      event: NotificationType.BOOKING_CONFIRMED,
+      serviceTitle: result.booking.service.title,
+      orderNumber: result.booking.orderNumber,
+      bookingId: result.booking.id,
     });
 
     const otherPending = await this.prisma.dispatchOffer.findMany({
@@ -580,6 +621,140 @@ export class DispatchService implements OnModuleInit {
   }
 
   /**
+   * Müştəri qəbul olunmuş təcili icraçını buraxır və yenidən axtarış başladır.
+   */
+  async skipAcceptedProvider(bookingId: string, customerId: string): Promise<void> {
+    const now = new Date();
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.findUnique({
+        where: { id: bookingId },
+        include: {
+          service: { select: { title: true } },
+        },
+      });
+
+      if (!booking) throw new NotFoundException('Sifariş tapılmadı');
+      if (booking.customerId !== customerId) {
+        throw new ForbiddenException('Bu sifarişi idarə etmək icazəniz yoxdur');
+      }
+      if (booking.type !== BookingType.INSTANT) {
+        throw new BadRequestException(
+          'Başqa xidmət verən yalnız təcili sifarişdə axtarıla bilər',
+        );
+      }
+      if (booking.status !== BookingStatus.CONFIRMED) {
+        if (
+          booking.status === BookingStatus.EN_ROUTE ||
+          booking.status === BookingStatus.ARRIVED ||
+          booking.status === BookingStatus.IN_PROGRESS
+        ) {
+          throw new BadRequestException(
+            'Xidmət verən artıq yola çıxıb və ya işə başlayıb',
+          );
+        }
+        throw new BadRequestException(
+          'Hələ qəbul olunmuş xidmət verən yoxdur',
+        );
+      }
+      if (booking.dispatchSkipCount >= DISPATCH.MAX_CUSTOMER_PROVIDER_SKIPS) {
+        throw new BadRequestException(
+          'Başqa xidmət verən axtarış limiti bitib. Sifarişi ləğv edib yenidən verə bilərsiniz',
+        );
+      }
+
+      const acceptedOffer = await tx.dispatchOffer.findFirst({
+        where: {
+          bookingId,
+          providerId: booking.providerId,
+          status: DispatchOfferStatus.ACCEPTED,
+        },
+        select: { id: true },
+      });
+
+      if (acceptedOffer) {
+        await tx.dispatchOffer.update({
+          where: { id: acceptedOffer.id },
+          data: {
+            status: DispatchOfferStatus.SKIPPED,
+            respondedAt: now,
+          },
+        });
+      }
+
+      const reverted = await tx.booking.updateMany({
+        where: {
+          id: bookingId,
+          status: BookingStatus.CONFIRMED,
+          type: BookingType.INSTANT,
+        },
+        data: {
+          status: BookingStatus.PENDING,
+          acceptedAt: null,
+          dispatchWindowStartedAt: now,
+          dispatchSkipCount: { increment: 1 },
+        },
+      });
+      if (reverted.count !== 1) {
+        throw new ConflictException('Sifariş artıq dəyişib');
+      }
+
+      await tx.notification.create({
+        data: {
+          userId: booking.providerId,
+          type: NotificationType.BOOKING_CANCELLED,
+          title: 'Müştəri başqa xidmət verən axtarır',
+          body: `«${booking.service.title}» sifarişi üçün müştəri sizin qiymətinizi qəbul etmədi.`,
+          data: { bookingId, skippedProvider: true },
+        },
+      });
+
+      return {
+        skippedProviderId: booking.providerId,
+        offerId: acceptedOffer?.id ?? null,
+        serviceTitle: booking.service.title,
+        customerId: booking.customerId,
+      };
+    });
+
+    this.channels?.deliverAfterInApp({
+      userId: result.skippedProviderId,
+      title: 'Müştəri başqa xidmət verən axtarır',
+      body: `«${result.serviceTitle}» sifarişi üçün müştəri sizin qiymətinizi qəbul etmədi.`,
+      type: NotificationType.BOOKING_CANCELLED,
+      data: { bookingId, skippedProvider: true },
+      serviceTitle: result.serviceTitle,
+    });
+
+    if (result.offerId) {
+      this.emitOfferResult(result.skippedProviderId, {
+        offerId: result.offerId,
+        bookingId,
+        status: 'SKIPPED',
+        providerId: result.skippedProviderId,
+      });
+      this.metrics.incDispatchOffer('cancelled');
+    }
+
+    this.realtime?.emitBookingStatus(
+      {
+        bookingId,
+        status: BookingStatus.PENDING,
+        timestamp: now.toISOString(),
+      },
+      [result.customerId, result.skippedProviderId],
+    );
+
+    await this.releaseProviderIfBusy(result.skippedProviderId);
+
+    this.logger.log(
+      `Customer skip provider=${result.skippedProviderId} booking=${bookingId}`,
+    );
+
+    await this.startForBooking(bookingId);
+  }
+
+  /**
    * Axtarış pəncərəsi bitdi — hələ PENDING-dirsə auto-cancel.
    */
   async handleSearchWindowEnd(data: SearchWindowJobData): Promise<void> {
@@ -690,8 +865,11 @@ export class DispatchService implements OnModuleInit {
       where: {
         type: BookingType.INSTANT,
         status: BookingStatus.PENDING,
-        createdAt: { gte: createdAfter },
         customerId: { not: providerId },
+        OR: [
+          { dispatchWindowStartedAt: { gte: createdAfter } },
+          { dispatchWindowStartedAt: null, createdAt: { gte: createdAfter } },
+        ],
         service: {
           OR: servicePairs.map((s) => ({
             categoryId: s.categoryId,
@@ -740,16 +918,7 @@ export class DispatchService implements OnModuleInit {
     if (!booking) return;
     if (booking.type !== BookingType.INSTANT) return;
     if (booking.status !== BookingStatus.PENDING) return;
-    if (booking.destLat == null || booking.destLng == null) {
-      await this.failDispatch(
-        booking.id,
-        booking.customerId,
-        'Təyinat koordinatları yoxdur',
-      );
-      return;
-    }
-
-    const prefs = this.dispatchPrefs.get(bookingId);
+    const prefs = this.hydratePrefs(bookingId, booking.dispatchPrefs);
     const serviceCityRaw =
       prefs?.serviceCity?.trim() || booking.service.location?.trim() || '';
     if (!serviceCityRaw) {
@@ -764,8 +933,12 @@ export class DispatchService implements OnModuleInit {
     const serviceCity = resolveServiceCity(serviceCityRaw);
     const locationLabels = locationLabelsForCity(serviceCity);
     const now = new Date();
-    const searchOpen = isDispatchSearchWindowOpen(
+    const windowStart = dispatchSearchWindowStart(
       booking.createdAt,
+      booking.dispatchWindowStartedAt,
+    );
+    const searchOpen = isDispatchSearchWindowOpen(
+      windowStart,
       now,
       this.searchWindowSec(),
     );
@@ -817,7 +990,7 @@ export class DispatchService implements OnModuleInit {
 
     const ranked = rankDispatchCandidates(candidates);
     const available = ranked.filter((c) => !exclude.has(c.providerId));
-    const expiresAt = this.searchWindowExpiresAt(booking.createdAt);
+    const expiresAt = this.searchWindowExpiresAt(windowStart);
 
     if (available.length === 0) {
       await this.queue.scheduleRediscovery(
@@ -861,8 +1034,8 @@ export class DispatchService implements OnModuleInit {
     categoryId: string;
     serviceTitle: string;
     locationLabels: readonly string[];
-    destLat: number;
-    destLng: number;
+    destLat: number | null;
+    destLng: number | null;
     minPrice?: number;
     maxPrice?: number;
     minRating?: number;
@@ -915,6 +1088,9 @@ export class DispatchService implements OnModuleInit {
       const rating = profile?.rating ?? 0;
       let distanceM = Number.POSITIVE_INFINITY;
       if (
+        input.destLat != null &&
+        input.destLng != null &&
+        isValidCoordinates(input.destLat, input.destLng) &&
         profile?.lastLat != null &&
         profile?.lastLng != null &&
         isValidCoordinates(profile.lastLat, profile.lastLng)
@@ -938,8 +1114,8 @@ export class DispatchService implements OnModuleInit {
     booking: {
       id: string;
       address: string | null;
-      destLat: number;
-      destLng: number;
+      destLat: number | null;
+      destLng: number | null;
       scheduledAt: Date;
       serviceTitle: string;
     };
@@ -994,8 +1170,8 @@ export class DispatchService implements OnModuleInit {
       data: {
         userId: candidate.providerId,
         type: NotificationType.BOOKING_CREATED,
-        title: 'Ani sifariş təklifi',
-        body: `«${booking.serviceTitle}» üzrə təcili sifariş — qəbul və ya rədd edin.`,
+        title: 'Təcili sifariş təklifi',
+        body: `«${booking.serviceTitle}» üzrə təcili sifariş daxil olub.`,
         data: {
           bookingId: booking.id,
           offerId: offer.id,
@@ -1006,8 +1182,8 @@ export class DispatchService implements OnModuleInit {
     this.channels?.deliverAfterInApp({
       userId: candidate.providerId,
       notificationId: offerNotification.id,
-      title: 'Ani sifariş təklifi',
-      body: `«${booking.serviceTitle}» üzrə təcili sifariş — qəbul və ya rədd edin.`,
+      title: 'Təcili sifariş təklifi',
+      body: `«${booking.serviceTitle}» üzrə təcili sifariş daxil olub.`,
       type: NotificationType.BOOKING_CREATED,
       data: { bookingId: booking.id, offerId: offer.id, dispatch: true },
       serviceTitle: booking.serviceTitle,
@@ -1082,7 +1258,7 @@ export class DispatchService implements OnModuleInit {
       data: {
         userId: customerId,
         type: NotificationType.BOOKING_CANCELLED,
-        title: 'Ani sifariş tapılmadı',
+        title: 'Təcili sifariş tapılmadı',
         body: `${reason}. Yeni sifariş yarada və ya daha sonra yenidən cəhd edə bilərsiniz.`,
         data: { bookingId, dispatchFailed: true },
       },
@@ -1090,7 +1266,7 @@ export class DispatchService implements OnModuleInit {
     this.channels?.deliverAfterInApp({
       userId: customerId,
       notificationId: failNotification.id,
-      title: 'Ani sifariş tapılmadı',
+      title: 'Təcili sifariş tapılmadı',
       body: `${reason}. Yeni sifariş yarada və ya daha sonra yenidən cəhd edə bilərsiniz.`,
       type: NotificationType.BOOKING_CANCELLED,
       data: { bookingId, dispatchFailed: true },
@@ -1103,6 +1279,36 @@ export class DispatchService implements OnModuleInit {
     }, [customerId]);
 
     this.logger.log(`Dispatch failed booking=${bookingId}: ${reason}`);
+  }
+
+  private async safeSendBookingMail(input: {
+    to: string;
+    event: Parameters<typeof buildBookingMailContent>[0]['event'];
+    serviceTitle: string;
+    orderNumber?: string;
+    bookingId?: string;
+  }) {
+    try {
+      const content = buildBookingMailContent(input);
+      if (!content) return;
+      await this.mailService.sendBookingStatusMail({
+        to: input.to,
+        subject: content.subject,
+        intro: content.intro,
+        body: content.body,
+        orderNumber: input.orderNumber,
+        reviewBookingId:
+          input.event === NotificationType.BOOKING_COMPLETED
+            ? input.bookingId
+            : undefined,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Sifariş e-poçtu göndərilmədi (${input.event}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   private emitOfferResult(

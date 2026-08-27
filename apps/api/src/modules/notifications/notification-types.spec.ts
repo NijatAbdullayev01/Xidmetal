@@ -5,6 +5,8 @@ import {
   MESSAGE_NOTIFICATION_TYPES,
   NotificationType,
   REVIEW_NOTIFICATION_TYPES,
+  SERVICE_NOTIFICATION_TYPES,
+  isServiceReviewNotification,
 } from '@xidmetal/shared';
 
 /**
@@ -38,13 +40,51 @@ describe('ADMIN_NOTIFICATION_TYPES (inbox)', () => {
     expect(ADMIN_NOTIFICATION_TYPES).toContain(NotificationType.ADMIN_ANNOUNCEMENT);
   });
 
-  it('sifariş və mesaj tipləri daxil deyil', () => {
+  it('sifariş, mesaj, rəy və xidmət yoxlaması tipləri daxil deyil', () => {
     for (const type of [
       ...BOOKING_NOTIFICATION_TYPES,
       ...MESSAGE_NOTIFICATION_TYPES,
       ...REVIEW_NOTIFICATION_TYPES,
+      ...SERVICE_NOTIFICATION_TYPES,
     ]) {
       expect(ADMIN_NOTIFICATION_TYPES).not.toContain(type);
     }
+  });
+});
+
+describe('SERVICE_NOTIFICATION_TYPES', () => {
+  it('təsdiq və düzəliş daxildir', () => {
+    expect(SERVICE_NOTIFICATION_TYPES).toContain(NotificationType.SERVICE_APPROVED);
+    expect(SERVICE_NOTIFICATION_TYPES).toContain(NotificationType.SERVICE_NEEDS_REVISION);
+  });
+});
+
+describe('isServiceReviewNotification', () => {
+  it('yeni tipləri tanıyır', () => {
+    expect(isServiceReviewNotification(NotificationType.SERVICE_APPROVED, null)).toBe(true);
+    expect(isServiceReviewNotification(NotificationType.SERVICE_NEEDS_REVISION, null)).toBe(
+      true,
+    );
+  });
+
+  it('köhnə ADMIN_ANNOUNCEMENT bayraqlarını tanıyır', () => {
+    expect(
+      isServiceReviewNotification(NotificationType.ADMIN_ANNOUNCEMENT, {
+        serviceNeedsRevision: true,
+      }),
+    ).toBe(true);
+    expect(
+      isServiceReviewNotification(NotificationType.ADMIN_ANNOUNCEMENT, {
+        serviceApproved: true,
+      }),
+    ).toBe(true);
+  });
+
+  it('adi platforma elanını xidmət yoxlaması saymır', () => {
+    expect(
+      isServiceReviewNotification(NotificationType.ADMIN_ANNOUNCEMENT, {
+        source: 'admin',
+      }),
+    ).toBe(false);
   });
 });

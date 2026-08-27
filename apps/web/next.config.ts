@@ -74,13 +74,29 @@ function buildSecurityHeaders() {
     wsOrigin.replace(/\/$/, ''),
     localPublicApp ? localApiOrigin : '',
     localPublicApp ? localApiOrigin.replace(/^http/, 'ws') : '',
-    // Google Maps JavaScript API (konum seçici + canlı tracking)
-    'https://maps.googleapis.com',
-    'https://maps.gstatic.com',
     'https://*.googleapis.com',
     'https://*.gstatic.com',
     'https://challenges.cloudflare.com',
   ].filter(Boolean);
+
+  // `https:` bütün HTTPS media-nı açır; lokal API isə HTTP-dir (`http://localhost:4100`)
+  const httpMediaOrigins = [
+    process.env.STORAGE_PUBLIC_BASE_URL,
+    process.env.S3_PUBLIC_URL,
+    apiOrigin,
+    publicApiOrigin,
+    localPublicApp ? localApiOrigin : '',
+  ]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value))
+    .map((value) => {
+      try {
+        return new URL(value).origin;
+      } catch {
+        return '';
+      }
+    })
+    .filter((origin, index, all) => origin.startsWith('http:') && all.indexOf(origin) === index);
 
   const csp = [
     "default-src 'self'",
@@ -88,12 +104,12 @@ function buildSecurityHeaders() {
     "frame-ancestors 'none'",
     "form-action 'self'",
     "object-src 'none'",
-    "img-src 'self' data: blob: https:",
+    `img-src 'self' data: blob: https: ${httpMediaOrigins.join(' ')}`.trim(),
     "font-src 'self' data: https://fonts.gstatic.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "script-src 'self' 'unsafe-inline'" +
       (process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'") +
-      ' https://maps.googleapis.com https://maps.gstatic.com https://challenges.cloudflare.com',
+      ' https://challenges.cloudflare.com',
     "frame-src 'self' https://challenges.cloudflare.com",
     "worker-src 'self' blob:",
     `connect-src ${connectSrc.join(' ')}`,

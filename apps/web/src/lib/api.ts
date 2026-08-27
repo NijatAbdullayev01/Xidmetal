@@ -32,6 +32,7 @@ import type {
   NotificationSummary,
   UnreadNotificationsSummary,
   BookingAttentionSummary,
+  ServiceAttentionSummary,
   CreateConversationInput,
   SendMessageInput,
   CreateBookingInput,
@@ -55,6 +56,7 @@ import type {
 import { BookingStatus, CLIENT_APP, CLIENT_APP_HEADER } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
 import { userFacingApiMessage } from './api-error';
+import { isPublicGetRequest } from './api-fetch-policy';
 
 /**
  * Brauzer: boş base → eyni origin (next.config rewrite → API) — cookie üçün vacibdir.
@@ -142,11 +144,12 @@ export async function apiClient<T>(
 ): Promise<T> {
   const { token, headers, ...rest } = options;
   const isFormData = typeof FormData !== 'undefined' && rest.body instanceof FormData;
+  const publicGet = isPublicGetRequest(rest.method, token);
 
   const response = await fetch(`${resolveApiBaseUrl()}${API_PREFIX}${endpoint}`, {
     ...rest,
-    credentials: 'include',
-    ...(token ? { cache: 'no-store' as const } : {}),
+    credentials: publicGet ? 'omit' : 'include',
+    ...(!publicGet ? { cache: 'no-store' as const } : {}),
     headers: {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       [CLIENT_APP_HEADER]: CLIENT_APP.MARKETPLACE,
@@ -479,6 +482,13 @@ export const api = {
       token,
     }),
 
+  skipBookingProvider: (token: string, id: string) =>
+    apiClient<BookingSummary>(`/bookings/${id}/skip-provider`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify({}),
+    }),
+
   locationPings: (token: string, bookingId: string, params?: { limit?: string }) => {
     const query = params ? `?${new URLSearchParams(params)}` : '';
     return apiClient<LocationPingSummary[]>(
@@ -573,6 +583,13 @@ export const api = {
       apiClient<BookingAttentionSummary>('/notifications/review-unread-count', { token }),
     markReviewReadAll: (token: string) =>
       apiClient<{ markedCount: number }>('/notifications/review-read-all', {
+        method: 'POST',
+        token,
+      }),
+    serviceUnreadCount: (token: string) =>
+      apiClient<ServiceAttentionSummary>('/notifications/service-unread-count', { token }),
+    markServiceReadAll: (token: string) =>
+      apiClient<{ markedCount: number }>('/notifications/service-read-all', {
         method: 'POST',
         token,
       }),

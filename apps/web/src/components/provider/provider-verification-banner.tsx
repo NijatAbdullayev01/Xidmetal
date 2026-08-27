@@ -24,8 +24,6 @@ export function ProviderVerificationBanner({ className }: { className?: string }
     queryKey: ['users', 'me'],
     queryFn: () => api.users.me(token!),
     enabled: !!token,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
     refetchInterval: (query) => {
       const profile = query.state.data?.providerProfile;
       if (profile && !profile.isVerified) return PROVIDER_VERIFICATION_POLL_MS;

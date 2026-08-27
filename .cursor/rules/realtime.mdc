@@ -1,6 +1,6 @@
 ---
 description: Real-time (WebSocket), tracking və dispatch kodu üçün qaydalar
-globs: apps/api/src/modules/{realtime,tracking,dispatch}/**,apps/web/src/**/*map*,apps/web/src/**/*track*
+globs: apps/api/src/modules/{realtime,tracking,dispatch}/**,apps/web/src/**/*track*
 alwaysApply: false
 ---
 
@@ -23,8 +23,8 @@ Dizayn mənbəyi: `docs/REALTIME_TRACKING.md`, `docs/BOOKING_LIFECYCLE.md`.
 - Status dəyişikliyi mərkəzi `assertTransition(from, to, role)`-dən keçir (BOOKING_LIFECYCLE.md matrisi).
 - Hər keçid **transaction** daxilində: status + timestamp + event yayımı + notification (BullMQ).
 
-## Xəritə / ETA
-- Xəritə API açarı client-ə sızmır; ETA server tərəfdə hesablanıb cache olunur (Redis, qısa TTL).
+## ETA
+- Client-də embedded xəritə yoxdur.
 
 ## Qadağan
 - Auth-suz WS event qəbulu.

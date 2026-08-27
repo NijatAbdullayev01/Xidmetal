@@ -15,6 +15,7 @@ import { MailService } from '../../common/mail/mail.service';
 import {
   buildBookingMailContent,
   bookingStatusToMailEvent,
+  shouldSendCustomerStatusMail,
 } from '../../common/mail/booking-mail';
 import { CreateBookingDto, RescheduleBookingDto, UpdateBookingStatusDto } from './dto';
 import {
@@ -27,9 +28,12 @@ import {
   isBookingTransitionAllowed,
   bookingLifecycleFieldsForStatus,
   isAzerbaijanLocation,
+  catalogLocationCentroid,
   locationsServeSameCity,
   matchCatalogLocationFromText,
   resolveServiceCity,
+  normalizeBookingOrderNumber,
+  formatAzDateTime,
   type BookingSummary,
 } from '@xidmetal/shared';
 import { DispatchOfferStatus, ServiceStatus } from '@prisma/client';
@@ -48,6 +52,10 @@ import {
   normalizeIdempotencyKey,
 } from '../../common/idempotency/idempotency.helpers';
 import { isAssignedProvider } from './booking-access';
+import {
+  allocateBookingOrderNumber,
+  bookingOrderNumberSearchWhere,
+} from './booking-order-number';
 
 const bookingSummaryInclude = {
   service: { select: { id: true, title: true } },
@@ -65,6 +73,7 @@ const bookingSummaryInclude = {
       firstName: true,
       lastName: true,
       email: true,
+      providerProfile: { select: { rating: true, reviewCount: true } },
     },
   },
   review: { select: { id: true } },
@@ -89,12 +98,14 @@ export class BookingsService {
     @Optional()
     @Inject(forwardRef(() => TrackingService))
     private tracking?: TrackingService,
-    @Optional() private geo?: GeoService,
+    @Optional()
+    @Inject(forwardRef(() => GeoService))
+    private geo?: GeoService,
   ) {}
 
   async findById(id: string, userId: string, role: string) {
     const booking = await this.prisma.booking.findUnique({
-      where: { id },
+      where: this.bookingLookupWhere(id),
       include: bookingSummaryInclude,
     });
     if (!booking) {
@@ -117,7 +128,7 @@ export class BookingsService {
     if (role === UserRole.PROVIDER && !isParticipant) {
       const offer = await this.prisma.dispatchOffer.findFirst({
         where: {
-          bookingId: id,
+          bookingId: booking.id,
           providerId: userId,
           status: {
             in: [DispatchOfferStatus.PENDING, DispatchOfferStatus.ACCEPTED],
@@ -149,7 +160,7 @@ export class BookingsService {
     ) {
       const offer = await this.prisma.dispatchOffer.findFirst({
         where: {
-          bookingId: id,
+          bookingId: booking.id,
           providerId: userId,
           status: DispatchOfferStatus.PENDING,
           expiresAt: { gt: new Date() },
@@ -171,6 +182,7 @@ export class BookingsService {
     limit = 20,
     status?: BookingStatus,
     statuses?: BookingStatus[],
+    search?: string,
   ) {
     const skip = (page - 1) * limit;
     const statusFilter =
@@ -181,7 +193,7 @@ export class BookingsService {
           : {};
 
     const now = new Date();
-    const where =
+    const scopedWhere =
       role === UserRole.PROVIDER
         ? {
             AND: [
@@ -218,6 +230,11 @@ export class BookingsService {
         : role === UserRole.ADMIN
           ? { ...statusFilter }
           : { customerId: userId, ...statusFilter };
+
+    const orderNumberFilter = bookingOrderNumberSearchWhere(search);
+    const where = orderNumberFilter
+      ? { AND: [scopedWhere, orderNumberFilter] }
+      : scopedWhere;
 
     const providerOfferInclude =
       role === UserRole.PROVIDER
@@ -283,7 +300,7 @@ export class BookingsService {
       serviceId: dto.serviceId,
       type: dto.type ?? BookingType.SCHEDULED,
       scheduledAt: dto.scheduledAt ?? null,
-      notes: dto.notes ?? null,
+      notes: dto.notes?.trim() || null,
       address: dto.address ?? null,
       imageUrl: dto.imageUrl ?? null,
       destLat: dto.destLat ?? null,
@@ -318,7 +335,7 @@ export class BookingsService {
 
     if (isInstant && !idempotencyKey) {
       throw new BadRequestException(
-        'Ani sifariş üçün Idempotency-Key başlığı məcburidir',
+        'Təcili sifariş üçün Idempotency-Key başlığı məcburidir',
       );
     }
 
@@ -356,6 +373,19 @@ export class BookingsService {
     if (!destCoords && dto.address?.trim()) {
       destCoords = await this.resolveDestFromAddress(dto.address.trim());
     }
+    if (!destCoords && isInstant) {
+      const catalogLocation =
+        (dto.serviceLocation?.trim() &&
+        isAzerbaijanLocation(dto.serviceLocation.trim())
+          ? dto.serviceLocation.trim()
+          : null) ??
+        (dto.address?.trim()
+          ? matchCatalogLocationFromText(dto.address.trim())
+          : null);
+      if (catalogLocation) {
+        destCoords = catalogLocationCentroid(catalogLocation);
+      }
+    }
     const originCoords = this.normalizeCoordPair(dto.originLat, dto.originLng, 'Mənşə');
 
     const booking = await this.prisma.$transaction(async (tx) => {
@@ -383,10 +413,7 @@ export class BookingsService {
         throw new BadRequestException('Öz xidmətinizə sifariş verə bilməzsiniz');
       }
 
-      const notes = dto.notes?.trim();
-      if (!notes) {
-        throw new BadRequestException('Qeyd yazın');
-      }
+      const notes = dto.notes?.trim() || null;
 
       const address = dto.address?.trim();
       if (!service.isRemote && !address) {
@@ -395,7 +422,7 @@ export class BookingsService {
 
       if (isInstant && !destCoords) {
         throw new BadRequestException(
-          'Ani sifariş üçün təyinat koordinatları məcburidir',
+          'Ünvanə şəhər və ya rayon yazın (məs. Bakı, Gəncə)',
         );
       }
 
@@ -425,8 +452,11 @@ export class BookingsService {
       }
       // INSTANT: slot lock yox — capacity/BUSY accept zamanı yoxlanır; scheduledAt display window
 
+      const orderNumber = await allocateBookingOrderNumber(tx);
+
       const created = await tx.booking.create({
         data: {
+          orderNumber,
           serviceId: dto.serviceId,
           customerId,
           providerId: service.providerId,
@@ -451,7 +481,7 @@ export class BookingsService {
             userId: service.providerId,
             type: NotificationType.BOOKING_CREATED,
             title: 'Yeni sifariş',
-            body: `${created.customer.firstName} ${created.customer.lastName} «${created.service.title}» xidmətinə sifariş verdi.`,
+            body: `${created.customer.firstName} ${created.customer.lastName} «${created.service.title}» xidmətinə sifariş verdi (${created.orderNumber}).`,
             data: { bookingId: created.id },
           },
         });
@@ -468,11 +498,13 @@ export class BookingsService {
         event: NotificationType.BOOKING_CREATED,
         serviceTitle: createdBooking.service.title,
         scheduledAtLabel: this.formatScheduledAt(createdBooking.scheduledAt),
+        orderNumber: createdBooking.orderNumber,
+        bookingId: createdBooking.id,
       });
       this.channels?.deliverAfterInApp({
         userId: createdBooking.providerId,
         title: 'Yeni sifariş',
-        body: `${createdBooking.customer.firstName} ${createdBooking.customer.lastName} «${createdBooking.service.title}» xidmətinə sifariş verdi.`,
+        body: `${createdBooking.customer.firstName} ${createdBooking.customer.lastName} «${createdBooking.service.title}» xidmətinə sifariş verdi (${createdBooking.orderNumber}).`,
         type: NotificationType.BOOKING_CREATED,
         data: { bookingId: createdBooking.id },
         serviceTitle: createdBooking.service.title,
@@ -565,7 +597,7 @@ export class BookingsService {
     }
     if (!isAssignedProvider(providerId, booking)) {
       throw new ForbiddenException(
-        'Ani sifarişi yalnız qəbul etdikdən sonra yenidən planlaşdırmaq olar',
+        'Təcili sifarişi yalnız qəbul etdikdən sonra yenidən planlaşdırmaq olar',
       );
     }
     if (booking.status !== BookingStatus.PENDING) {
@@ -743,6 +775,30 @@ export class BookingsService {
     return await this.mapBooking(updated);
   }
 
+  /**
+   * Qəbul olunmuş təcili icraçını buraxıb başqa onlayn xidmət verən axtarır.
+   */
+  async skipProvider(id: string, userId: string, role: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: this.bookingLookupWhere(id),
+    });
+    if (!booking) throw new NotFoundException('Sifariş tapılmadı');
+
+    const isAdmin = role === UserRole.ADMIN;
+    const isCustomer = booking.customerId === userId;
+    if (!isCustomer && !isAdmin) {
+      throw new ForbiddenException('Bu sifarişi idarə etmək icazəniz yoxdur');
+    }
+
+    if (!this.dispatch) {
+      throw new BadRequestException('Axtarış hazırda əlçatan deyil');
+    }
+
+    await this.dispatch.skipAcceptedProvider(booking.id, booking.customerId);
+    this.tracking?.invalidateBookingCache(booking.id);
+    return this.findById(booking.id, userId, role);
+  }
+
   async updateStatus(id: string, userId: string, role: string, dto: UpdateBookingStatusDto) {
     const booking = await this.prisma.booking.findUnique({ where: { id } });
     if (!booking) throw new NotFoundException('Sifariş tapılmadı');
@@ -774,7 +830,7 @@ export class BookingsService {
         dto.status === BookingStatus.REJECTED)
     ) {
       throw new BadRequestException(
-        'Ani sifariş yalnız təklif qəbulu/rəddi ilə təsdiqlənir',
+        'Təcili sifariş yalnız təklif qəbulu/rəddi ilə təsdiqlənir',
       );
     }
 
@@ -808,6 +864,7 @@ export class BookingsService {
           : dto.status === BookingStatus.REJECTED
             ? {
                 cancelReason: dto.cancelReason!.trim(),
+                cancelledAt: now,
               }
             : {};
 
@@ -1010,6 +1067,7 @@ export class BookingsService {
   private enqueueStatusEmails(
     booking: {
       id: string;
+      orderNumber: string;
       scheduledAt: Date;
       service: { title: string };
       customer: { id: string; email: string };
@@ -1050,11 +1108,13 @@ export class BookingsService {
         serviceTitle: booking.service.title,
         actorLabel,
         cancelReason: meta.cancelReason,
+        orderNumber: booking.orderNumber,
+        bookingId: booking.id,
       });
       this.channels?.deliverAfterInApp({
         userId: recipientId,
         title: 'Sifariş ləğv edildi',
-        body: `«${booking.service.title}» sifarişi ${actorLabel} tərəfindən ləğv edildi.${
+        body: `«${booking.service.title}» sifarişi (${booking.orderNumber}) ${actorLabel} tərəfindən ləğv edildi.${
           meta.cancelReason ? ` Səbəb: ${meta.cancelReason}` : ''
         }`,
         type: event,
@@ -1064,23 +1124,25 @@ export class BookingsService {
       return;
     }
 
-    // CONFIRMED / REJECTED / EN_ROUTE / ARRIVED / IN_PROGRESS / COMPLETED → müştəri
-    void this.safeSendBookingMail({
-      to: booking.customer.email,
-      event,
-      serviceTitle: booking.service.title,
-      scheduledAtLabel: this.formatScheduledAt(booking.scheduledAt),
-      cancelReason:
-        meta.status === BookingStatus.REJECTED
-          ? meta.cancelReason
-          : undefined,
-    });
+    // Push/WS: CONFIRMED / REJECTED / EN_ROUTE / ARRIVED / IN_PROGRESS / COMPLETED
+    // E-poçt: yalnız CONFIRMED və COMPLETED
+    if (shouldSendCustomerStatusMail(meta.status)) {
+      void this.safeSendBookingMail({
+        to: booking.customer.email,
+        event,
+        serviceTitle: booking.service.title,
+        scheduledAtLabel: this.formatScheduledAt(booking.scheduledAt),
+        orderNumber: booking.orderNumber,
+        bookingId: booking.id,
+      });
+    }
 
     const channelCopy = this.statusChannelCopy(
       event,
       booking.service.title,
       this.formatScheduledAt(booking.scheduledAt),
       meta.status === BookingStatus.REJECTED ? meta.cancelReason : undefined,
+      booking.orderNumber,
     );
     if (channelCopy) {
       this.channels?.deliverAfterInApp({
@@ -1100,39 +1162,41 @@ export class BookingsService {
     serviceTitle: string,
     scheduledAtLabel: string,
     cancelReason?: string,
+    orderNumber?: string,
   ): { title: string; body: string } | null {
+    const ref = orderNumber ? ` (${orderNumber})` : '';
     switch (event) {
       case NotificationType.BOOKING_CONFIRMED:
         return {
           title: 'Sifariş təsdiqləndi',
-          body: `«${serviceTitle}» sifarişiniz ${scheduledAtLabel} tarixinə təsdiqləndi.`,
+          body: `«${serviceTitle}» sifarişiniz${ref} ${scheduledAtLabel} tarixinə təsdiqləndi.`,
         };
       case NotificationType.BOOKING_REJECTED:
         return {
           title: 'Sifariş rədd edildi',
-          body: `«${serviceTitle}» sifarişiniz rədd edildi.${
+          body: `«${serviceTitle}» sifarişiniz${ref} rədd edildi.${
             cancelReason ? ` Səbəb: ${cancelReason}` : ''
           }`,
         };
       case NotificationType.BOOKING_EN_ROUTE:
         return {
           title: 'Xidmət verən yoldadır',
-          body: `«${serviceTitle}» sifarişiniz üçün xidmət verən yola çıxdı.`,
+          body: `«${serviceTitle}» sifarişiniz${ref} üçün xidmət verən yola çıxdı.`,
         };
       case NotificationType.BOOKING_ARRIVED:
         return {
           title: 'Xidmət verən ünvanda',
-          body: `«${serviceTitle}» sifarişiniz üçün xidmət verən ünvana çatıb.`,
+          body: `«${serviceTitle}» sifarişiniz${ref} üçün xidmət verən ünvana çatıb.`,
         };
       case NotificationType.BOOKING_IN_PROGRESS:
         return {
           title: 'Sifariş başladı',
-          body: `«${serviceTitle}» sifarişiniz icra olunur.`,
+          body: `«${serviceTitle}» sifarişiniz${ref} icra olunur.`,
         };
       case NotificationType.BOOKING_COMPLETED:
         return {
           title: 'Sifariş tamamlandı',
-          body: `«${serviceTitle}» sifarişiniz tamamlandı. İstəsəniz rəy yaza bilərsiniz.`,
+          body: `«${serviceTitle}» sifarişiniz${ref} tamamlandı. İstəsəniz rəy yaza bilərsiniz.`,
         };
       default:
         return null;
@@ -1146,6 +1210,8 @@ export class BookingsService {
     scheduledAtLabel?: string;
     actorLabel?: string;
     cancelReason?: string;
+    orderNumber?: string;
+    bookingId?: string;
   }) {
     try {
       const content = buildBookingMailContent(input);
@@ -1155,6 +1221,11 @@ export class BookingsService {
         subject: content.subject,
         intro: content.intro,
         body: content.body,
+        orderNumber: input.orderNumber,
+        reviewBookingId:
+          input.event === NotificationType.BOOKING_COMPLETED
+            ? input.bookingId
+            : undefined,
       });
     } catch (error) {
       this.logger.warn(
@@ -1166,13 +1237,7 @@ export class BookingsService {
   }
 
   private formatScheduledAt(date: Date): string {
-    return new Intl.DateTimeFormat('az-AZ', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
+    return formatAzDateTime(date);
   }
 
   /** Bir tərəf göndərilibsə digəri də lazımdır; ikisi də yoxdursa null */
@@ -1193,7 +1258,7 @@ export class BookingsService {
     return { lat, lng };
   }
 
-  /** Ünvan mətnindən təyinat koordinatı (planlı sifarişlər üçün fallback). */
+  /** Ünvan mətnindən təyinat koordinatı (müştəri GPS göndərməyəndə). */
   private async resolveDestFromAddress(
     address: string,
   ): Promise<{ lat: number; lng: number } | null> {
@@ -1235,19 +1300,29 @@ export class BookingsService {
     }
 
     throw new BadRequestException(
-      'Ani sifariş üçün şəhər və ya rayon seçin',
+      'Təcili sifariş üçün şəhər və ya rayon seçin',
     );
+  }
+
+  private bookingLookupWhere(id: string): { orderNumber: string } | { id: string } {
+    const orderNumber = normalizeBookingOrderNumber(id);
+    return orderNumber ? { orderNumber } : { id };
   }
 
   private async mapBooking(
     booking: {
       id: string;
+      orderNumber: string;
       serviceId: string;
       service: { title: string };
       customerId: string;
       customer: { firstName: string; lastName: string };
       providerId: string;
-      provider: { firstName: string; lastName: string };
+      provider: {
+        firstName: string;
+        lastName: string;
+        providerProfile?: { rating: number; reviewCount: number } | null;
+      };
       scheduledAt: Date;
       proposedScheduledAt?: Date | null;
       status: string;
@@ -1270,6 +1345,8 @@ export class BookingsService {
       completedAt?: Date | null;
       review?: { id: string } | null;
       createdAt: Date;
+      dispatchWindowStartedAt?: Date | null;
+      dispatchSkipCount?: number;
     },
     dispatchOffer?: {
       id: string;
@@ -1279,12 +1356,15 @@ export class BookingsService {
   ) {
     return {
       id: booking.id,
+      orderNumber: booking.orderNumber,
       serviceId: booking.serviceId,
       serviceTitle: booking.service.title,
       customerId: booking.customerId,
       customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
       providerId: booking.providerId,
       providerName: `${booking.provider.firstName} ${booking.provider.lastName}`,
+      providerRating: booking.provider.providerProfile?.rating ?? 0,
+      providerReviewCount: booking.provider.providerProfile?.reviewCount ?? 0,
       scheduledAt: booking.scheduledAt.toISOString(),
       proposedScheduledAt: booking.proposedScheduledAt?.toISOString(),
       status: booking.status,
@@ -1307,6 +1387,9 @@ export class BookingsService {
       completedAt: booking.completedAt?.toISOString(),
       hasReview: !!booking.review,
       createdAt: booking.createdAt.toISOString(),
+      dispatchWindowStartedAt:
+        booking.dispatchWindowStartedAt?.toISOString() ?? null,
+      dispatchSkipCount: booking.dispatchSkipCount ?? 0,
       dispatchOfferId: dispatchOffer?.id ?? null,
       dispatchDistanceM: dispatchOffer?.distanceM ?? null,
       dispatchExpiresAt: dispatchOffer?.expiresAt.toISOString() ?? null,

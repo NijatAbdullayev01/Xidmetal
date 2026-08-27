@@ -3,6 +3,7 @@ import {
   UserRole,
   BOOKING_NOTIFICATION_TYPES,
   REVIEW_NOTIFICATION_TYPES,
+  isServiceReviewNotification,
   sanitizeInternalPath,
 } from '@xidmetal/shared';
 import type { NotificationSummary } from '@xidmetal/shared';
@@ -51,6 +52,17 @@ export function resolveNotificationHref(
       return `${base}/messages?conversationId=${encodeURIComponent(conversationId)}`;
     }
     return `${base}/messages`;
+  }
+
+  if (isServiceReviewNotification(notification.type, data)) {
+    const serviceId = typeof data?.serviceId === 'string' ? data.serviceId : null;
+    const needsRevision =
+      notification.type === NotificationType.SERVICE_NEEDS_REVISION ||
+      data?.serviceNeedsRevision === true;
+    if (needsRevision && serviceId) {
+      return `/dashboard/provider/services/${encodeURIComponent(serviceId)}/edit`;
+    }
+    return '/dashboard/provider/services';
   }
 
   if (notification.type === NotificationType.ADMIN_ANNOUNCEMENT) {

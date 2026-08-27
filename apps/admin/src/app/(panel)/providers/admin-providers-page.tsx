@@ -10,6 +10,7 @@ import {
   KycDocumentType,
   PROVIDER_ACCOUNT_TYPE_LABELS,
   ProviderAccountType,
+  toDisplayMediaUrl,
   UserRole,
 } from '@xidmetal/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -211,7 +212,7 @@ export function AdminProvidersPage() {
                           </div>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={doc.url}
+                            src={toDisplayMediaUrl(doc.url)}
                             alt=""
                             className="max-h-40 w-auto rounded-md border border-border object-cover"
                           />

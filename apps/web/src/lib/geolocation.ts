@@ -38,7 +38,7 @@ const GEO_TIGHT_LOCK_ACCURACY_M = 20;
 /**
  * İlk kobud oxunuşdan sonra GPS-in dəqiqləşməsi üçün minimum gözləmə (ms).
  * Chrome ilk callback-də tez-tez şəbəkə mövqeyi verir; bu pəncərə olmadan
- * pin dəqiq GPS-ə çatmamış "yaxın amma dəqiq deyil" yerdə ilişir.
+ * mövqe dəqiq GPS-ə çatmamış "yaxın amma dəqiq deyil" yerdə ilişir.
  */
 const GEO_MIN_REFINE_WEBKIT_MS = 8_000;
 const GEO_MIN_REFINE_DEFAULT_MS = 5_000;
@@ -61,10 +61,10 @@ export function geoPermissionDeniedMessage(
   appleMobile = isAppleMobileGeolocation(),
 ): string {
   if (appleMobile) {
-    return 'Mövqe üçün xəritədəki düyməyə basın. Açılmazsa: Ayarlar → Məxfilik → Məkan Xidmətləri → Safari → Soruş və ya İcazə ver';
+    return 'Mövqe üçün düyməyə basın. Açılmazsa: Ayarlar → Məxfilik → Məkan Xidmətləri → Safari → Soruş və ya İcazə ver';
   }
   if (webkit) {
-    return 'Mövqe üçün xəritədəki düyməyə basın. Açılmazsa: Safari → Ayarlar → Vebsaytlar → Məkan Xidmətləri';
+    return 'Mövqe üçün düyməyə basın. Açılmazsa: Safari → Ayarlar → Vebsaytlar → Məkan Xidmətləri';
   }
   return 'Mövqe icazəsi verilmədi — ünvan çubuğundakı kilidə basıb Məkan → İcazə ver seçin';
 }
@@ -76,13 +76,13 @@ export function geoErrorMessage(code: GeoPositionErrorCode): string {
     case 'permission_denied':
       return geoPermissionDeniedMessage();
     case 'position_unavailable':
-      return 'Mövqe tapılmadı — xəritədən əl ilə seçin, cihazın məkan xidmətini və GPS-i yoxlayın';
+      return 'Mövqe tapılmadı — ünvanı əl ilə yazın, cihazın məkan xidmətini və GPS-i yoxlayın';
     case 'timeout':
-      return 'Mövqe sorğusu vaxt aşımına uğradı — ünvan çubuğunda məkan icazəsini yoxlayın və ya xəritədən seçin';
+      return 'Mövqe sorğusu vaxt aşımına uğradı — ünvan çubuğunda məkan icazəsini yoxlayın və ya ünvanı əl ilə yazın';
     case 'aborted':
       return 'Mövqe sorğusu ləğv edildi';
     default:
-      return 'Mövqe alınmadı — xəritədən əl ilə seçə bilərsiniz';
+      return 'Mövqe alınmadı — ünvanı əl ilə yaza bilərsiniz';
   }
 }
 
@@ -167,8 +167,8 @@ export function geoAccuracyHint(accuracyM: number | null): string | null {
   if (accuracyM == null) return null;
   if (accuracyM > 300) {
     return isAppleMobileGeolocation()
-      ? 'Təxmini yer gəldi — Ayarlar → Məxfilik → Məkan Xidmətləri → Safari → Dəqiq Məkanı açın və ya pini əl ilə düzəldin'
-      : 'GPS dəqiqliyi zəifdir — pini xəritədə əl ilə düzəldin';
+      ? 'Təxmini yer gəldi — Ayarlar → Məxfilik → Məkan Xidmətləri → Safari → Dəqiq Məkanı açın və ya ünvanı əl ilə yazın'
+      : 'GPS dəqiqliyi zəifdir — yenidən cəhd edin və ya ünvanı əl ilə yazın';
   }
   if (accuracyM > 100) return 'Siqnal zəifdir — açıq yerdə yenidən cəhd edin';
   return 'GPS dəqiqliyi yaxşıdır';
@@ -275,7 +275,7 @@ export function readCurrentPosition(options?: PositionOptions): Promise<GeoCoord
 
 /**
  * Sürətli ilkin oxunuş:
- * qısa-müddətli keş və ya şəbəkə mövqeyi ilə xəritəni tez doldurur.
+ * qısa-müddətli keş və ya şəbəkə mövqeyi ilə formu tez doldurur.
  * GPS-dən əvvəl çağırmayın — `shouldPrimeWithNetworkLocation`.
  */
 export function readCachedPosition(options?: {
@@ -303,7 +303,7 @@ export async function readCurrentPositionWithFallback(options?: {
   highAccuracyWaitMs?: number;
   /** İcazə dialoqu üçün əlavə ehtiyat (ms) */
   permissionGraceMs?: number;
-  /** Hər yaxşılaşan oxunuş — xəritəni Bakı default-unda saxlamamaq üçün */
+  /** Hər yaxşılaşan oxunuş — Bakı default-unda saxlamamaq üçün */
   onReading?: (reading: GeoCoordsWithAccuracy) => void;
   signal?: AbortSignal;
 }): Promise<GeoCoordsWithAccuracy> {

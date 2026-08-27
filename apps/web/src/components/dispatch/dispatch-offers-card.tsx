@@ -4,7 +4,7 @@ import { Loader2, MapPin, Radio, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDispatchOffers } from '@/hooks/use-dispatch-offers';
-import { formatPrice } from '@/lib/utils';
+import { formatBookingAddressDisplay } from '@/lib/booking-address';
 
 function formatDistance(meters: number | null | undefined): string {
   if (meters == null || !Number.isFinite(meters)) return '—';
@@ -47,9 +47,9 @@ export function DispatchOffersCard() {
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <CardTitle className="text-base sm:text-lg">Ani sifariş təklifləri</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Təcili sifariş təklifləri</CardTitle>
             <CardDescription className="mt-1">
-              Eyni xidmət növü üzrə təcili sifarişlər — qəbul və ya rədd edin
+              Eyni xidmət növü üzrə təcili sifarişlər — təsdiq və ya imtina edin
               {wsConnected ? ' · canlı' : ' · yeniləmə'}
             </CardDescription>
           </div>
@@ -110,16 +110,13 @@ export function DispatchOffersCard() {
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {offer.booking?.customerName}
-                    {offer.booking?.totalPrice != null
-                      ? ` · ${formatPrice(offer.booking.totalPrice)}`
-                      : ''}
                   </p>
                   {offer.booking?.address && (
                     <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
                       <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                       <span>
                         <span className="text-foreground">Yazılı ünvan:</span>{' '}
-                        {offer.booking.address}
+                        {formatBookingAddressDisplay(offer.booking.address)}
                       </span>
                     </p>
                   )}

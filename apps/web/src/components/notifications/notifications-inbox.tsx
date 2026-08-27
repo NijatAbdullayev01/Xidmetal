@@ -65,8 +65,9 @@ export function NotificationsInbox() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Bildirişlər</h1>
           <p className="mt-1 text-muted-foreground">
-            Admin və platforma tərəfindən göndərilən elanlar. Sifariş və mesaj
-            bildirişləri buraya düşmür — müvafiq bölmələrdə göstərilir.
+            Admin və platforma tərəfindən göndərilən elanlar. Sifariş, mesaj və
+            xidmət yoxlaması bildirişləri buraya düşmür — müvafiq bölmələrdə
+            göstərilir.
           </p>
         </div>
         <Button

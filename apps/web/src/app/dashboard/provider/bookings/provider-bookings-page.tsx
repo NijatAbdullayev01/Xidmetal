@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, Loader2, MapPin, MessageSquare } from 'lucide-react';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CalendarClock, Loader2 } from 'lucide-react';
 import {
   BookingStatus,
   BookingType,
-  isTrackableBookingStatus,
+  toDisplayMediaUrl,
+  formatBookingDateTime,
 } from '@xidmetal/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,18 +22,17 @@ import { useAuthToken } from '@/hooks/use-auth-token';
 import { useAckBookingNotifications } from '@/hooks/use-ack-booking-notifications';
 import { BOOKING_ATTENTION_QUERY_KEY } from '@/hooks/use-booking-notifications';
 import { useDispatchOffers } from '@/hooks/use-dispatch-offers';
-import { combineDateAndTime, formatDateTime, formatPrice, cn } from '@/lib/utils';
-import {
-  BOOKING_STATUS_LABELS,
-  BOOKING_STATUS_TEXT_CLASSES,
-  BOOKING_TYPE_LABELS,
-} from '@/lib/provider-labels';
+import { combineDateAndTime, formatDateTime, cn } from '@/lib/utils';
+import { BOOKING_TYPE_LABELS } from '@/lib/provider-labels';
 import { BookingAddressBlock } from '@/components/bookings/booking-address-block';
+import { BookingStatusBadge } from '@/components/bookings/booking-status-badge';
 import { CancelBookingDialog } from '@/components/bookings/cancel-booking-dialog';
+import { BookingOrderNumber } from '@/components/bookings/booking-order-number';
+import { BookingMessageButton } from '@/components/bookings/booking-message-button';
 import {
   BookingStatusFilters,
   buildBookingStatusTabs,
-  getBookingStatusQueryParams,
+  getBookingListQueryParams,
   type BookingStatusTabKey,
 } from '@/components/bookings/booking-status-filters';
 import { ProviderAvailabilityCard } from '@/components/provider/provider-availability-card';
@@ -169,6 +169,7 @@ export function ProviderBookingsPage() {
   } = useDispatchOffers(!!token);
   const [activeTab, setActiveTab] = useState<BookingStatusTabKey>('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [orderNumberSearch, setOrderNumberSearch] = useState('');
   const [actionId, setActionId] = useState<string | null>(null);
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -179,16 +180,17 @@ export function ProviderBookingsPage() {
     status: typeof BookingStatus.CANCELLED | typeof BookingStatus.REJECTED;
   } | null>(null);
 
-  const statusParams = getBookingStatusQueryParams(activeTab, statusFilter, TABS);
+  const listParams = useMemo(
+    () => getBookingListQueryParams(activeTab, statusFilter, TABS, orderNumberSearch),
+    [activeTab, statusFilter, orderNumberSearch],
+  );
+  const hasOrderSearch = Boolean(listParams.search);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['bookings', 'provider', activeTab, statusFilter],
-    queryFn: () =>
-      api.bookings(token!, {
-        limit: '50',
-        ...statusParams,
-      }),
+    queryKey: ['bookings', 'provider', listParams],
+    queryFn: () => api.bookings(token!, listParams),
     enabled: !!token,
+    placeholderData: keepPreviousData,
     refetchInterval: 20_000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
@@ -353,6 +355,7 @@ export function ProviderBookingsPage() {
         onTabChange={setActiveTab}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
+        onOrderNumberSearchChange={setOrderNumberSearch}
       />
 
       {isLoading && (
@@ -364,7 +367,9 @@ export function ProviderBookingsPage() {
       {!isLoading && visibleBookings.length === 0 && (
         <Card>
           <CardContent className="py-16 text-center text-muted-foreground">
-            Bu kateqoriyada sifariş yoxdur
+            {hasOrderSearch
+              ? 'Bu nömrəyə uyğun sifariş tapılmadı'
+              : 'Bu kateqoriyada sifariş yoxdur'}
           </CardContent>
         </Card>
       )}
@@ -535,40 +540,20 @@ export function ProviderBookingsPage() {
                         Tamamla
                       </Button>
                     )}
-                    {!isInstantPending && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={messageLoadingId === booking.id}
-                        onClick={() => handleMessage(booking.id)}
-                      >
-                        {messageLoadingId === booking.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            <MessageSquare className="h-4 w-4" />
-                            Mesaj yaz
-                          </>
-                        )}
-                      </Button>
-                    )}
-                    <Link
-                      href={`/dashboard/provider/bookings/${booking.id}`}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-sm hover:bg-muted"
-                    >
-                      <MapPin className="h-4 w-4" />
-                      {isTrackableBookingStatus(booking.status)
-                        ? 'Canlı izlə'
-                        : 'Ətraflı'}
-                    </Link>
+                    <BookingMessageButton
+                      status={booking.status}
+                      loading={messageLoadingId === booking.id}
+                      onClick={() => handleMessage(booking.id)}
+                    />
                   </div>
                 </div>
 
                 <div className="mt-1.5 space-y-1.5 text-sm">
+                  <BookingOrderNumber value={booking.orderNumber} />
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-foreground">Sifariş növü:</span>
                     {booking.type === BookingType.INSTANT ? (
-                      <Badge className="bg-brand text-sm text-brand-foreground">
+                      <Badge className="bg-brand px-1.5 py-0 text-sm font-normal leading-5 text-brand-foreground">
                         {BOOKING_TYPE_LABELS[BookingType.INSTANT]}
                       </Badge>
                     ) : (
@@ -579,37 +564,30 @@ export function ProviderBookingsPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-foreground">Sifarişin statusu:</span>
-                    <span className={BOOKING_STATUS_TEXT_CLASSES[booking.status]}>
-                      {BOOKING_STATUS_LABELS[booking.status]}
-                    </span>
+                    <BookingStatusBadge
+                      booking={booking}
+                      className="px-1.5 py-0 text-sm font-normal leading-5"
+                    />
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-foreground">Müştəri:</span>
                     <span className="text-muted-foreground">{booking.customerName}</span>
                   </div>
-                  {booking.type !== BookingType.INSTANT && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-foreground">Tarix:</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-foreground">Tarix və saat:</span>
                       <span className="text-muted-foreground">
-                        {formatDateTime(booking.scheduledAt)}
+                        {formatBookingDateTime(booking)}
                       </span>
-                    </div>
-                  )}
+                  </div>
                   {booking.proposedScheduledAt && (
                     <div className="flex flex-wrap items-center gap-2 text-amber-700 dark:text-amber-400">
-                      <span className="text-foreground">Təklif olunan tarix:</span>
+                      <span className="text-foreground">Təklif olunan tarix və saat:</span>
                       <span>
                         {formatDateTime(booking.proposedScheduledAt)}{' '}
                         (müştəri təsdiqi gözlənilir)
                       </span>
                     </div>
                   )}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-foreground">Qiymət:</span>
-                    <span className="text-muted-foreground">
-                      {formatPrice(booking.totalPrice)}
-                    </span>
-                  </div>
                   {booking.notes && (
                     <div className="flex items-start gap-2">
                       <span className="shrink-0 text-foreground">Qeyd:</span>
@@ -626,6 +604,11 @@ export function ProviderBookingsPage() {
                       </span>
                     </div>
                   )}
+                  <BookingAddressBlock
+                    address={booking.address}
+                    destLat={booking.destLat}
+                    destLng={booking.destLng}
+                  />
                 </div>
 
                 {booking.imageUrl && (
@@ -635,7 +618,7 @@ export function ProviderBookingsPage() {
                     </p>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={booking.imageUrl}
+                      src={toDisplayMediaUrl(booking.imageUrl)}
                       alt="Görüləcək işin şəkli"
                       className="max-h-48 max-w-full rounded-xl border border-border object-contain"
                     />
@@ -656,14 +639,6 @@ export function ProviderBookingsPage() {
                     }}
                   />
                 )}
-
-                <BookingAddressBlock
-                  className="mt-3 text-sm"
-                  address={booking.address}
-                  destLat={booking.destLat}
-                  destLng={booking.destLng}
-                  showDirections
-                />
               </CardContent>
             </Card>
           );

@@ -95,7 +95,9 @@ export class MessagesController {
   @Post('conversations')
   @UseGuards(EmailVerifiedGuard)
   @RequireEmailVerified()
-  @ApiOperation({ summary: 'Yeni söhbət yarat və ya mövcud olanı aç' })
+  @ApiOperation({
+    summary: 'Yeni söhbət yarat və ya mövcud olanı aç (sifariş qəbulundan sonra)',
+  })
   createConversation(
     @CurrentUser('id') userId: string,
     @CurrentUser('role') role: string,

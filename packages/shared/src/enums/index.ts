@@ -51,6 +51,8 @@ export enum DispatchOfferStatus {
   REJECTED = 'REJECTED',
   EXPIRED = 'EXPIRED',
   CANCELLED = 'CANCELLED',
+  /** Müştəri qiyməti bəyənməyib bu xidmət verəni buraxdı */
+  SKIPPED = 'SKIPPED',
 }
 
 /** Ödəniş statusu (Faza 5 — feature flag; default OFF) */
@@ -119,14 +121,19 @@ export enum NotificationType {
   MESSAGE_RECEIVED = 'MESSAGE_RECEIVED',
   /**
    * Platforma / admin elanı — yalnız zəng + Bildirişlər səhifəsi.
-   * Sifariş/mesaj/rəy bildirişləri bu inbox-a daxil deyil.
+   * Sifariş/mesaj/rəy/xidmət yoxlaması bildirişləri bu inbox-a daxil deyil.
    */
   ADMIN_ANNOUNCEMENT = 'ADMIN_ANNOUNCEMENT',
+  /** Admin xidməti təsdiqlədi — Xidmətlərim badge (inbox-a düşmür) */
+  SERVICE_APPROVED = 'SERVICE_APPROVED',
+  /** Admin xidməti düzəlişə göndərdi — Xidmətlərim (inbox-a düşmür) */
+  SERVICE_NEEDS_REVISION = 'SERVICE_NEEDS_REVISION',
 }
 
 /**
  * Zəng ikonu və dashboard notifications inbox allowlist-i.
- * Sifariş → BOOKING_*; mesaj → MESSAGE_*; rəy → REVIEW_* (ayrı badge/kanal).
+ * Sifariş → BOOKING_*; mesaj → MESSAGE_*; rəy → REVIEW_*;
+ * xidmət yoxlaması → SERVICE_* (ayrı badge/kanal).
  */
 export const ADMIN_NOTIFICATION_TYPES = [
   NotificationType.ADMIN_ANNOUNCEMENT,
@@ -198,6 +205,28 @@ export const REVIEW_NOTIFICATION_TYPES = [NotificationType.REVIEW_RECEIVED] as c
 
 /** Mesaj zəng / deep-link (söhbət oxunanda bağlanır) */
 export const MESSAGE_NOTIFICATION_TYPES = [NotificationType.MESSAGE_RECEIVED] as const;
+
+/** Xidmət verən — Xidmətlərim badge (təsdiq / düzəliş). Inbox-a düşmür. */
+export const SERVICE_NOTIFICATION_TYPES = [
+  NotificationType.SERVICE_APPROVED,
+  NotificationType.SERVICE_NEEDS_REVISION,
+] as const;
+
+const SERVICE_NOTIFICATION_TYPE_SET = new Set<string>(SERVICE_NOTIFICATION_TYPES);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Köhnə ADMIN_ANNOUNCEMENT sətirləri `data.serviceApproved` / `serviceNeedsRevision` daşıyır. */
+export function isServiceReviewNotification(
+  type: string,
+  data?: Record<string, unknown> | null,
+): boolean {
+  if (SERVICE_NOTIFICATION_TYPE_SET.has(type)) return true;
+  if (type !== NotificationType.ADMIN_ANNOUNCEMENT || !isRecord(data)) return false;
+  return data.serviceApproved === true || data.serviceNeedsRevision === true;
+}
 
 export enum AvailabilityOverrideType {
   AVAILABLE = 'AVAILABLE',

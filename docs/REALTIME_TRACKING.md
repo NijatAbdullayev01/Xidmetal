@@ -1,6 +1,6 @@
 # Real-time & Canlı İzləmə Dizaynı
 
-Bu sənəd xidmət verənin yolda olduğu zaman xəritədə **canlı izlənməsi** üçün texniki dizaynı təsvir edir.
+Bu sənəd xidmət verənin yolda olduğu zaman **canlı izlənməsi** üçün texniki dizaynı təsvir edir.
 
 > **Cari vəziyyət (2026-08, Faza 3):** Socket.IO gateway + `tracking` / dispatch / **`message:new`** **implemented**. Mesajlar/bildirişlər üçün TanStack Query **polling** fallback saxlanılır; WS ilə invalidate. Bax: [ROADMAP.md](./ROADMAP.md) Faza 3.
 
@@ -89,24 +89,24 @@ Etibarsız token → bağlantı rədd edilir. HTTP `JwtStrategy` ilə eyni secre
 Provider PWA                Gateway              Customer PWA
  watchPosition()  ──push──►  throttle/validate
                             ├─ geo profile + PostGIS
-                            ├─ broadcast ──►  location:update ─► xəritədə marker
+                            ├─ broadcast ──►  location:update ─► ETA / məsafə paneli
                             └─ (hər ~15s) LocationPing DB
 ```
 
 - **Provider:** `navigator.geolocation.watchPosition` → ~3s throttle → `location:push` (yalnız trackable status).
 - **Server hot path:** validate + Redis throttle → **WS `location:update` dərhal** (haversine ETA).
 - **Server background:** ProviderProfile/PostGIS sync ~15s; `LocationPing` ~15s; Mapbox ETA dəqiqləşdirmə (opsional).
-- **Müştəri:** `location:update` → Google Maps marker + ETA/məsafə.
+- **Müştəri:** canlı mövqe paneli və Google Maps linki yoxdur; ünvan mətni sifariş kartında qalır.
 
 > Battery/data: throttle interval və `enableHighAccuracy` balanslıdır. Background GPS brauzer/OS limitlərinə tabedir (tab açıq olanda etibarlı).
 > Miqyas: bax [CAPACITY.md](./CAPACITY.md).
 
 ---
 
-## 6. Xəritə & ETA
+## 6. ETA
 
-- **Xəritə:** Google Maps JS (`NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`). Açar yoxdursa AZ empty state — build sınmır.
-- **ETA / məsafə (Bolt üslubu):** `GET /geo/route` + WS — Google Routes (New) → OSRM → Mapbox → haversine×yol əmsalı. Client xəritə: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`.
+- Embedded xəritə və xarici Google Maps naviqasiya linki yoxdur.
+- **ETA / məsafə:** server `GET /geo/route` + WS (provider sync üçün) — Google Routes (New) → OSRM → Mapbox → haversine×yol əmsalı.
 
 ---
 
@@ -132,7 +132,7 @@ Provider PWA                Gateway              Customer PWA
 - Handshake JWT auth (məcburi).
 - Otaq üzvlüyü server-side.
 - Rate limit WS `location:push`.
-- Directions secret yalnız backend-də (`GOOGLE_MAPS_API_KEY` / `MAPBOX_ACCESS_TOKEN`); client Google Maps açarı domain-restricted public key.
+- Directions secret yalnız backend-də (`GOOGLE_MAPS_API_KEY` / `MAPBOX_ACCESS_TOKEN`).
 
 ---
 

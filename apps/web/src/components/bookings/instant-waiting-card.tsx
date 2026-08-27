@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 interface InstantWaitingCardProps {
   /** Sifariş yaradılma vaxtı (ISO) — axtarış pəncərəsi buradan hesablanır */
   createdAt: string;
+  /** Skip sonrası yenilənmiş pəncərə başlanğıcı */
+  searchStartedAt?: string | null;
   onCancel?: () => void;
   cancelDisabled?: boolean;
   cancelPending?: boolean;
@@ -33,20 +35,21 @@ function formatCountdown(remainingMs: number): string {
  */
 export function InstantWaitingCard({
   createdAt,
+  searchStartedAt,
   onCancel,
   cancelDisabled,
   cancelPending,
 }: InstantWaitingCardProps) {
   const windowSec = DISPATCH.SEARCH_WINDOW_SEC;
   const windowMinutes = Math.max(1, Math.round(windowSec / 60));
-  const endsAt = searchWindowEndsAt(createdAt, windowSec);
+  const endsAt = searchWindowEndsAt(searchStartedAt || createdAt, windowSec);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     setNow(Date.now());
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [createdAt]);
+  }, [createdAt, searchStartedAt]);
 
   const remainingMs = endsAt - now;
   const expired = remainingMs <= 0;
@@ -75,7 +78,7 @@ export function InstantWaitingCard({
           <p className="mt-1 text-xs text-muted-foreground">
             {expired
               ? 'Uyğun xidmət verən tapılmadıqda sifariş avtomatik ləğv olunacaq. Bu səhifə avtomatik yenilənir.'
-              : 'Bir nəfər qəbul edənə qədər gözləyin. Bu səhifə avtomatik yenilənir.'}
+              : 'Bir nəfər qəbul edənə qədər gözləyin. Qiymət qəbul edən xidmət verənin tarifinə görə dəqiqləşəcək.'}
           </p>
 
           <div className="mt-3 space-y-2">

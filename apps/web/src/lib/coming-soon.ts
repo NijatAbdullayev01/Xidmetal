@@ -14,13 +14,16 @@ export function isComingSoonExemptPath(pathname: string): boolean {
     pathname === '/icon-192.png' ||
     pathname === '/icon-512.png' ||
     pathname === '/apple-touch-icon.png' ||
-    pathname === '/apple-touch-icon-precomposed.png'
+    pathname === '/apple-touch-icon-precomposed.png' ||
+    pathname === '/logo.png' ||
+    pathname === '/logo-transparent.png'
   ) {
     return true;
   }
 
   const prefixes = [
     '/coming-soon',
+    '/mail/unsubscribe',
     '/dashboard',
     '/login',
     '/register',

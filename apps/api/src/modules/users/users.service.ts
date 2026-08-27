@@ -28,6 +28,7 @@ import { MailService } from '../../common/mail/mail.service';
 import { assertValidEmailCode } from '../../common/auth/email-verification-codes';
 import { generateNumericOtp } from '../../common/auth/otp';
 import { StorageService } from '../../common/storage/storage.service';
+import { invalidateJwtUserCache } from '../../common/auth/jwt-user-cache';
 import {
   ChangePasswordDto,
   UpdateProfileDto,
@@ -270,6 +271,7 @@ export class UsersService {
       // bütün mövcud sessiyaları ləğv edirik.
       this.prisma.refreshToken.deleteMany({ where: { userId } }),
     ]);
+    invalidateJwtUserCache(userId);
 
     return { message: 'Şifrə uğurla dəyişdirildi' };
   }
@@ -529,6 +531,7 @@ export class UsersService {
         },
       });
     });
+    invalidateJwtUserCache(userId);
 
     // PostGIS geography sütunu Prisma Unsupported — raw scrub
     try {

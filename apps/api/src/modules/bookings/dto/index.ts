@@ -33,11 +33,11 @@ export class CreateBookingDto {
   @IsDateString()
   scheduledAt?: string;
 
-  @ApiProperty({ description: 'Müştəri qeydi' })
+  @ApiPropertyOptional({ description: 'Müştəri qeydi (opsional)' })
+  @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(1000)
-  notes!: string;
+  notes?: string;
 
   @ApiPropertyOptional({
     description: 'Xidmətin göstəriləcəyi yazılı ünvan (yerində xidmət üçün məcburi)',
@@ -64,7 +64,7 @@ export class CreateBookingDto {
   type?: BookingType;
 
   @ApiPropertyOptional({
-    description: 'Təyinat enliyi (xəritə mövqeyi; ani sifarişdə məcburi)',
+    description: 'Təyinat enliyi (opsional; boşdursa ünvan geokodlaşdırılır)',
   })
   @IsOptional()
   @Type(() => Number)
@@ -74,7 +74,7 @@ export class CreateBookingDto {
   destLat?: number;
 
   @ApiPropertyOptional({
-    description: 'Təyinat uzunluğu (xəritə mövqeyi; ani sifarişdə məcburi)',
+    description: 'Təyinat uzunluğu (opsional; boşdursa ünvan geokodlaşdırılır)',
   })
   @IsOptional()
   @Type(() => Number)
@@ -204,4 +204,17 @@ export class BookingQueryDto {
   @IsArray()
   @IsEnum(BookingStatus, { each: true })
   statuses?: BookingStatus[];
+
+  @ApiPropertyOptional({
+    description:
+      'Sifariş nömrəsi axtarışı: tam `XM-26-000421`, prefiks və ya son 3–8 rəqəm.',
+    example: 'XM-26-000421',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() || undefined : value,
+  )
+  search?: string;
 }

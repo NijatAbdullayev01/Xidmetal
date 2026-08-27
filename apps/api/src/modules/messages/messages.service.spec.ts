@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { NotificationType, UserRole } from '@xidmetal/shared';
+import { NotificationType, UserRole, BookingStatus, BookingType } from '@xidmetal/shared';
 import { MessagesService } from './messages.service';
 
 vi.mock('./typing.store', () => ({
@@ -163,6 +163,29 @@ describe('MessagesService.sendMessage', () => {
     ).rejects.toThrow('Bu söhbətə giriş icazəniz yoxdur');
   });
 
+  it('COMPLETED sifarişə bağlı söhbətdə mesaj göndərməyə icazə vermir', async () => {
+    const service = new MessagesService(
+      {
+        conversation: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: 'conv-1',
+            customerId: 'customer-1',
+            providerId: 'provider-1',
+            booking: { status: BookingStatus.COMPLETED },
+          }),
+        },
+      } as never,
+      {} as never,
+      {} as never,
+      { emitMessageNew: vi.fn() } as never,
+      { deliverAfterInApp: vi.fn() } as never,
+    );
+
+    await expect(
+      service.sendMessage('conv-1', 'customer-1', { content: 'Salam' }),
+    ).rejects.toThrow('Tamamlanmış sifarişdə mesaj yazıla bilməz');
+  });
+
   it('provider/customer siyahı filtrini düzgün seçir', async () => {
     const prisma = {
       conversation: {
@@ -187,5 +210,95 @@ describe('MessagesService.sendMessage', () => {
         where: { providerId: 'p-1', providerDeletedAt: null },
       }),
     );
+  });
+});
+
+describe('MessagesService.createConversation', () => {
+  const makeService = (prisma: unknown) =>
+    new MessagesService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      { emitMessageNew: vi.fn() } as never,
+      { deliverAfterInApp: vi.fn() } as never,
+    );
+
+  it('PENDING rezervasiyada söhbət açmağa icazə vermir', async () => {
+    const service = makeService({
+      booking: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'b1',
+          customerId: 'customer-1',
+          providerId: 'provider-1',
+          status: BookingStatus.PENDING,
+          type: BookingType.SCHEDULED,
+          acceptedAt: null,
+        }),
+      },
+    });
+
+    await expect(
+      service.createConversation('customer-1', UserRole.CUSTOMER, { bookingId: 'b1' }),
+    ).rejects.toThrow('Mesaj yazmaq üçün xidmət verən sifarişi qəbul etməlidir');
+  });
+
+  it('PENDING təcili sifarişdə söhbət açmağa icazə vermir', async () => {
+    const service = makeService({
+      booking: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'b2',
+          customerId: 'customer-1',
+          providerId: 'seed-provider',
+          status: BookingStatus.PENDING,
+          type: BookingType.INSTANT,
+          acceptedAt: null,
+        }),
+      },
+    });
+
+    await expect(
+      service.createConversation('customer-1', UserRole.CUSTOMER, { bookingId: 'b2' }),
+    ).rejects.toThrow('Mesaj yazmaq üçün xidmət verən sifarişi qəbul etməlidir');
+  });
+
+  it('CONFIRMED sifarişdə mesaj qapısından keçir', async () => {
+    const service = makeService({
+      booking: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'b3',
+          customerId: 'customer-1',
+          providerId: 'provider-1',
+          status: BookingStatus.CONFIRMED,
+          type: BookingType.SCHEDULED,
+          acceptedAt: new Date(),
+        }),
+      },
+      user: {
+        findUnique: vi.fn().mockResolvedValue(null),
+      },
+    });
+
+    await expect(
+      service.createConversation('customer-1', UserRole.CUSTOMER, { bookingId: 'b3' }),
+    ).rejects.toThrow('Xidmət verən tapılmadı');
+  });
+
+  it('COMPLETED sifarişdə söhbət açmağa icazə vermir', async () => {
+    const service = makeService({
+      booking: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'b4',
+          customerId: 'customer-1',
+          providerId: 'provider-1',
+          status: BookingStatus.COMPLETED,
+          type: BookingType.SCHEDULED,
+          acceptedAt: new Date(),
+        }),
+      },
+    });
+
+    await expect(
+      service.createConversation('customer-1', UserRole.CUSTOMER, { bookingId: 'b4' }),
+    ).rejects.toThrow('Tamamlanmış sifarişdə mesaj yazıla bilməz');
   });
 });

@@ -1,15 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, MessageSquare, CalendarClock, Star, MapPin } from 'lucide-react';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Loader2, CalendarClock, Star } from 'lucide-react';
 import {
   BookingStatus,
   BookingType,
+  DISPATCH,
+  isBookingPriceVisibleToCustomer,
+  isBookingProviderRatingVisible,
   isCancellableBookingStatus,
-  isTrackableBookingStatus,
+  isInstantProviderSkippable,
+  toDisplayMediaUrl,
+  formatBookingDateTime,
 } from '@xidmetal/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,25 +23,26 @@ import { BookingAddressBlock } from '@/components/bookings/booking-address-block
 import { ReviewDialog } from '@/components/bookings/review-dialog';
 import { CancelBookingDialog } from '@/components/bookings/cancel-booking-dialog';
 import { InstantWaitingCard } from '@/components/bookings/instant-waiting-card';
+import { InstantSkipProviderCard } from '@/components/bookings/instant-skip-provider-card';
+import { BookingMessageButton } from '@/components/bookings/booking-message-button';
+import { BookingOrderNumber } from '@/components/bookings/booking-order-number';
+import { BookingProviderName } from '@/components/bookings/booking-provider-name';
+import { BookingStatusBadge } from '@/components/bookings/booking-status-badge';
 import { useBookingsRealtimeInvalidation } from '@/hooks/use-booking-tracking';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { useAckBookingNotifications } from '@/hooks/use-ack-booking-notifications';
 import { BOOKING_ATTENTION_QUERY_KEY } from '@/hooks/use-booking-notifications';
 import { formatPrice, formatDateTime, cn } from '@/lib/utils';
-import {
-  BOOKING_STATUS_LABELS,
-  BOOKING_STATUS_TEXT_CLASSES,
-  BOOKING_TYPE_LABELS,
-} from '@/lib/provider-labels';
+import { BOOKING_TYPE_LABELS } from '@/lib/provider-labels';
 import {
   BookingStatusFilters,
   buildBookingStatusTabs,
-  getBookingStatusQueryParams,
+  getBookingListQueryParams,
   type BookingStatusTabKey,
 } from '@/components/bookings/booking-status-filters';
 
-const TABS = buildBookingStatusTabs('Ləğv / rədd');
+const TABS = buildBookingStatusTabs('Ləğv / imtina');
 
 export function CustomerBookingsPage() {
   const token = useAuthToken();
@@ -48,6 +54,7 @@ export function CustomerBookingsPage() {
   useBookingsRealtimeInvalidation(!!token);
   const [activeTab, setActiveTab] = useState<BookingStatusTabKey>('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [orderNumberSearch, setOrderNumberSearch] = useState('');
   const [actionId, setActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [messageLoadingId, setMessageLoadingId] = useState<string | null>(null);
@@ -60,16 +67,17 @@ export function CustomerBookingsPage() {
     serviceTitle: string;
   } | null>(null);
 
-  const statusParams = getBookingStatusQueryParams(activeTab, statusFilter, TABS);
+  const listParams = useMemo(
+    () => getBookingListQueryParams(activeTab, statusFilter, TABS, orderNumberSearch),
+    [activeTab, statusFilter, orderNumberSearch],
+  );
+  const hasOrderSearch = Boolean(listParams.search);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['bookings', activeTab, statusFilter],
-    queryFn: () =>
-      api.bookings(token!, {
-        limit: '50',
-        ...statusParams,
-      }),
+    queryKey: ['bookings', listParams],
+    queryFn: () => api.bookings(token!, listParams),
     enabled: !!token,
+    placeholderData: keepPreviousData,
     refetchInterval: 20_000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
@@ -173,6 +181,27 @@ export function CustomerBookingsPage() {
     },
   });
 
+  const skipProviderMutation = useMutation({
+    mutationFn: (id: string) => {
+      if (!token) throw new Error('Autentifikasiya tələb olunur');
+      return api.skipBookingProvider(token, id);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      void queryClient.invalidateQueries({ queryKey: BOOKING_ATTENTION_QUERY_KEY });
+      setActionId(null);
+      setActionError(null);
+    },
+    onError: (error) => {
+      setActionId(null);
+      if (error instanceof ApiError) {
+        setActionError(error.message);
+      } else {
+        setActionError('Başqa xidmət verən axtarılarkən xəta baş verdi');
+      }
+    },
+  });
+
   const handleCancel = (booking: { id: string; serviceTitle: string }) => {
     setActionError(null);
     setCancelBooking(booking);
@@ -233,6 +262,7 @@ export function CustomerBookingsPage() {
         onTabChange={setActiveTab}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
+        onOrderNumberSearchChange={setOrderNumberSearch}
       />
 
       {isLoading && (
@@ -244,7 +274,9 @@ export function CustomerBookingsPage() {
       {!isLoading && data?.items.length === 0 && (
         <Card>
           <CardContent className="py-16 text-center text-muted-foreground">
-            Bu kateqoriyada sifariş yoxdur
+            {hasOrderSearch
+              ? 'Bu nömrəyə uyğun sifariş tapılmadı'
+              : 'Bu kateqoriyada sifariş yoxdur'}
           </CardContent>
         </Card>
       )}
@@ -254,6 +286,11 @@ export function CustomerBookingsPage() {
           const isInstantPending =
             booking.type === BookingType.INSTANT &&
             booking.status === BookingStatus.PENDING;
+          const isInstantUnassigned = isInstantPending && !booking.acceptedAt;
+          const canSkipProvider = isInstantProviderSkippable(
+            booking.type,
+            booking.status,
+          );
           const isPending = booking.status === BookingStatus.PENDING;
 
           return (
@@ -342,38 +379,20 @@ export function CustomerBookingsPage() {
                     {booking.status === BookingStatus.COMPLETED && booking.hasReview && (
                       <Badge variant="success">Rəy verildi</Badge>
                     )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={messageLoadingId === booking.id}
+                    <BookingMessageButton
+                      status={booking.status}
+                      loading={messageLoadingId === booking.id}
                       onClick={() => handleMessage(booking.id)}
-                    >
-                      {messageLoadingId === booking.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <MessageSquare className="h-4 w-4" />
-                          Mesaj yaz
-                        </>
-                      )}
-                    </Button>
-                    <Link
-                      href={`/dashboard/customer/bookings/${booking.id}`}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-sm hover:bg-muted"
-                    >
-                      <MapPin className="h-4 w-4" />
-                      {isTrackableBookingStatus(booking.status)
-                        ? 'Canlı izlə'
-                        : 'Ətraflı'}
-                    </Link>
+                    />
                   </div>
                 </div>
 
                 <div className="mt-1.5 space-y-1.5 text-sm">
+                  <BookingOrderNumber value={booking.orderNumber} />
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-foreground">Sifariş növü:</span>
                     {booking.type === BookingType.INSTANT ? (
-                      <Badge className="bg-brand text-sm text-brand-foreground">
+                      <Badge className="bg-brand px-1.5 py-0 text-sm font-normal leading-5 text-brand-foreground">
                         {BOOKING_TYPE_LABELS[BookingType.INSTANT]}
                       </Badge>
                     ) : (
@@ -384,28 +403,40 @@ export function CustomerBookingsPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-foreground">Sifarişin statusu:</span>
-                    <span className={BOOKING_STATUS_TEXT_CLASSES[booking.status]}>
-                      {BOOKING_STATUS_LABELS[booking.status]}
-                    </span>
+                    <BookingStatusBadge
+                      booking={booking}
+                      className="px-1.5 py-0 text-sm font-normal leading-5"
+                    />
                   </div>
+                  {!isInstantUnassigned && (
+                    <BookingProviderName
+                      providerId={booking.providerId}
+                      providerName={booking.providerName}
+                      rating={booking.providerRating}
+                      reviewCount={booking.providerReviewCount}
+                      showRating={isBookingProviderRatingVisible(
+                        booking.type,
+                        booking.acceptedAt,
+                      )}
+                    />
+                  )}
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-foreground">Xidmət verən:</span>
-                    <span className="text-muted-foreground">{booking.providerName}</span>
-                  </div>
-                  {booking.type !== BookingType.INSTANT && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-foreground">Tarix:</span>
+                    <span className="text-foreground">Tarix və saat:</span>
                       <span className="text-muted-foreground">
-                        {formatDateTime(booking.scheduledAt)}
+                        {formatBookingDateTime(booking)}
+                      </span>
+                  </div>
+                  {isBookingPriceVisibleToCustomer(
+                    booking.status,
+                    booking.acceptedAt,
+                  ) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-foreground">Qiymət:</span>
+                      <span className="text-muted-foreground">
+                        {formatPrice(booking.totalPrice)}
                       </span>
                     </div>
                   )}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-foreground">Qiymət:</span>
-                    <span className="text-muted-foreground">
-                      {formatPrice(booking.totalPrice)}
-                    </span>
-                  </div>
                   {booking.notes && (
                     <div className="flex items-start gap-2">
                       <span className="shrink-0 text-foreground">Qeyd:</span>
@@ -424,23 +455,35 @@ export function CustomerBookingsPage() {
                         </span>
                       </div>
                     )}
+                  <BookingAddressBlock
+                    address={booking.address}
+                    destLat={booking.destLat}
+                    destLng={booking.destLng}
+                  />
                 </div>
 
-                {isInstantPending && (
-                  <InstantWaitingCard
-                    createdAt={booking.createdAt}
-                    onCancel={() =>
-                      handleCancel({
-                        id: booking.id,
-                        serviceTitle: booking.serviceTitle,
-                      })
-                    }
-                    cancelDisabled={actionId === booking.id}
-                    cancelPending={
-                      actionId === booking.id && updateMutation.isPending
-                    }
-                  />
+                {canSkipProvider && (
+                  <div className="mt-3">
+                    <InstantSkipProviderCard
+                      providerId={booking.providerId}
+                      providerName={booking.providerName}
+                      providerRating={booking.providerRating}
+                      providerReviewCount={booking.providerReviewCount}
+                      skipCount={booking.dispatchSkipCount}
+                      maxSkips={DISPATCH.MAX_CUSTOMER_PROVIDER_SKIPS}
+                      pending={
+                        actionId === booking.id && skipProviderMutation.isPending
+                      }
+                      disabled={actionId === booking.id}
+                      onSkip={() => {
+                        setActionError(null);
+                        setActionId(booking.id);
+                        skipProviderMutation.mutate(booking.id);
+                      }}
+                    />
+                  </div>
                 )}
+
                 {booking.proposedScheduledAt &&
                   booking.status === BookingStatus.PENDING && (
                     <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 dark:border-amber-700/50 dark:bg-amber-950/30">
@@ -451,13 +494,15 @@ export function CustomerBookingsPage() {
                             Xidmət verən yeni tarix təklif edib
                           </p>
                           <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
-                            Təklif olunan tarix:{' '}
+                            Təklif olunan tarix və saat:{' '}
                             <strong>
                               {formatDateTime(booking.proposedScheduledAt)}
                             </strong>
                           </p>
                           <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                            Mesajı oxumaq üçün «Mesaj yaz» düyməsindən istifadə edin.
+                            Təklifi yuxarıdakı düymələrlə təsdiq və ya rədd edə
+                            bilərsiniz. Mesaj yazmaq xidmət verən sifarişi qəbul
+                            etdikdən sonra aktiv olacaq.
                           </p>
                         </div>
                       </div>
@@ -470,18 +515,28 @@ export function CustomerBookingsPage() {
                     </p>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={booking.imageUrl}
+                      src={toDisplayMediaUrl(booking.imageUrl)}
                       alt="Görüləcək işin şəkli"
                       className="max-h-48 max-w-full rounded-xl border border-border object-contain"
                     />
                   </div>
                 )}
-                <BookingAddressBlock
-                  className="mt-3 text-sm"
-                  address={booking.address}
-                  destLat={booking.destLat}
-                  destLng={booking.destLng}
-                />
+                {isInstantPending && (
+                  <InstantWaitingCard
+                    createdAt={booking.createdAt}
+                    searchStartedAt={booking.dispatchWindowStartedAt}
+                    onCancel={() =>
+                      handleCancel({
+                        id: booking.id,
+                        serviceTitle: booking.serviceTitle,
+                      })
+                    }
+                    cancelDisabled={actionId === booking.id}
+                    cancelPending={
+                      actionId === booking.id && updateMutation.isPending
+                    }
+                  />
+                )}
               </CardContent>
             </Card>
           );

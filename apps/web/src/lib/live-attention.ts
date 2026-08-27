@@ -1,6 +1,6 @@
-import { UserRole } from '@xidmetal/shared';
+import { parseBookingOrderNumberSearch, UserRole } from '@xidmetal/shared';
 
-export type LiveAttentionKind = 'message' | 'booking' | 'admin';
+export type LiveAttentionKind = 'message' | 'booking' | 'admin' | 'service';
 
 /** Görünən tabda daha tez, arxa planda da dayandırılmadan poll */
 export const LIVE_POLL_VISIBLE_MS = 4_000;
@@ -59,13 +59,27 @@ export function dashboardServicesPath(): string {
   return '/dashboard/provider/services';
 }
 
+/** Eyni sifariş nömrəsi bir qrup; fərqli nömrələr ayrı bildiriş. */
+export function bookingAttentionGroupKey(
+  title: string | null | undefined,
+  body: string | null | undefined,
+  fallbackId: string | null | undefined,
+): string {
+  const parsed = parseBookingOrderNumberSearch(`${title ?? ''} ${body ?? ''}`);
+  if (parsed?.type === 'equals') {
+    return `booking-${parsed.value}`;
+  }
+  if (fallbackId) return `booking-${fallbackId}`;
+  return `booking-${Date.now()}`;
+}
+
 /** Mobil cihazlarda qısa vibrasiya (dəstəklənirsə). */
 export function vibrateAttention(kind: LiveAttentionKind): void {
   if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
   try {
     if (kind === 'booking') {
       navigator.vibrate([80, 40, 80, 40, 120]);
-    } else if (kind === 'admin') {
+    } else if (kind === 'admin' || kind === 'service') {
       navigator.vibrate([100, 50, 100]);
     } else {
       navigator.vibrate([60, 30, 60]);

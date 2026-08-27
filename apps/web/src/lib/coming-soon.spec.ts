@@ -6,6 +6,8 @@ describe('isComingSoonExemptPath', () => {
     expect(isComingSoonExemptPath('/dashboard/provider')).toBe(true);
     expect(isComingSoonExemptPath('/login')).toBe(true);
     expect(isComingSoonExemptPath('/register')).toBe(true);
+    expect(isComingSoonExemptPath('/mail/unsubscribe')).toBe(true);
+    expect(isComingSoonExemptPath('/logo.png')).toBe(true);
   });
 
   it('açıq marketplace səhifələri bağlanır', () => {

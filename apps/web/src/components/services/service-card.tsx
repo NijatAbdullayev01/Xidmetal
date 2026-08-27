@@ -8,6 +8,7 @@ import {
   formatCargoRouteScope,
   formatServiceVenue,
   ServiceVenue,
+  toDisplayMediaUrl,
 } from '@xidmetal/shared';
 import { formatPrice, cn } from '@/lib/utils';
 import { ServiceOrderButton } from '@/components/services/service-order-button';
@@ -36,7 +37,7 @@ function ProviderAvatar({
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={avatarUrl}
+        src={toDisplayMediaUrl(avatarUrl)}
         alt={`${name} profil şəkli`}
         className="h-11 w-11 rounded-full object-cover"
       />

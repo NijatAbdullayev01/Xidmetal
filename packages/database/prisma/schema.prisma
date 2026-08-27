@@ -212,6 +212,10 @@ model Service {
   submittedAt DateTime? @map("submitted_at")
   /** Son admin qərarı (təsdiq / düzəliş) */
   reviewedAt  DateTime? @map("reviewed_at")
+  /** Düzəliş istənəndəki məzmun barmaq izi — yoxlamaya göndərmək üçün dəyişməlidir */
+  revisionBaselineHash String? @map("revision_baseline_hash")
+  /** Xidmət verən məzmunu düzəlişdən sonra dəyişəndə doldurulur */
+  revisionEditedAt     DateTime? @map("revision_edited_at")
   providerId  String        @map("provider_id")
   categoryId  String        @map("category_id")
   createdAt   DateTime      @default(now()) @map("created_at")
@@ -305,6 +309,8 @@ enum BookingType {
 
 model Booking {
   id                  String        @id @default(uuid())
+  /** İstifadəçiyə görünən dəyişməz nömrə (XM-YY-NNNNNN); daxili PK UUID qalır */
+  orderNumber         String        @unique @default(dbgenerated("next_booking_order_number()")) @map("order_number") @db.VarChar(20)
   serviceId           String        @map("service_id")
   customerId          String        @map("customer_id")
   providerId          String        @map("provider_id")
@@ -337,6 +343,12 @@ model Booking {
   startedAt    DateTime?    @map("started_at")
   /** IN_PROGRESS → COMPLETED */
   completedAt  DateTime?    @map("completed_at")
+  /** INSTANT axtarış pəncərəsi (yoxdursa createdAt). Skip sonrası yenilənir. */
+  dispatchWindowStartedAt DateTime? @map("dispatch_window_started_at")
+  /** Müştəri qəbul olunmuş icraçını neçə dəfə buraxıb */
+  dispatchSkipCount       Int       @default(0) @map("dispatch_skip_count")
+  /** INSTANT filtrləri (minRating/minPrice/maxPrice/serviceCity) — skip sonrası saxlanır */
+  dispatchPrefs           Json?     @map("dispatch_prefs")
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
@@ -438,6 +450,7 @@ enum DispatchOfferStatus {
   REJECTED
   EXPIRED
   CANCELLED
+  SKIPPED
 }
 
 model DispatchOffer {
@@ -563,6 +576,10 @@ enum NotificationType {
   MESSAGE_RECEIVED
   /// Platforma / admin tərəfindən göndərilən bildirişlər (zəng ikonu)
   ADMIN_ANNOUNCEMENT
+  /// Admin xidməti təsdiqlədi — Xidmətlərim (inbox yox)
+  SERVICE_APPROVED
+  /// Admin xidməti düzəlişə göndərdi — Xidmətlərim (inbox yox)
+  SERVICE_NEEDS_REVISION
 }
 
 // ─── Şikayətlər ──────────────────────────────────────────────────────────────

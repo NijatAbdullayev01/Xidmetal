@@ -68,8 +68,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function CategoryPage({ params }: CategoryPageProps) {
-  const { slug } = await params;
+async function CategoryPageBody({ slug }: { slug: string }) {
   const data = await loadCategoryData(slug);
 
   if (!data) {
@@ -78,9 +77,15 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
   const { category, services } = data;
 
+  return <CategoryContent category={category} services={services} />;
+}
+
+export default async function CategoryPage({ params }: CategoryPageProps) {
+  const { slug } = await params;
+
   return (
     <Suspense fallback={<CategoryPageSkeleton />}>
-      <CategoryContent category={category} services={services} />
+      <CategoryPageBody slug={slug} />
     </Suspense>
   );
 }

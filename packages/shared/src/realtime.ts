@@ -97,7 +97,7 @@ export interface DispatchOfferExpiredPayload {
 export interface DispatchOfferResultPayload {
   offerId: string;
   bookingId: string;
-  status: 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
+  status: 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED' | 'SKIPPED';
   providerId?: string;
 }
 

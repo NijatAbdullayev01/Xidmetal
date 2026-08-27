@@ -194,7 +194,7 @@ Keçidlər shared `booking-lifecycle` + `bookings.service` rol matrisi ilə yoxl
 ### Gələcək
 - **Search:** Elasticsearch/Meilisearch (cari: Postgres `contains` / ilike filtrləri)
 - **Payment:** real Stripe checkout / live charge (məhsul qərarı; flag ON) — scaffolding mövcuddur
-- **Email:** managed provider (SendGrid/Resend); cari SMTP production-da işləyir
+- **Email:** SMTP (Resend) + SPF/DKIM/DMARC; [EMAIL.md](./EMAIL.md)
 - **Mobile:** React Native (`apps/mobile`) — yalnız tam runnable app; plan: [MOBILE.md](./MOBILE.md)
 - **Orchestration:** K8s/Vercel — compose + GHCR artıq var
 

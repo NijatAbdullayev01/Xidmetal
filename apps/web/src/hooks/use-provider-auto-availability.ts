@@ -50,8 +50,6 @@ export function useProviderAutoAvailability(enabled = true) {
     queryKey: ['users', 'me'],
     queryFn: () => api.users.me(token!),
     enabled: enabled && !!token && role === UserRole.PROVIDER,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
     refetchInterval: (query) => {
       const profile = query.state.data?.providerProfile;
       if (profile && !profile.isVerified) return PROVIDER_VERIFICATION_POLL_MS;

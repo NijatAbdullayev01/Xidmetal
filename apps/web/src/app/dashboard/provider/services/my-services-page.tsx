@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Loader2, Pencil, PlusCircle, Trash2, X } from 'lucide-react';
-import { ServiceStatus } from '@xidmetal/shared';
+import { ServiceStatus, canSubmitServiceForReview } from '@xidmetal/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button, buttonStyles } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,7 @@ import {
 import { useState } from 'react';
 import { ProviderVerificationBanner } from '@/components/provider/provider-verification-banner';
 import { PROVIDER_VERIFICATION_POLL_MS } from '@/lib/live-attention';
+import { useAckServiceNotifications } from '@/hooks/use-ack-service-notifications';
 
 interface DeleteTarget {
   id: string;
@@ -33,6 +34,8 @@ export function MyServicesPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
+  useAckServiceNotifications(!!token);
+
   const { data: me } = useQuery({
     queryKey: ['users', 'me'],
     queryFn: () => api.users.me(token!),
@@ -44,8 +47,7 @@ export function MyServicesPage() {
     queryKey: ['services', 'mine'],
     queryFn: () => api.myServices(token!, { limit: '50' }),
     enabled: !!token,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    placeholderData: keepPreviousData,
     refetchInterval: (query) => {
       const items = query.state.data?.items;
       if (!items?.length) return false;
@@ -194,6 +196,11 @@ export function MyServicesPage() {
         {data?.items.map((service) => {
           const hasBookingHistory = (service.bookingCount ?? 0) > 0;
           const hasActiveBookings = (service.activeBookingCount ?? 0) > 0;
+          const needsRevision = service.status === ServiceStatus.NEEDS_REVISION;
+          const canSubmit = canSubmitServiceForReview({
+            status: service.status,
+            hasRevisionEdits: service.hasRevisionEdits === true,
+          });
 
           return (
           <Card key={service.id}>
@@ -208,14 +215,6 @@ export function MyServicesPage() {
                 <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
                   {service.description}
                 </p>
-                {service.status === ServiceStatus.NEEDS_REVISION && service.reviewNote ? (
-                  <p
-                    className="mt-2 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-100"
-                    role="status"
-                  >
-                    Admin qeydi: {service.reviewNote}
-                  </p>
-                ) : null}
                 {service.status === ServiceStatus.PENDING_REVIEW ? (
                   <p className="mt-2 text-sm text-muted-foreground">
                     Admin yoxlamasındadır — təsdiqdən sonra müştərilərə görünəcək.
@@ -231,6 +230,14 @@ export function MyServicesPage() {
                   </span>
                   <span>Yaradılıb: {formatDate(service.createdAt)}</span>
                 </div>
+                {needsRevision && service.reviewNote ? (
+                  <p
+                    className="mt-2 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-100"
+                    role="status"
+                  >
+                    Moderator qeydi: {service.reviewNote}
+                  </p>
+                ) : null}
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -246,11 +253,13 @@ export function MyServicesPage() {
                   service.status === ServiceStatus.NEEDS_REVISION) && (
                   <Button
                     size="sm"
-                    disabled={actionId === service.id || !isVerified}
+                    disabled={actionId === service.id || !isVerified || !canSubmit}
                     title={
                       !isVerified
                         ? 'Yoxlamaya göndərmək üçün hesab təsdiqi lazımdır'
-                        : undefined
+                        : !canSubmit
+                          ? 'Əvvəlcə düzəlişi yadda saxlayın, sonra yoxlamaya göndərin'
+                          : undefined
                     }
                     onClick={() => handleSubmitForReview(service.id)}
                   >

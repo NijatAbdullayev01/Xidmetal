@@ -7,6 +7,7 @@ import { DashboardSidebar } from '@/components/layout/dashboard-sidebar';
 import { ProviderPresenceSync } from '@/components/provider/provider-presence-sync';
 import { ProviderTripLocationSync } from '@/components/provider/provider-trip-location-sync';
 import { usePresenceHeartbeat } from '@/hooks/use-presence-heartbeat';
+import { useDashboardPrefetch } from '@/hooks/use-dashboard-prefetch';
 import { cn } from '@/lib/utils';
 
 const FULL_WIDTH_ROUTES = ['/dashboard/provider/services/new'];
@@ -15,6 +16,7 @@ const FILL_VIEWPORT_ROUTES = ['/dashboard/provider/messages'];
 export function ProviderDashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   usePresenceHeartbeat(true);
+  useDashboardPrefetch('provider');
   const isFullWidth = FULL_WIDTH_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
   );

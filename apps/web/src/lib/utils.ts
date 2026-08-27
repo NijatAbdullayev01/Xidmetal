@@ -18,50 +18,11 @@ export function formatPrice(amount: number, currency = 'AZN'): string {
   return `${formatted} ${currency}`;
 }
 
-const AZ_MONTHS = [
-  'yanvar',
-  'fevral',
-  'mart',
-  'aprel',
-  'may',
-  'iyun',
-  'iyul',
-  'avqust',
-  'sentyabr',
-  'oktyabr',
-  'noyabr',
-  'dekabr',
-] as const;
-
-/** Tarixi Azərbaycan formatında göstərir: «12 iyul 2026» */
-export function formatDate(date: string | Date): string {
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) {
-    return '—';
-  }
-
-  const day = parsed.getDate();
-  const month = AZ_MONTHS[parsed.getMonth()];
-  const year = parsed.getFullYear();
-
-  return `${day} ${month} ${year}`;
-}
-
-/** Tarix və saatı Azərbaycan formatında göstərir */
-export function formatDateTime(date: string | Date): string {
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) {
-    return '—';
-  }
-
-  const datePart = formatDate(parsed);
-  const timePart = new Intl.DateTimeFormat('az-AZ', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(parsed);
-
-  return `${datePart}, ${timePart}`;
-}
+export {
+  formatAzDate as formatDate,
+  formatAzDateTime as formatDateTime,
+  formatAzTime as formatTimeInBaku,
+} from '@xidmetal/shared';
 
 /** datetime-local input üçün lokal vaxt */
 export function toDateTimeLocalValue(date: string | Date): string {
@@ -84,35 +45,3 @@ export function combineDateAndTime(date: string, time: string): string {
   return combined.toISOString();
 }
 
-/** ETA saniyəsini qısa AZ mətnə çevirir: «4 dəq», «1 saat 12 dəq». */
-export function formatEta(seconds: number | null | undefined): string | null {
-  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return null;
-  const totalMin = Math.max(0, Math.round(seconds / 60));
-  if (totalMin < 1) return '1 dəq-dən az';
-  if (totalMin < 60) return `${totalMin} dəq`;
-  const hours = Math.floor(totalMin / 60);
-  const mins = totalMin % 60;
-  if (mins === 0) return `${hours} saat`;
-  return `${hours} saat ${mins} dəq`;
-}
-
-/** Məsafəni qısa AZ mətnə çevirir. */
-export function formatDistanceMeters(meters: number | null | undefined): string | null {
-  if (meters == null || !Number.isFinite(meters) || meters < 0) return null;
-  if (meters < 1000) return `${Math.round(meters)} m`;
-  const km = meters / 1000;
-  return `${km < 10 ? km.toFixed(1) : Math.round(km)} km`;
-}
-
-/** ISO datetime-dan Asia/Baku HH:mm */
-export function formatTimeInBaku(iso: string | Date): string {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Baku',
-  }).formatToParts(new Date(iso));
-  const hour = parts.find((part) => part.type === 'hour')?.value ?? '00';
-  const minute = parts.find((part) => part.type === 'minute')?.value ?? '00';
-  return `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
-}

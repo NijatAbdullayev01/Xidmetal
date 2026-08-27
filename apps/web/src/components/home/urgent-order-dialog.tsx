@@ -2,32 +2,37 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Loader2, Radio, X } from 'lucide-react';
+import { Camera, Loader2, Radio, Trash2, X } from 'lucide-react';
 import {
+  BAKU_CITY,
   BookingType,
   ProviderAvailability,
   UserRole,
+  isCompleteBookingLocation,
   locationsServeSameCity,
-  matchCatalogLocationFromText,
+  toDisplayMediaUrl,
   type CategorySummary,
   type ServiceSummary,
 } from '@xidmetal/shared';
-import { LocationMapPicker } from '@/components/geo/location-map-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LocationPicker } from '@/components/ui/location-picker';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, uploadImage } from '@/lib/api';
 import { getServiceTypesForCategory } from '@/lib/service-types';
 import { composeBookingAddress } from '@/lib/booking-address';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
+
+const MAX_IMAGE_SIZE_BYTES = 1 * 1024 * 1024;
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 const RATING_OPTIONS = [
   { value: '', label: 'Fərq etməz' },
@@ -46,8 +51,18 @@ const urgentOrderSchema = z
     notes: z
       .string()
       .trim()
-      .min(1, 'Qeyd yazın')
       .max(1000, 'Qeyd maksimum 1000 simvol ola bilər'),
+    serviceLocation: z
+      .string()
+      .trim()
+      .min(1, 'Şəhər və ya rayon seçin')
+      .refine(
+        (value) => isCompleteBookingLocation(value),
+        (value) => ({
+          message:
+            value.trim() === BAKU_CITY ? 'Bakı rayonu seçin' : 'Şəhər və ya rayon seçin',
+        }),
+      ),
     address: z
       .string()
       .trim()
@@ -56,8 +71,6 @@ const urgentOrderSchema = z
     addressBlock: z.string().trim().max(30, 'Blok maksimum 30 simvol ola bilər').optional(),
     addressFloor: z.string().trim().max(20, 'Mərtəbə maksimum 20 simvol ola bilər').optional(),
     addressDoor: z.string().trim().max(30, 'Qapı maksimum 30 simvol ola bilər').optional(),
-    destLat: z.string().optional(),
-    destLng: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     const composed = composeBookingAddress({
@@ -65,41 +78,13 @@ const urgentOrderSchema = z
       block: data.addressBlock,
       floor: data.addressFloor,
       door: data.addressDoor,
+      location: data.serviceLocation,
     });
     if (composed.length > 500) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Yazılı ünvan və detallar birlikdə maksimum 500 simvol ola bilər',
         path: ['address'],
-      });
-    }
-
-    const lat = data.destLat?.trim() ? Number(data.destLat) : NaN;
-    const lng = data.destLng?.trim() ? Number(data.destLng) : NaN;
-    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Mövqenizi paylaşın və ya xəritədən seçin',
-        path: ['destLat'],
-      });
-    }
-    if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Mövqenizi paylaşın və ya xəritədən seçin',
-        path: ['destLng'],
-      });
-    }
-
-    if (
-      data.address?.trim() &&
-      !matchCatalogLocationFromText(data.address)
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          'Mövqedən şəhər/rayon müəyyən olunmadı. Xəritədən yenidən seçin',
-        path: ['destLat'],
       });
     }
 
@@ -190,8 +175,13 @@ export function UrgentOrderDialog({
   initialCategories,
 }: UrgentOrderDialogProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const idempotencyKeyRef = useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imagePreview, setImagePreview] = useState<string | undefined>();
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
 
   const {
     register,
@@ -211,26 +201,18 @@ export function UrgentOrderDialog({
       minPrice: '',
       maxPrice: '',
       notes: '',
+      serviceLocation: '',
       address: '',
       addressBlock: '',
       addressFloor: '',
       addressDoor: '',
-      destLat: '',
-      destLng: '',
     },
   });
 
   const categoryId = watch('categoryId');
   const serviceType = watch('serviceType');
-  const address = watch('address');
-  const destLat = watch('destLat');
-  const destLng = watch('destLng');
-
-  /** Konum ünvanından şəhər/rayon — Bakı daxili rayonlar ümumi Bakı kimi sayılır */
-  const serviceLocation = useMemo(
-    () => (address?.trim() ? matchCatalogLocationFromText(address) : null),
-    [address],
-  );
+  const serviceLocation = watch('serviceLocation');
+  const locationReady = isCompleteBookingLocation(serviceLocation ?? '');
 
   const categoriesQuery = useQuery({
     queryKey: ['urgent-order-categories'],
@@ -251,16 +233,20 @@ export function UrgentOrderDialog({
   }, [selectedCategory]);
 
   const servicesQuery = useQuery({
-    queryKey: ['urgent-order-services', categoryId],
+    queryKey: ['urgent-order-services', categoryId, serviceType, serviceLocation],
     queryFn: async () => {
       const page = await api.services({
         categoryId,
         page: '1',
-        limit: '100',
+        limit: '50',
+        ...(serviceType ? { title: serviceType } : {}),
+        ...(serviceLocation && isCompleteBookingLocation(serviceLocation)
+          ? { location: serviceLocation }
+          : {}),
       });
       return page.items;
     },
-    enabled: open && !!categoryId,
+    enabled: open && !!categoryId && !!serviceType,
   });
 
   const minRatingValue = watch('minRating');
@@ -269,7 +255,7 @@ export function UrgentOrderDialog({
 
   const matchedServices = useMemo(() => {
     const services = servicesQuery.data ?? [];
-    if (!serviceType || !serviceLocation) return [] as ServiceSummary[];
+    if (!serviceType || !locationReady) return [] as ServiceSummary[];
     const minRating = parseOptionalRating(minRatingValue);
     const minPrice = parseOptionalPrice(minPriceValue);
     const maxPrice = parseOptionalPrice(maxPriceValue);
@@ -286,6 +272,7 @@ export function UrgentOrderDialog({
     servicesQuery.data,
     serviceType,
     serviceLocation,
+    locationReady,
     minRatingValue,
     minPriceValue,
     maxPriceValue,
@@ -318,7 +305,7 @@ export function UrgentOrderDialog({
       maxPriceParsed,
     ],
     queryFn: () => {
-      if (!serviceLocation) {
+      if (!locationReady) {
         return Promise.resolve({ count: 0 });
       }
       return api.geo.onlineCount({
@@ -330,7 +317,7 @@ export function UrgentOrderDialog({
         ...(maxPriceParsed !== null ? { maxPrice: maxPriceParsed } : {}),
       });
     },
-    enabled: open && !!categoryId && !!serviceType && !!serviceLocation,
+    enabled: open && !!categoryId && !!serviceType && locationReady,
     refetchInterval: 15_000,
     retry: 2,
     refetchOnMount: 'always',
@@ -350,14 +337,16 @@ export function UrgentOrderDialog({
       maxPrice: '',
       minPrice: '',
       notes: '',
+      serviceLocation: '',
       address: '',
       addressBlock: '',
       addressFloor: '',
       addressDoor: '',
-      destLat: '',
-      destLng: '',
     });
     idempotencyKeyRef.current = null;
+    setImagePreview(undefined);
+    setImageError(null);
+    setImageUploading(false);
     clearErrors();
   }, [open, reset, clearErrors]);
 
@@ -377,17 +366,36 @@ export function UrgentOrderDialog({
         throw new Error('Sifariş vermək üçün e-poçtunuzu təsdiqləyin');
       }
 
-      const services = servicesQuery.data ?? [];
       const minRating = parseOptionalRating(values.minRating);
       const minPrice = parseOptionalPrice(values.minPrice);
       const maxPrice = parseOptionalPrice(values.maxPrice);
-      const resolvedLocation = matchCatalogLocationFromText(values.address);
-      if (!resolvedLocation) {
+      const resolvedLocation = values.serviceLocation.trim();
+      if (!isCompleteBookingLocation(resolvedLocation)) {
         throw new Error(
-          'Mövqedən şəhər/rayon müəyyən olunmadı. Xəritədən yenidən seçin.',
+          resolvedLocation === BAKU_CITY
+            ? 'Bakı rayonu seçin'
+            : 'Şəhər və ya rayon seçin',
         );
       }
-      const matched = services.filter((s) =>
+      const listing = await queryClient.fetchQuery({
+        queryKey: [
+          'urgent-order-services',
+          values.categoryId,
+          values.serviceType,
+          resolvedLocation,
+        ],
+        queryFn: async () => {
+          const page = await api.services({
+            categoryId: values.categoryId,
+            page: '1',
+            limit: '50',
+            title: values.serviceType,
+            location: resolvedLocation,
+          });
+          return page.items;
+        },
+      });
+      const matched = listing.filter((s) =>
         matchesFilters(s, {
           serviceType: values.serviceType,
           serviceLocation: resolvedLocation,
@@ -410,26 +418,21 @@ export function UrgentOrderDialog({
             : `urgent-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       }
 
-      const destLatNum = Number(values.destLat);
-      const destLngNum = Number(values.destLng);
-
       return api.createBooking(
         token,
         {
           serviceId: seed.id,
-          notes: values.notes.trim(),
+          notes: values.notes.trim() || undefined,
+          imageUrl: imagePreview,
           address: composeBookingAddress({
             street: values.address,
             block: values.addressBlock,
             floor: values.addressFloor,
             door: values.addressDoor,
+            location: resolvedLocation,
           }),
           serviceLocation: resolvedLocation,
           type: BookingType.INSTANT,
-          destLat: destLatNum,
-          destLng: destLngNum,
-          originLat: destLatNum,
-          originLng: destLngNum,
           ...(minRating !== null ? { minRating } : {}),
           ...(minPrice !== null ? { minPrice } : {}),
           ...(maxPrice !== null ? { maxPrice } : {}),
@@ -455,21 +458,61 @@ export function UrgentOrderDialog({
   });
 
   const isSubmitting = createMutation.isPending;
+  const canSubmit =
+    !isSubmitting &&
+    !imageUploading &&
+    !(!!categoryId && !!serviceType && locationReady && servicesQuery.isPending);
+
+  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setImageError(null);
+
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type as (typeof ACCEPTED_IMAGE_TYPES)[number])) {
+      setImageError('Yalnız JPG, PNG və ya WEBP formatı qəbul edilir');
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      setImageError('Şəkil maksimum 1 MB ola bilər');
+      return;
+    }
+
+    const token = useAuthStore.getState().session ? 'session' : null;
+    if (!token) {
+      setImageError('Şəkil yükləmək üçün daxil olun');
+      return;
+    }
+
+    setImageUploading(true);
+    try {
+      const url = await uploadImage(token, file, 'bookings');
+      setImagePreview(url);
+    } catch (error) {
+      setImageError(error instanceof ApiError ? error.message : 'Şəkil yüklənmədi');
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleImageRemove = () => {
+    setImagePreview(undefined);
+    setImageError(null);
+  };
 
   const onSubmit = (values: UrgentOrderFormValues) => {
     clearErrors('root');
     createMutation.mutate(values);
   };
 
-  const latNum = destLat?.trim() ? Number(destLat) : null;
-  const lngNum = destLng?.trim() ? Number(destLng) : null;
-
   return (
     <Modal
       open={open}
       onClose={onClose}
       title="Təcili sifariş"
-      description="Kateqoriya, xidmət növü və meyarları seçib ani sifariş yaradın"
+      description="Kateqoriya, xidmət növü və meyarları seçib təcili sifariş yaradın"
       panelClassName="max-w-xl max-h-[min(94dvh,820px)]"
     >
       <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
@@ -542,6 +585,105 @@ export function UrgentOrderDialog({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="urgent-location">Şəhər və ya rayon</Label>
+            <LocationPicker
+              id="urgent-location"
+              value={serviceLocation ?? ''}
+              onChange={(next) =>
+                setValue('serviceLocation', next, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                })
+              }
+              disabled={isSubmitting}
+              error={!!errors.serviceLocation}
+              clearable={false}
+              requireBakuDistrict
+            />
+            {errors.serviceLocation ? (
+              <p className="text-sm text-destructive" role="alert">
+                {errors.serviceLocation.message}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Bakı seçəndə inzibati rayon da seçilməlidir, sonra küçə ünvanını yazın.
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="urgent-address">Yazılı ünvan</Label>
+            <Input
+              id="urgent-address"
+              placeholder={
+                locationReady
+                  ? 'məs. Nizami küçəsi 12'
+                  : 'Əvvəlcə şəhər və ya rayon seçin'
+              }
+              disabled={isSubmitting || !locationReady}
+              error={!!errors.address}
+              {...register('address')}
+            />
+            {errors.address ? (
+              <p className="text-sm text-destructive" role="alert">
+                {errors.address.message}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="urgent-address-block">Blok</Label>
+              <Input
+                id="urgent-address-block"
+                placeholder="məs. 5"
+                disabled={isSubmitting || !locationReady}
+                error={!!errors.addressBlock}
+                autoComplete="off"
+                {...register('addressBlock')}
+              />
+              {errors.addressBlock ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {errors.addressBlock.message}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="urgent-address-floor">Mərtəbə</Label>
+              <Input
+                id="urgent-address-floor"
+                placeholder="məs. 3"
+                disabled={isSubmitting || !locationReady}
+                error={!!errors.addressFloor}
+                autoComplete="off"
+                inputMode="numeric"
+                {...register('addressFloor')}
+              />
+              {errors.addressFloor ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {errors.addressFloor.message}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="urgent-address-door">Qapı</Label>
+              <Input
+                id="urgent-address-door"
+                placeholder="məs. 14"
+                disabled={isSubmitting || !locationReady}
+                error={!!errors.addressDoor}
+                autoComplete="off"
+                {...register('addressDoor')}
+              />
+              {errors.addressDoor ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {errors.addressDoor.message}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="urgent-rating">Minimum reytinq</Label>
             <Select
               id="urgent-rating"
@@ -597,10 +739,10 @@ export function UrgentOrderDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="urgent-notes">Qeyd</Label>
+            <Label htmlFor="urgent-notes">Qeyd (istəyə bağlı)</Label>
             <Textarea
               id="urgent-notes"
-              placeholder="Nə lazımdır, təciliilik və digər detallar…"
+              placeholder="Xidmət verənə əlavə məlumat yazın"
               disabled={isSubmitting}
               error={!!errors.notes}
               {...register('notes')}
@@ -613,103 +755,65 @@ export function UrgentOrderDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="urgent-address">Yazılı ünvan</Label>
-            <Input
-              id="urgent-address"
-              placeholder="Xəritədən seçilən yazılı ünvan"
-              disabled={isSubmitting}
-              error={!!errors.address}
-              {...register('address')}
+            <Label htmlFor="urgent-image">İşin şəkli (istəyə bağlı)</Label>
+            <p className="text-sm text-muted-foreground">
+              Görüləcək işi göstərən şəkil əlavə edin. JPG, PNG və ya WEBP, maksimum 1 MB.
+            </p>
+            <input
+              ref={fileInputRef}
+              id="urgent-image"
+              type="file"
+              accept={ACCEPTED_IMAGE_TYPES.join(',')}
+              className="hidden"
+              disabled={isSubmitting || imageUploading}
+              onChange={(event) => void handleImageSelect(event)}
             />
-            {errors.address ? (
+            {imagePreview ? (
+              <div className="relative overflow-hidden rounded-xl border border-border bg-muted">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={toDisplayMediaUrl(imagePreview)}
+                  alt="Görüləcək işin şəkli"
+                  className="max-h-48 w-full object-contain"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="absolute right-2 top-2 min-h-[44px] bg-background/90"
+                  disabled={isSubmitting || imageUploading}
+                  onClick={handleImageRemove}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Sil
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-[44px] w-full sm:w-auto"
+                disabled={isSubmitting || imageUploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {imageUploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    Yüklənir…
+                  </>
+                ) : (
+                  <>
+                    <Camera className="h-4 w-4" />
+                    Şəkil əlavə et
+                  </>
+                )}
+              </Button>
+            )}
+            {imageError ? (
               <p className="text-sm text-destructive" role="alert">
-                {errors.address.message}
+                {imageError}
               </p>
             ) : null}
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="urgent-address-block">Blok</Label>
-              <Input
-                id="urgent-address-block"
-                placeholder="məs. 5"
-                disabled={isSubmitting}
-                error={!!errors.addressBlock}
-                autoComplete="off"
-                {...register('addressBlock')}
-              />
-              {errors.addressBlock ? (
-                <p className="text-sm text-destructive" role="alert">
-                  {errors.addressBlock.message}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="urgent-address-floor">Mərtəbə</Label>
-              <Input
-                id="urgent-address-floor"
-                placeholder="məs. 3"
-                disabled={isSubmitting}
-                error={!!errors.addressFloor}
-                autoComplete="off"
-                inputMode="numeric"
-                {...register('addressFloor')}
-              />
-              {errors.addressFloor ? (
-                <p className="text-sm text-destructive" role="alert">
-                  {errors.addressFloor.message}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="urgent-address-door">Qapı</Label>
-              <Input
-                id="urgent-address-door"
-                placeholder="məs. 14"
-                disabled={isSubmitting}
-                error={!!errors.addressDoor}
-                autoComplete="off"
-                {...register('addressDoor')}
-              />
-              {errors.addressDoor ? (
-                <p className="text-sm text-destructive" role="alert">
-                  {errors.addressDoor.message}
-                </p>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Mövqe</Label>
-            <LocationMapPicker
-              lat={latNum != null && Number.isFinite(latNum) ? latNum : null}
-              lng={lngNum != null && Number.isFinite(lngNum) ? lngNum : null}
-              disabled={isSubmitting}
-              autoLocate
-              onChange={({ lat, lng, address: nextAddress }) => {
-                setValue('destLat', String(lat), {
-                  shouldValidate: true,
-                  shouldDirty: true,
-                });
-                setValue('destLng', String(lng), {
-                  shouldValidate: true,
-                  shouldDirty: true,
-                });
-                if (nextAddress?.trim()) {
-                  setValue('address', nextAddress.trim(), {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  });
-                }
-                clearErrors(['destLat', 'destLng', 'address']);
-              }}
-            />
-            {(errors.destLat || errors.destLng) && (
-              <p className="text-sm text-destructive" role="alert">
-                {errors.destLat?.message ?? errors.destLng?.message}
-              </p>
-            )}
           </div>
 
           {errors.root ? (
@@ -728,7 +832,7 @@ export function UrgentOrderDialog({
           )}
         >
           <UrgentOnlineStatus
-            ready={!!categoryId && !!serviceType && !!serviceLocation}
+            ready={!!categoryId && !!serviceType && locationReady}
             loading={
               (onlineCountQuery.isPending && !servicesQuery.isSuccess) ||
               (servicesQuery.isPending && onlineProviderCount == null)
@@ -739,7 +843,7 @@ export function UrgentOrderDialog({
           <Button
             type="submit"
             size="lg"
-            disabled={isSubmitting || matchingCount === 0}
+            disabled={!canSubmit}
             className="w-full min-h-11 sm:w-auto"
           >
             {isSubmitting ? (

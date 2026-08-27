@@ -33,5 +33,6 @@ export function useReviewNotifications(enabled = true) {
     attentionCount: data?.count ?? 0,
     latestUnreadId: data?.latestUnreadId ?? null,
     latestUnreadAt: data?.latestUnreadAt ?? null,
+    latestTitle: data?.latestTitle ?? null,
   };
 }

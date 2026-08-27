@@ -3,15 +3,17 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   ProviderAvailability,
+  formatBookingDateTime,
   type BookingSummary,
 } from '@xidmetal/shared';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { api } from '@/lib/api';
+import { formatBookingAddressDisplay } from '@/lib/booking-address';
 import {
   ACTIVE_BOOKING_TAB_STATUSES,
   BOOKING_STATUS_LABELS,
 } from '@/lib/provider-labels';
-import { cn, formatDateTime } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 type DutyState = 'loading' | 'unverified' | 'online' | 'offline' | 'busy';
 
@@ -168,7 +170,7 @@ function BusyBookingSummary({
   const meta = [
     booking.customerName,
     BOOKING_STATUS_LABELS[booking.status],
-    formatDateTime(booking.scheduledAt),
+    formatBookingDateTime(booking),
   ]
     .filter(Boolean)
     .join(' · ');
@@ -179,7 +181,7 @@ function BusyBookingSummary({
       <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">{meta}</p>
       {booking.address ? (
         <p className="mt-0.5 truncate text-xs text-muted-foreground sm:text-sm">
-          Yazılı ünvan: {booking.address}
+          Yazılı ünvan: {formatBookingAddressDisplay(booking.address)}
         </p>
       ) : null}
     </div>

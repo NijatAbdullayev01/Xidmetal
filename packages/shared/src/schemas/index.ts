@@ -266,7 +266,11 @@ export const createBookingSchema = withOptionalCoordPairs(
     serviceId: z.string().uuid(),
     /** SCHEDULED üçün məcburi; INSTANT-da opsional (server ofset təyin edir) */
     scheduledAt: z.string().datetime().optional(),
-    notes: z.string().trim().min(1, 'Qeyd yazın').max(1000),
+    notes: z
+      .string()
+      .trim()
+      .max(1000, 'Qeyd maksimum 1000 simvol ola bilər')
+      .optional(),
     address: z.string().trim().min(1, 'Yazılı ünvan daxil edin').max(500).optional(),
     imageUrl: imageUrlSchema.optional(),
     /** Default SCHEDULED. INSTANT → avto-dispatch (Faza 4). */
@@ -302,16 +306,11 @@ export const createBookingSchema = withOptionalCoordPairs(
     }
   }
   if (type === BookingType.INSTANT) {
-    const hasDest =
-      data.destLat !== undefined &&
-      data.destLat !== null &&
-      data.destLng !== undefined &&
-      data.destLng !== null;
-    if (!hasDest) {
+    if (!data.address?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Ani sifariş üçün təyinat koordinatları məcburidir',
-        path: ['destLat'],
+        message: 'Yazılı ünvan daxil edin',
+        path: ['address'],
       });
     }
     if (data.serviceLocation && !isAzerbaijanLocation(data.serviceLocation)) {
@@ -366,6 +365,7 @@ export const onlineProvidersCountQuerySchema = z.object({
   minRating: z.coerce.number().min(0).max(5).optional(),
   minPrice: z.coerce.number().min(0).optional(),
   maxPrice: z.coerce.number().min(0).optional(),
+  serviceLocation: z.string().trim().min(1).max(120).optional(),
 });
 
 export const geocodeQuerySchema = z.object({
@@ -640,6 +640,7 @@ export const adminServicesQuerySchema = paginationSchema.extend({
 
 export const adminBookingsQuerySchema = paginationSchema.extend({
   status: z.nativeEnum(BookingStatus).optional(),
+  search: z.string().max(32).optional(),
 });
 
 export const adminReviewsQuerySchema = paginationSchema.extend({

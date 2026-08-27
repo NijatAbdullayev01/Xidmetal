@@ -9,21 +9,22 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { ArrowRight, Camera, Loader2, Trash2, X } from 'lucide-react';
 import {
   AvailabilitySlotStatus,
+  BAKU_CITY,
   BookingType,
-  isValidCoordinates,
+  isCompleteBookingLocation,
   type ServiceSummary,
 } from '@xidmetal/shared';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LocationPicker } from '@/components/ui/location-picker';
 import { Modal } from '@/components/ui/modal';
 import { Textarea } from '@/components/ui/textarea';
 import { TimePicker, type TimePickerOption } from '@/components/ui/time-picker';
 import { api, ApiError, uploadImage } from '@/lib/api';
 import { composeBookingAddress } from '@/lib/booking-address';
 import { useAuthStore } from '@/store/auth.store';
-import { LocationMapPicker } from '@/components/geo/location-map-picker';
 import { cn, combineDateAndTime, formatPrice, formatTimeInBaku } from '@/lib/utils';
 import { getPriceUnitLabel } from '@/lib/provider-labels';
 
@@ -40,8 +41,22 @@ function createBookServiceFormSchema(requireAddress: boolean) {
       notes: z
         .string()
         .trim()
-        .min(1, 'Qeyd yazın')
         .max(1000, 'Qeyd maksimum 1000 simvol ola bilər'),
+      serviceLocation: requireAddress
+        ? z
+            .string()
+            .trim()
+            .min(1, 'Şəhər və ya rayon seçin')
+            .refine(
+              (value) => isCompleteBookingLocation(value),
+              (value) => ({
+                message:
+                  value.trim() === BAKU_CITY
+                    ? 'Bakı rayonu seçin'
+                    : 'Şəhər və ya rayon seçin',
+              }),
+            )
+        : z.string().optional(),
       address: requireAddress
         ? z
             .string()
@@ -52,8 +67,6 @@ function createBookServiceFormSchema(requireAddress: boolean) {
       addressBlock: z.string().trim().max(30, 'Blok maksimum 30 simvol ola bilər').optional(),
       addressFloor: z.string().trim().max(20, 'Mərtəbə maksimum 20 simvol ola bilər').optional(),
       addressDoor: z.string().trim().max(30, 'Qapı maksimum 30 simvol ola bilər').optional(),
-      destLat: z.string().optional(),
-      destLng: z.string().optional(),
     })
     .superRefine((data, ctx) => {
       if (requireAddress || data.address?.trim()) {
@@ -62,23 +75,13 @@ function createBookServiceFormSchema(requireAddress: boolean) {
           block: data.addressBlock,
           floor: data.addressFloor,
           door: data.addressDoor,
+          location: data.serviceLocation,
         });
         if (composed.length > 500) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: 'Yazılı ünvan və detallar birlikdə maksimum 500 simvol ola bilər',
             path: ['address'],
-          });
-        }
-      }
-      if (requireAddress) {
-        const lat = data.destLat?.trim() ? Number(data.destLat) : NaN;
-        const lng = data.destLng?.trim() ? Number(data.destLng) : NaN;
-        if (!isValidCoordinates(lat, lng)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'Mövqeyi xəritədən seçin',
-            path: ['destLat'],
           });
         }
       }
@@ -123,21 +126,18 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
       date: '',
       time: '',
       notes: '',
+      serviceLocation: '',
       address: '',
       addressBlock: '',
       addressFloor: '',
       addressDoor: '',
-      destLat: '',
-      destLng: '',
     },
   });
 
   const selectedDate = watch('date');
   const selectedTime = watch('time');
-  const destLatValue = watch('destLat');
-  const destLngValue = watch('destLng');
-  const latNum = destLatValue?.trim() ? Number(destLatValue) : null;
-  const lngNum = destLngValue?.trim() ? Number(destLngValue) : null;
+  const serviceLocation = watch('serviceLocation');
+  const locationReady = isCompleteBookingLocation(serviceLocation ?? '');
   const today = useMemo(() => {
     const now = new Date();
     const year = now.getFullYear();
@@ -182,12 +182,11 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
       date: '',
       time: '',
       notes: '',
+      serviceLocation: '',
       address: '',
       addressBlock: '',
       addressFloor: '',
       addressDoor: '',
-      destLat: '',
-      destLng: '',
     });
     setImagePreview(undefined);
     setImageError(null);
@@ -235,24 +234,19 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
             block: values.addressBlock,
             floor: values.addressFloor,
             door: values.addressDoor,
+            location: values.serviceLocation,
           })
         : undefined;
-
-      const destLat = values.destLat?.trim() ? Number(values.destLat) : NaN;
-      const destLng = values.destLng?.trim() ? Number(values.destLng) : NaN;
-      const hasDest = isValidCoordinates(destLat, destLng);
 
       return api.createBooking(
         token,
         {
           serviceId: service.id,
           scheduledAt,
-          notes: values.notes.trim(),
+          notes: values.notes.trim() || undefined,
           address,
           imageUrl: imagePreview,
           type: BookingType.SCHEDULED,
-          destLat: hasDest ? destLat : undefined,
-          destLng: hasDest ? destLng : undefined,
         },
         { idempotencyKey },
       );
@@ -430,12 +424,45 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
 
           {requireAddress && (
             <div className="space-y-2">
+              <Label htmlFor={`booking-location-${service.id}`}>Şəhər və ya rayon</Label>
+              <LocationPicker
+                id={`booking-location-${service.id}`}
+                value={serviceLocation ?? ''}
+                onChange={(next) =>
+                  setValue('serviceLocation', next, {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  })
+                }
+                disabled={isSubmitting}
+                error={!!errors.serviceLocation}
+                clearable={false}
+                requireBakuDistrict
+              />
+              {errors.serviceLocation ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {errors.serviceLocation.message}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Bakı seçəndə inzibati rayon da seçilməlidir, sonra küçə ünvanını yazın.
+                </p>
+              )}
+            </div>
+          )}
+
+          {requireAddress && (
+            <div className="space-y-2">
               <Label htmlFor={`booking-address-${service.id}`}>Yazılı ünvan</Label>
               <Input
                 id={`booking-address-${service.id}`}
-                placeholder="Xəritədən seçilən yazılı ünvan"
+                placeholder={
+                  locationReady
+                    ? 'məs. Nizami küçəsi 12'
+                    : 'Əvvəlcə şəhər və ya rayon seçin'
+                }
                 error={!!errors.address}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !locationReady}
                 {...register('address')}
               />
               {errors.address && (
@@ -454,7 +481,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
                   id={`booking-address-block-${service.id}`}
                   placeholder="məs. 5"
                   error={!!errors.addressBlock}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !locationReady}
                   autoComplete="off"
                   {...register('addressBlock')}
                 />
@@ -470,7 +497,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
                   id={`booking-address-floor-${service.id}`}
                   placeholder="məs. 3"
                   error={!!errors.addressFloor}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !locationReady}
                   autoComplete="off"
                   inputMode="numeric"
                   {...register('addressFloor')}
@@ -487,7 +514,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
                   id={`booking-address-door-${service.id}`}
                   placeholder="məs. 14"
                   error={!!errors.addressDoor}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !locationReady}
                   autoComplete="off"
                   {...register('addressDoor')}
                 />
@@ -500,42 +527,10 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
             </div>
           )}
 
-          {requireAddress && (
-            <div className="space-y-2">
-              <Label>Mövqe</Label>
-              <LocationMapPicker
-                lat={latNum != null && Number.isFinite(latNum) ? latNum : null}
-                lng={lngNum != null && Number.isFinite(lngNum) ? lngNum : null}
-                disabled={isSubmitting}
-                autoLocate
-                onChange={({ lat, lng, address: nextAddress }) => {
-                  setValue('destLat', String(lat), {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  });
-                  setValue('destLng', String(lng), {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  });
-                  if (nextAddress?.trim()) {
-                    setValue('address', nextAddress.trim(), {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    });
-                  }
-                  clearErrors(['destLat', 'destLng', 'address']);
-                }}
-              />
-              {(errors.destLat || errors.destLng) && (
-                <p className="text-sm text-destructive" role="alert">
-                  {errors.destLat?.message ?? errors.destLng?.message}
-                </p>
-              )}
-            </div>
-          )}
-
           <div className="space-y-2">
-            <Label htmlFor={`booking-notes-${service.id}`}>Qeyd</Label>
+            <Label htmlFor={`booking-notes-${service.id}`}>
+              Qeyd (istəyə bağlı)
+            </Label>
             <Textarea
               id={`booking-notes-${service.id}`}
               rows={3}

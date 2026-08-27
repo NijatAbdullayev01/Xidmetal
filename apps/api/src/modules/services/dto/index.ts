@@ -230,4 +230,21 @@ export class ServiceQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({ description: 'Xidmət başlığı (dəqiq uyğunluq)' })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  title?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Xidmət ərazisi. Bakı daxili rayonlar ümumi Bakı kimi süzülür.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  location?: string;
 }

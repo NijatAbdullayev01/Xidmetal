@@ -11,6 +11,14 @@ export interface DispatchCandidate {
   rating: number;
 }
 
+/** INSTANT dispatch filtrləri — booking-də JSON kimi saxlanır */
+export interface DispatchBookingPrefs {
+  minRating?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  serviceCity?: string;
+}
+
 /** Rediscovery istisnası üçün offer sətiri */
 export interface DispatchOfferExclusionInput {
   providerId: string;
@@ -71,6 +79,10 @@ export function providersExcludedFromRedispatch(
       exclude.add(providerId);
       continue;
     }
+    if (providerOffers.some((o) => o.status === 'SKIPPED')) {
+      exclude.add(providerId);
+      continue;
+    }
 
     const rejectedTimes = providerOffers
       .filter((o) => o.status === 'REJECTED')
@@ -88,15 +100,14 @@ export function providersExcludedFromRedispatch(
       continue;
     }
 
-    // CANCELLED / EXPIRED və s. — yenidən göndərmə
-    exclude.add(providerId);
+    // CANCELLED / EXPIRED — yeni təklif göndərilə bilər (məs. müştəri skip)
   }
 
   return exclude;
 }
 
 /**
- * Axtarış pəncərəsi hələ açıqdırmı (booking.createdAt + SEARCH_WINDOW_SEC).
+ * Axtarış pəncərəsi hələ açıqdırmı (windowStart + SEARCH_WINDOW_SEC).
  */
 export function isDispatchSearchWindowOpen(
   createdAt: Date,
@@ -105,6 +116,45 @@ export function isDispatchSearchWindowOpen(
 ): boolean {
   if (!Number.isFinite(searchWindowSec) || searchWindowSec <= 0) return false;
   return now.getTime() < createdAt.getTime() + searchWindowSec * 1000;
+}
+
+/**
+ * INSTANT axtarış pəncərəsinin başlanğıcı.
+ * Skip sonrası `dispatchWindowStartedAt` istifadə olunur.
+ */
+export function dispatchSearchWindowStart(
+  createdAt: Date,
+  dispatchWindowStartedAt?: Date | null,
+): Date {
+  return dispatchWindowStartedAt ?? createdAt;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+/**
+ * Booking.dispatchPrefs JSON-unu təmizləyir.
+ */
+export function parseDispatchPrefs(raw: unknown): DispatchBookingPrefs | null {
+  if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return null;
+  }
+  const record = raw as Record<string, unknown>;
+  const prefs: DispatchBookingPrefs = {};
+  if (isFiniteNumber(record.minRating) && record.minRating >= 0) {
+    prefs.minRating = record.minRating;
+  }
+  if (isFiniteNumber(record.minPrice) && record.minPrice >= 0) {
+    prefs.minPrice = record.minPrice;
+  }
+  if (isFiniteNumber(record.maxPrice) && record.maxPrice >= 0) {
+    prefs.maxPrice = record.maxPrice;
+  }
+  if (typeof record.serviceCity === 'string' && record.serviceCity.trim()) {
+    prefs.serviceCity = record.serviceCity.trim();
+  }
+  return Object.keys(prefs).length > 0 ? prefs : null;
 }
 
 /**

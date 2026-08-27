@@ -65,6 +65,7 @@ export function Header() {
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
       <Link
         href={user ? getDashboardPath(user.role) : '/dashboard'}
+        prefetch
         className="relative flex items-center justify-center gap-2 rounded-md border !border-[#000000] px-3 py-2.5 text-sm font-medium hover:bg-brand-dark/20 sm:justify-start sm:py-2"
         aria-label={
           hasAttention ? `${user?.firstName ?? 'Profil'} — ${attentionLabel}` : undefined
@@ -122,6 +123,7 @@ export function Header() {
           <ThemeToggle className="text-brand-foreground hover:bg-brand-dark/20 hover:text-brand-foreground" />
           <Link
             href={profileHref}
+            prefetch
             className="relative rounded-md p-2 transition-colors hover:bg-brand-dark/20"
             aria-label={
               authed

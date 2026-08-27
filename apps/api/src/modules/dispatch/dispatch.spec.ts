@@ -81,10 +81,12 @@ describe('dispatch redispatch exclusion', () => {
       { providerId: 'a', status: 'PENDING' },
       { providerId: 'b', status: 'ACCEPTED', respondedAt: new Date() },
       { providerId: 'c', status: 'CANCELLED', respondedAt: new Date() },
+      { providerId: 'd', status: 'SKIPPED', respondedAt: new Date() },
     ]);
     expect(exclude.has('a')).toBe(true);
     expect(exclude.has('b')).toBe(true);
-    expect(exclude.has('c')).toBe(true);
+    expect(exclude.has('c')).toBe(false);
+    expect(exclude.has('d')).toBe(true);
     expect(exclude.has('new')).toBe(false);
   });
 
@@ -149,6 +151,62 @@ describe('dispatch redispatch exclusion', () => {
     ).toBe(false);
   });
 
+  it('skip sonrası axtarış pəncərəsi dispatchWindowStartedAt-dən sayılır', async () => {
+    const { dispatchSearchWindowStart, isDispatchSearchWindowOpen } =
+      await import('@xidmetal/shared');
+    const createdAt = new Date('2026-08-11T10:00:00.000Z');
+    const skippedAt = new Date('2026-08-11T10:12:00.000Z');
+    const windowStart = dispatchSearchWindowStart(createdAt, skippedAt);
+    expect(
+      isDispatchSearchWindowOpen(
+        windowStart,
+        new Date('2026-08-11T10:15:00.000Z'),
+        600,
+      ),
+    ).toBe(true);
+    expect(
+      isDispatchSearchWindowOpen(
+        createdAt,
+        new Date('2026-08-11T10:15:00.000Z'),
+        600,
+      ),
+    ).toBe(false);
+  });
+
+  it('parseDispatchPrefs yalnız etibarlı ədədləri saxlayır', async () => {
+    const { parseDispatchPrefs } = await import('@xidmetal/shared');
+    expect(parseDispatchPrefs(null)).toBeNull();
+    expect(
+      parseDispatchPrefs({
+        minRating: 4,
+        minPrice: 10,
+        maxPrice: 40,
+        serviceCity: 'Bakı',
+        extra: true,
+      }),
+    ).toEqual({
+      minRating: 4,
+      minPrice: 10,
+      maxPrice: 40,
+      serviceCity: 'Bakı',
+    });
+    expect(parseDispatchPrefs({ minRating: '4' })).toBeNull();
+  });
+
+  it('CONFIRMED INSTANT skippable, EN_ROUTE deyil', async () => {
+    const { isInstantProviderSkippable, BookingStatus, BookingType } =
+      await import('@xidmetal/shared');
+    expect(
+      isInstantProviderSkippable(BookingType.INSTANT, BookingStatus.CONFIRMED),
+    ).toBe(true);
+    expect(
+      isInstantProviderSkippable(BookingType.INSTANT, BookingStatus.EN_ROUTE),
+    ).toBe(false);
+    expect(
+      isInstantProviderSkippable(BookingType.SCHEDULED, BookingStatus.CONFIRMED),
+    ).toBe(false);
+  });
+
   it('BullMQ custom job ids must not contain colon', () => {
     const bookingId = '7d7a3b7e-a539-492e-9982-015e21441ad5';
     const providerId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
@@ -180,9 +238,17 @@ describe('INSTANT vs SCHEDULED create contract', () => {
     expect(missingDate.success).toBe(false);
   });
 
-  it('INSTANT requires dest coords and allows omitting scheduledAt', async () => {
+  it('INSTANT requires address and allows omitting scheduledAt', async () => {
     const { createBookingSchema, BookingType } = await import('@xidmetal/shared');
     const ok = createBookingSchema.safeParse({
+      serviceId: '11111111-1111-1111-1111-111111111111',
+      notes: 'İndi gəlin',
+      type: BookingType.INSTANT,
+      address: 'Bakı',
+    });
+    expect(ok.success).toBe(true);
+
+    const withCoords = createBookingSchema.safeParse({
       serviceId: '11111111-1111-1111-1111-111111111111',
       notes: 'İndi gəlin',
       type: BookingType.INSTANT,
@@ -190,13 +256,31 @@ describe('INSTANT vs SCHEDULED create contract', () => {
       destLng: 49.8671,
       address: 'Bakı',
     });
-    expect(ok.success).toBe(true);
+    expect(withCoords.success).toBe(true);
 
-    const noCoords = createBookingSchema.safeParse({
+    const noAddress = createBookingSchema.safeParse({
       serviceId: '11111111-1111-1111-1111-111111111111',
       notes: 'İndi gəlin',
       type: BookingType.INSTANT,
     });
-    expect(noCoords.success).toBe(false);
+    expect(noAddress.success).toBe(false);
+  });
+
+  it('qeyd opsionaldır — boş və ya yoxdursa qəbul edilir', async () => {
+    const { createBookingSchema, BookingType } = await import('@xidmetal/shared');
+    const omitted = createBookingSchema.safeParse({
+      serviceId: '11111111-1111-1111-1111-111111111111',
+      scheduledAt: '2026-09-01T10:00:00.000Z',
+      type: BookingType.SCHEDULED,
+    });
+    expect(omitted.success).toBe(true);
+
+    const empty = createBookingSchema.safeParse({
+      serviceId: '11111111-1111-1111-1111-111111111111',
+      scheduledAt: '2026-09-01T10:00:00.000Z',
+      notes: '   ',
+      type: BookingType.SCHEDULED,
+    });
+    expect(empty.success).toBe(true);
   });
 });

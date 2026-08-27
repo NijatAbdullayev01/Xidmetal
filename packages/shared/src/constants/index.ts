@@ -63,6 +63,11 @@ export const DISPATCH = {
   MAX_ACTIVE_OFFERS: 500,
   /** Namizəd limiti (eyni xidmət növü + şəhər) */
   MAX_CANDIDATES: 500,
+  /**
+   * Müştəri qəbul olunmuş təcili sifarişdə neçə dəfə
+   * «başqa xidmət verən axtar» edə bilər.
+   */
+  MAX_CUSTOMER_PROVIDER_SKIPS: 5,
 } as const;
 
 /** Ödəniş (Faza 5) — default OFF; live charge yoxdur */

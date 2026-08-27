@@ -190,11 +190,12 @@ Həftəlik iş saatlarını yenilə.
 
 ### GET /bookings 🔒
 
-Sifarişlər siyahısı (rol üzrə filtr). Query: `page`, `limit`, `status`.
+Sifarişlər siyahısı (rol üzrə filtr). Query: `page`, `limit`, `status`, `statuses`, `search` (sifariş nömrəsi: tam `XM-26-000421`, prefiks və ya son 3–8 rəqəm).
+Cavabda hər sifarişin `id` (UUID) və avtomatik `orderNumber` sahəsi var (`XM-26-000421`).
 
 ### GET /bookings/:id 🔒
 
-Sifariş detalları — yalnız iştirakçı və ya ADMIN.
+Sifariş detalları — yalnız iştirakçı və ya ADMIN. `:id` UUID və ya sifariş nömrəsi ola bilər.
 
 ### POST /bookings 🔒 CUSTOMER (+ email verified)
 
@@ -209,11 +210,11 @@ Sifariş detalları — yalnız iştirakçı və ya ADMIN.
 }
 ```
 
-Header: `Idempotency-Key` (opsional, tövsiyə — double-submit / INSTANT təkrarını eyni sifarişə bağlayır).
+`notes` opsionaldır (boş və ya yoxdursa saxlanılmır). Header: `Idempotency-Key` (opsional, tövsiyə — double-submit / INSTANT təkrarını eyni sifarişə bağlayır).
 
 Slot `availability` ilə yoxlanır (transaction + `pg_advisory_xact_lock`) — **yalnız SCHEDULED**. E-poçt təsdiqi + təsdiqlənmiş provider tələb olunur. Opsional `type`: `SCHEDULED` (default) | `INSTANT`.
 
-**INSTANT:** `destLat`/`destLng` məcburi; `serviceLocation` (şəhər/rayon kataloqu) tövsiyə olunur — yoxdursa seed xidmətin `location` və ya ünvan mətnindən çıxarılır; `scheduledAt` opsional (server ~15 dəq ofset); slot lock yoxdur; create sonrası `dispatch` **eyni xidmət şəhəri** + yaxın ONLINE xidmət verənlərə offer göndərir. Bakı daxili rayonlar (`Bakı, Nəsimi rayonu` və s.) ümumi **Bakı** kimi sayılır — Lerik kimi digər rayonlara ötürülmür.
+**INSTANT:** `address` məcburi; `destLat`/`destLng` opsional (yoxdursa ünvan geokodlaşdırılır); `serviceLocation` (şəhər/rayon kataloqu) tövsiyə olunur — yoxdursa seed xidmətin `location` və ya ünvan mətnindən çıxarılır; `scheduledAt` opsional (server ~15 dəq ofset); slot lock yoxdur; create sonrası `dispatch` **eyni xidmət şəhəri** + yaxın ONLINE xidmət verənlərə offer göndərir. Bakı daxili rayonlar (`Bakı, Nəsimi rayonu` və s.) ümumi **Bakı** kimi sayılır — Lerik kimi digər rayonlara ötürülmür.
 
 Opsional geo (SCHEDULED): `destLat`/`destLng`, `originLat`/`originLng` (cüt göndərilməlidir; ünvan string qalır).
 
@@ -225,6 +226,10 @@ Opsional geo (SCHEDULED): `destLat`/`destLng`, `originLat`/`originLng` (cüt gö
 | POST | `/dispatch/offers/:id/accept` | Qəbul → booking CONFIRMED (race-safe) |
 | POST | `/dispatch/offers/:id/reject` | Rədd → 2 dəq sonra eyni xidmət verənə yenidən təklif (pəncərə açıqsa) |
 | GET | `/dispatch/offers?bookingId=` | Admin: sifariş üzrə bütün təkliflər |
+
+### POST /bookings/:id/skip-provider 🔒 CUSTOMER
+
+Qəbul olunmuş **INSTANT** icraçını buraxır (qiymət uyğun gəlməyəndə) və onlayn namizədlərə yenidən təklif göndərir. Yalnız `CONFIRMED` (iş başlamazdan əvvəl). Limit: 5. Cavab: yenilənmiş `BookingSummary` (`PENDING`).
 
 Env: `DISPATCH_SEARCH_WINDOW_SEC` (default 600), `DISPATCH_REDISCOVERY_INTERVAL_SEC` (default 30), `DISPATCH_DECLINE_REOFFER_COOLDOWN_SEC` (default 120 — imtina sonrası yenidən təklif), `REDIS_URL` (BullMQ; yoxdursa dev setTimeout). Tək təklif timeout yoxdur — eyni xidmət növü + şəhər üzrə ONLINE xidmət verənlərə fan-out; imtina edənə 2 dəq sonra yenidən təklif (pəncərə bitənə / qəbul olunana qədər); pəncərə bitəndə auto-cancel.
 
@@ -240,6 +245,8 @@ Env: `DISPATCH_SEARCH_WINDOW_SEC` (default 600), `DISPATCH_REDISCOVERY_INTERVAL_
 - Admin: bypass
 
 Lifecycle timestamp-lər: `acceptedAt`, `enRouteAt`, `arrivedAt`, `startedAt`, `completedAt`, `cancelledAt`.
+
+Müştəriyə sifariş e-poçtu: `CONFIRMED` (xidmət verən/admin təsdiqi və ya INSTANT offer accept) və `COMPLETED`. Digər statuslar in-app + push. Ləğv e-poçtu qarşı tərəfə gedir.
 
 ### PATCH /bookings/:id/reschedule 🔒 PROVIDER
 
@@ -275,7 +282,7 @@ Provider-ə gələn rəylər (default: `PENDING` + `APPROVED`). Query: `status`,
 
 ### POST /messages/conversations 🔒
 
-Söhbət aç / tap (customer–provider cütü).
+Söhbət aç / tap. `bookingId` ilə açılış yalnız xidmət verən sifarişi qəbul etdikdən sonra, tamamlanana qədər icazəlidir (`PENDING` / `REJECTED` / `CANCELLED` / `COMPLETED` yox; təcili və rezervasiya eyni qayda).
 
 ### GET /messages/conversations/:id 🔒
 
@@ -286,6 +293,8 @@ Soft-delete (yalnız öz siyahısından).
 ### GET /messages/conversations/:id/messages 🔒
 
 ### POST /messages/conversations/:id/messages 🔒
+
+Sifarişə bağlı söhbətdə göndərmə yalnız mesaj qapısı açıq olanda (`CONFIRMED`…`IN_PROGRESS`) icazəlidir; `COMPLETED` daxil terminal statuslarda bağlıdır.
 
 ### POST /messages/conversations/:id/read 🔒
 
@@ -362,7 +371,7 @@ brauzer client `withCredentials` + httpOnly cookie ilə qoşulur.
 | S→C | `message:new` | Chat: `user:{recipientId}` — `{ conversationId, messageId, senderId, preview, createdAt }` |
 | S→C | `dispatch:offer` / `dispatch:offer-expired` / `dispatch:offer-result` | Provider otağı / booking |
 
-Env: `NEXT_PUBLIC_WS_URL`, `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `GOOGLE_MAPS_API_KEY` (Directions), `MAPBOX_ACCESS_TOKEN` (opsional; boş = haversine ETA).
+Env: `NEXT_PUBLIC_WS_URL`, `GOOGLE_MAPS_API_KEY` (server Directions, opsional), `MAPBOX_ACCESS_TOKEN` (opsional; boş = haversine ETA).
 
 ---
 
@@ -370,7 +379,7 @@ Env: `NEXT_PUBLIC_WS_URL`, `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `GOOGLE_MAPS_API_K
 
 ### GET /notifications 🔒
 
-Yalnız admin/platforma elanları (`ADMIN_ANNOUNCEMENT`). Sifariş və mesaj bildirişləri bu siyahıda yoxdur.
+Yalnız admin/platforma elanları (`ADMIN_ANNOUNCEMENT`). Sifariş, mesaj və xidmət yoxlaması (təsdiq/düzəliş) bildirişləri bu siyahıda yoxdur.
 
 ### GET /notifications/unread-count 🔒
 
@@ -389,9 +398,10 @@ Yalnız admin inbox bildirişlərini oxundu edir.
 ### POST /notifications/booking-read-all 🔒
 
 > Booking/reschedule axınları DB-yə yazır. Admin platforma bildirişi: `POST /admin/announcements`.
-> **Kanal qaydası:** zəng / `/notifications` = yalnız `ADMIN_*`; sifariş = booking badge; mesaj = söhbət; rəy = review badge.
-> Emit olunanlar: `BOOKING_CREATED`, `BOOKING_CONFIRMED`, `BOOKING_REJECTED`, `BOOKING_CANCELLED`, `BOOKING_IN_PROGRESS`, `BOOKING_COMPLETED`, `BOOKING_RESCHEDULE_PROPOSED`, `BOOKING_RESCHEDULE_REJECTED` (tarix təklifi rədd — sifariş PENDING qalır), `REVIEW_RECEIVED`, `MESSAGE_RECEIVED` (söhbət üzrə dedupe), `ADMIN_ANNOUNCEMENT`. Admin `CONFIRMED`/`REJECTED` keçidləri də müştəriyə in-app bildiriş göndərir.
+> **Kanal qaydası:** zəng / `/notifications` = yalnız `ADMIN_*`; sifariş = booking badge; mesaj = söhbət; rəy = review badge; xidmət yoxlaması = Xidmətlərim.
 > Review unread: `GET/POST …/review-unread-count` / `review-read-all`.
+> Xidmət yoxlaması: `GET/POST …/service-unread-count` / `service-read-all` (`SERVICE_APPROVED`, `SERVICE_NEEDS_REVISION` — Xidmətlərim badge).
+> Emit olunanlar: `BOOKING_CREATED`, `BOOKING_CONFIRMED`, `BOOKING_REJECTED`, `BOOKING_CANCELLED`, `BOOKING_IN_PROGRESS`, `BOOKING_COMPLETED`, `BOOKING_RESCHEDULE_PROPOSED`, `BOOKING_RESCHEDULE_REJECTED` (tarix təklifi rədd — sifariş PENDING qalır), `REVIEW_RECEIVED`, `MESSAGE_RECEIVED` (söhbət üzrə dedupe), `ADMIN_ANNOUNCEMENT`, `SERVICE_APPROVED`, `SERVICE_NEEDS_REVISION`. Admin `CONFIRMED`/`REJECTED` keçidləri də müştəriyə in-app bildiriş göndərir.
 > In-app create-dən sonra best-effort **push** (DeviceToken + FCM/noop).
 
 ---
@@ -474,17 +484,19 @@ Body: `{ "status": "ACTIVE" | "PAUSED" | "ARCHIVED" | … }`. `ACTIVE` → `appr
 
 ### PATCH /admin/services/:id/approve
 
-Yoxlamada olan xidməti təsdiqləyir (`ACTIVE`), xidmət verənə bildiriş göndərir.
+Yoxlamada olan xidməti təsdiqləyir (`ACTIVE`), xidmət verənə `SERVICE_APPROVED` bildirişi göndərir (Xidmətlərim — Bildirişlər inbox-una düşmür).
 
 ### PATCH /admin/services/:id/request-revision
 
-Body: `{ "note": string }` (min 5). Status → `NEEDS_REVISION`; qeyd xidmət verənə görünür.
+Body: `{ "note": string }` (min 5). Status → `NEEDS_REVISION`; qeyd xidmət verənə görünür. `SERVICE_NEEDS_REVISION` bildirişi Xidmətlərim-ə düşür (Bildirişlər inbox-una yox). Məzmun barmaq izi saxlanılır — xidmət verən düzəlişi yadda saxlamadan yoxlamaya göndərə bilməz.
 
 ### POST /services/:id/submit-review
 
-Xidmət verən: `DRAFT` / `NEEDS_REVISION` → `PENDING_REVIEW`. Hesab təsdiqi məcburidir.
+Xidmət verən: `DRAFT` / `NEEDS_REVISION` → `PENDING_REVIEW`. Hesab təsdiqi məcburidir. `NEEDS_REVISION` üçün məzmun admin qeydindən sonra dəyişməlidir (`hasRevisionEdits`).
 
 ### GET /admin/bookings
+
+Query: `status`, `search` (sifariş nömrəsi, məs. `XM-26-000421`).
 
 ### GET /admin/reviews
 

@@ -42,7 +42,7 @@ export function useDispatchOffers(enabled = true) {
     if (!socket) return;
 
     const onOffer = (payload: DispatchOfferPayload) => {
-      setToast(`Yeni ani sifariş: ${payload.serviceTitle}`);
+      setToast(`Yeni təcili sifariş: ${payload.serviceTitle}`);
       invalidate();
     };
     const onExpired = () => {

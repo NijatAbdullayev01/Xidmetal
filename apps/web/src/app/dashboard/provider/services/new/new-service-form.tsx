@@ -17,6 +17,7 @@ import {
   CARGO_ROUTE_SCOPE_LABELS,
   formatVehicleDimensions,
   MAX_SERVICE_IMAGES,
+  toDisplayMediaUrl,
 } from '@xidmetal/shared';
 import { z } from 'zod';
 import {
@@ -783,7 +784,7 @@ export function NewServiceForm() {
                             >
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
-                                src={url}
+                                src={toDisplayMediaUrl(url)}
                                 alt={`Şəkil ${index + 1}`}
                                 className="h-full w-full object-cover"
                               />

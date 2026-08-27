@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toDisplayMediaUrl } from '@xidmetal/shared';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth.store';
@@ -84,7 +85,7 @@ export function AdminSidebar() {
       {user?.avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={user.avatarUrl}
+          src={toDisplayMediaUrl(user.avatarUrl)}
           alt={`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()}
           className="h-full w-full object-cover"
         />

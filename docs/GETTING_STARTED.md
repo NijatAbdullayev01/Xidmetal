@@ -52,7 +52,7 @@ cp .env.example .env
 | `NEXT_PUBLIC_API_URL` | Boş = cookie rewrite (local); prod-da API URL | `""` |
 | `NEXT_PUBLIC_APP_URL` | Marketplace URL | prod `http://localhost:3020`; **dev:** `http://localhost:3120` |
 | `NEXT_PUBLIC_ADMIN_URL` | Admin panel URL | prod `http://localhost:3021`; **dev:** `http://localhost:3121` |
-| `SMTP_*` | E-poçt (verify / şifrə bərpası). **Prod-da məcburi** | local-da boş olar |
+| `SMTP_*` | E-poçt (verify / sifariş). **Prod-da məcburi.** Spam: [EMAIL.md](./EMAIL.md) | `SMTP_FROM=mail@xidmetal.com` |
 | `STORAGE_DRIVER` | `local` və ya `s3` | `local` |
 | `STORAGE_PUBLIC_BASE_URL` | Yüklənən şəkillərin ictimai bazası | prod `http://localhost:4000/uploads`; **dev:** `:4100` |
 | `GEOCODER_PROVIDER` | `mock` və ya `nominatim` | `mock` |
@@ -61,7 +61,6 @@ cp .env.example .env
 | `NEXT_PUBLIC_WS_URL` | Socket.IO origin (birbaşa API) | prod `http://localhost:4000`; **dev:** `:4100` |
 | `GOOGLE_MAPS_API_KEY` | Server Directions ETA + traffic (boş = Mapbox/haversine) | `""` |
 | `MAPBOX_ACCESS_TOKEN` | Server Directions ETA (opsional; boş = Google/haversine) | `""` |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Google Maps JS (konum seçici + canlı tracking + client Directions; Directions API aktiv olsun) | `""` |
 | `DISPATCH_SEARCH_WINDOW_SEC` | Təcili sifariş axtarış pəncərəsi (saniyə); tək təklif timeout yox | `600` |
 | `DISPATCH_REDISCOVERY_INTERVAL_SEC` | Yeni ONLINE üçün yenidən axtarış intervalı | `30` |
 | `DISPATCH_DECLINE_REOFFER_COOLDOWN_SEC` | İmtina sonrası eyni xidmət verənə yenidən təklif gözləməsi | `120` |
@@ -125,6 +124,8 @@ TRUST_PROXY="true"
 ```
 
 Cloudflare DNS (proxied / orange cloud): `@`, `www`, `admin` → `77.42.42.63`. SSL/TLS: **Full** (origin self-signed kifayətdir). **Full (strict)** üçün Origin CA: `ops/certs/origin.pem` + `origin.key`. Dashboard: WebSockets ON, Always Use HTTPS ON.
+
+E-poçt spam qovluğu: eyni skript apex **SPF** + **DMARC** də qoyur. Resend DKIM və `SMTP_FROM=mail@xidmetal.com` — [EMAIL.md](./EMAIL.md).
 
 Ayrıca, boş 80/443 olan dedicated origin-də: `pnpm docker:prod:cloudflare`. Image-də `NEXT_PUBLIC_*` build-time-dır — domain dəyişəndə web/admin yenidən build/restart olunmalıdır.
 
@@ -268,6 +269,10 @@ Dev: `http://localhost:3120,http://localhost:3121`. Admin üçün `NEXT_PUBLIC_A
 ```bash
 pnpm db:generate
 ```
+
+### E-poçt spam qovluğuna düşür
+
+SPF/DKIM/DMARC və `SMTP_FROM=mail@xidmetal.com` — [EMAIL.md](./EMAIL.md). DNS: `CLOUDFLARE_API_TOKEN=… ./ops/cloudflare/provision-dns.sh`.
 
 ### node_modules problemləri
 

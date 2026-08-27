@@ -11,7 +11,13 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { CreateConversationDto, SendMessageDto } from './dto';
 import { clearTypingDb, isPeerTypingDb, setTypingDb } from './typing.store';
-import { UserRole, NotificationType } from '@xidmetal/shared';
+import {
+  UserRole,
+  NotificationType,
+  BookingStatus,
+  bookingMessagingBlockedMessage,
+  isBookingMessagingEnabled,
+} from '@xidmetal/shared';
 import { isBookingParticipant } from '../bookings/booking-access';
 import type {
   ConversationDetail,
@@ -35,7 +41,7 @@ type ConversationWithRelations = {
   updatedAt: Date;
   customer: { id: string; firstName: string; lastName: string; avatarUrl: string | null };
   provider: { id: string; firstName: string; lastName: string; avatarUrl: string | null };
-  booking: { service: { title: string } } | null;
+  booking: { status: string; service: { title: string } } | null;
   messages: Array<{
     id: string;
     conversationId: string;
@@ -134,7 +140,7 @@ export class MessagesService {
         include: {
           customer: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
           provider: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
-          booking: { select: { service: { select: { title: true } } } },
+          booking: { select: { status: true, service: { select: { title: true } } } },
           messages: {
             orderBy: { createdAt: 'desc' },
             take: 1,
@@ -184,7 +190,7 @@ export class MessagesService {
       include: {
         customer: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         provider: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
-        booking: { select: { service: { select: { title: true } } } },
+        booking: { select: { status: true, service: { select: { title: true } } } },
       },
     });
 
@@ -353,6 +359,7 @@ export class MessagesService {
         providerId: true,
         customerDeletedAt: true,
         providerDeletedAt: true,
+        booking: { select: { status: true } },
       },
     });
 
@@ -365,6 +372,8 @@ export class MessagesService {
     if (this.isHiddenForUser(conversation, userId)) {
       throw new NotFoundException('Söhbət tapılmadı');
     }
+
+    this.assertBookingAllowsMessaging(conversation.booking);
 
     await setTypingDb(this.prisma, conversationId, userId);
     return { ok: true as const };
@@ -438,6 +447,7 @@ export class MessagesService {
       if (!isBookingParticipant(userId, role, booking)) {
         throw new ForbiddenException('Bu sifarişə giriş icazəniz yoxdur');
       }
+      this.assertBookingAllowsMessaging(booking);
       customerId = booking.customerId;
       providerId = booking.providerId;
       bookingId = booking.id;
@@ -522,6 +532,7 @@ export class MessagesService {
   async sendMessage(conversationId: string, userId: string, dto: SendMessageDto) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
+      include: { booking: { select: { status: true } } },
     });
 
     if (!conversation) {
@@ -529,6 +540,7 @@ export class MessagesService {
     }
 
     this.assertParticipant(conversation, userId);
+    this.assertBookingAllowsMessaging(conversation.booking);
 
     const content = dto.content?.trim() ?? '';
     let imageUrl: string | null = null;
@@ -639,6 +651,13 @@ export class MessagesService {
     }
   }
 
+  private assertBookingAllowsMessaging(booking: { status: string } | null | undefined) {
+    if (!booking) return;
+    if (!isBookingMessagingEnabled(booking.status)) {
+      throw new BadRequestException(bookingMessagingBlockedMessage(booking.status));
+    }
+  }
+
   private mapPeerPresence(lastSeenAt: Date | null): PeerPresence {
     if (!lastSeenAt) {
       return { isOnline: false, lastSeenAt: null };
@@ -685,6 +704,7 @@ export class MessagesService {
       providerName: `${conv.provider.firstName} ${conv.provider.lastName}`,
       providerAvatarUrl: await this.storageService.toReadableMediaUrl(conv.provider.avatarUrl),
       bookingId: conv.bookingId ?? undefined,
+      bookingStatus: conv.booking?.status as BookingStatus | undefined,
       serviceTitle: conv.booking?.service.title,
       lastMessage: lastMsg?.imageUrl && lastMsg.content === '[Şəkil]' ? 'Şəkil' : lastMsg?.content,
       lastMessageAt: lastMsg?.createdAt.toISOString(),

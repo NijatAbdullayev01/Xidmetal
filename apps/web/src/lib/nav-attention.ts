@@ -8,6 +8,16 @@ export function formatNavAttentionAria(label: string, count: number): string | u
   return `${label}, ${count} gözləyən`;
 }
 
+/** Xidmətlərim: düzəliş növbəsi + oxunmamış təsdiq (düzəliş bildirişi status sayına daxildir). */
+export function providerServicesNavAttention(input: {
+  needsRevisionCount: number;
+  unreadApprovedCount: number;
+}): number {
+  const revision = Math.max(0, input.needsRevisionCount);
+  const approved = Math.max(0, input.unreadApprovedCount);
+  return revision + approved;
+}
+
 export interface AttentionSnapshot {
   id: string | null;
   at: string | null;

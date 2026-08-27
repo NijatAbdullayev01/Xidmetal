@@ -9,12 +9,18 @@ import { BookingsService } from './bookings.service';
 function bookingRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'b1',
+    orderNumber: 'XM-26-000001',
     serviceId: 's1',
     service: { title: 'Təmir' },
     customerId: 'cust-1',
     customer: { firstName: 'A', lastName: 'B', email: 'a@example.com' },
     providerId: 'prov-1',
-    provider: { firstName: 'X', lastName: 'Y', email: 'x@example.com' },
+    provider: {
+      firstName: 'X',
+      lastName: 'Y',
+      email: 'x@example.com',
+      providerProfile: { rating: 4.5, reviewCount: 12 },
+    },
     scheduledAt: new Date('2026-09-01T10:00:00.000Z'),
     proposedScheduledAt: null,
     status: BookingStatus.CONFIRMED,
@@ -80,8 +86,30 @@ describe('BookingsService.findById', () => {
 
     const result = await service.findById('b1', 'cust-1', UserRole.CUSTOMER);
     expect(result.id).toBe('b1');
+    expect(result.orderNumber).toBe('XM-26-000001');
     expect(result.customerId).toBe('cust-1');
     expect(result.status).toBe(BookingStatus.CONFIRMED);
+    expect(result.providerRating).toBe(4.5);
+    expect(result.providerReviewCount).toBe(12);
+  });
+
+  it('sifariş nömrəsi ilə tapır', async () => {
+    const findUnique = vi.fn().mockResolvedValue(bookingRow());
+    const service = makeService({
+      booking: { findUnique },
+    });
+
+    const result = await service.findById(
+      'xm-26-000001',
+      'cust-1',
+      UserRole.CUSTOMER,
+    );
+    expect(findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { orderNumber: 'XM-26-000001' },
+      }),
+    );
+    expect(result.orderNumber).toBe('XM-26-000001');
   });
 });
 
@@ -131,7 +159,7 @@ describe('BookingsService.create', () => {
         destLat: 40.4,
         destLng: 49.8,
       }),
-    ).rejects.toThrow('Ani sifariş üçün Idempotency-Key başlığı məcburidir');
+    ).rejects.toThrow('Təcili sifariş üçün Idempotency-Key başlığı məcburidir');
   });
 
   it('planlı sifariş üçün tarix tələb edir', async () => {
@@ -144,5 +172,121 @@ describe('BookingsService.create', () => {
         type: BookingType.SCHEDULED,
       }),
     ).rejects.toThrow('Sifariş tarixi tələb olunur');
+  });
+});
+
+describe('BookingsService.skipProvider', () => {
+  it('iştirakçı olmayan müştəriyə icazə vermir', async () => {
+    const service = makeService({
+      booking: {
+        findUnique: vi.fn().mockResolvedValue(
+          bookingRow({
+            status: BookingStatus.CONFIRMED,
+            type: BookingType.INSTANT,
+            acceptedAt: new Date(),
+          }),
+        ),
+      },
+    });
+
+    await expect(
+      service.skipProvider('b1', 'stranger', UserRole.CUSTOMER),
+    ).rejects.toThrow('Bu sifarişi idarə etmək icazəniz yoxdur');
+  });
+
+  it('dispatch yoxdursa xəta verir', async () => {
+    const service = makeService({
+      booking: {
+        findUnique: vi.fn().mockResolvedValue(
+          bookingRow({
+            status: BookingStatus.CONFIRMED,
+            type: BookingType.INSTANT,
+            acceptedAt: new Date(),
+          }),
+        ),
+      },
+    });
+
+    await expect(
+      service.skipProvider('b1', 'cust-1', UserRole.CUSTOMER),
+    ).rejects.toThrow('Axtarış hazırda əlçatan deyil');
+  });
+});
+
+describe('BookingsService.findAll', () => {
+  function listPrisma() {
+    return {
+      booking: {
+        findMany: vi.fn().mockResolvedValue([]),
+        count: vi.fn().mockResolvedValue(0),
+      },
+    };
+  }
+
+  it('müştəri siyahısında sifariş nömrəsini status ilə AND edir', async () => {
+    const prisma = listPrisma();
+    const service = makeService(prisma);
+
+    await service.findAll(
+      'cust-1',
+      UserRole.CUSTOMER,
+      1,
+      20,
+      BookingStatus.COMPLETED,
+      undefined,
+      'XM-26-000421',
+    );
+
+    expect(prisma.booking.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [
+            { customerId: 'cust-1', status: BookingStatus.COMPLETED },
+            { orderNumber: 'XM-26-000421' },
+          ],
+        },
+      }),
+    );
+  });
+
+  it('xidmət verən siyahısında axtarışı mövcud görünürlük filtri üzərinə qoyur', async () => {
+    const prisma = listPrisma();
+    const service = makeService(prisma);
+
+    await service.findAll(
+      'prov-1',
+      UserRole.PROVIDER,
+      1,
+      50,
+      undefined,
+      undefined,
+      '421',
+    );
+
+    expect(prisma.booking.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [
+            expect.objectContaining({ AND: expect.any(Array) }),
+            {
+              orderNumber: { contains: '421', mode: 'insensitive' },
+            },
+          ],
+        },
+      }),
+    );
+  });
+
+  it('axtarış yoxdursa where strukturunu dəyişmir', async () => {
+    const prisma = listPrisma();
+    const service = makeService(prisma);
+
+    await service.findAll('cust-1', UserRole.CUSTOMER, 1, 20);
+
+    expect(prisma.booking.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { customerId: 'cust-1' },
+      }),
+    );
   });
 });

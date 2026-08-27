@@ -1,73 +1,113 @@
 'use client';
 
 import { useEffect } from 'react';
-import { APP } from '@xidmetal/shared';
+import {
+  applyTabAttentionTitle,
+  stripTabAttentionPrefix,
+  TAB_ATTENTION_BLINK_MS,
+} from '@xidmetal/shared';
 
-/** Bizim əlavə etdiyimiz diqqət prefiksi: "(Yeni mesaj) …", "(2 yeni mesaj, 1 yeni sifariş) …" */
-const TITLE_ATTENTION_RE = /^\([^)]*(?:mesaj|sifariş)[^)]*\)\s+/i;
-const LEGACY_COUNT_RE = /^\(\d+\)\s+/;
-
-function stripTitleAttention(title: string): string {
-  const cleaned = title.replace(TITLE_ATTENTION_RE, '').replace(LEGACY_COUNT_RE, '').trim();
-  return cleaned || APP.name;
-}
-
-function formatAttentionLabel(unreadMessages: number, bookingAttention: number): string | null {
-  const parts: string[] = [];
-
-  if (unreadMessages > 0) {
-    parts.push(unreadMessages === 1 ? 'Yeni mesaj' : `${unreadMessages} yeni mesaj`);
-  }
-
-  if (bookingAttention > 0) {
-    parts.push(bookingAttention === 1 ? 'Yeni sifariş' : `${bookingAttention} yeni sifariş`);
-  }
-
-  if (parts.length === 0) return null;
-  return parts.join(', ');
-}
-
-function withTitleAttention(
-  baseTitle: string,
-  unreadMessages: number,
-  bookingAttention: number,
-): string {
-  const base = stripTitleAttention(baseTitle);
-  const label = formatAttentionLabel(unreadMessages, bookingAttention);
-  return label ? `(${label}) ${base}` : base;
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
 }
 
 /**
- * Brauzer tab başlığında oxunmamış mesaj / sifariş diqqətini göstərir.
+ * Brauzer tab başlığında oxunmamış bildirişin mövzusunu göstərir.
+ * Tab gizli olanda mövzu ilə orijinal başlıq arasında yanıb-sönür.
  * Səs, toast və OS bildirişi `useLiveAttention`-dadır.
  */
 export function useTabAttention(options: {
   enabled: boolean;
-  unreadMessages: number;
-  bookingAttention: number;
+  attentionLabel: string | null;
+  fallbackTitle: string;
 }) {
-  const { enabled, unreadMessages, bookingAttention } = options;
+  const { enabled, attentionLabel, fallbackTitle } = options;
 
   useEffect(() => {
     if (!enabled || typeof document === 'undefined') return;
 
+    let base = stripTabAttentionPrefix(document.title) || fallbackTitle;
+    let applying = false;
+    let blinkOn = true;
+    let intervalId: number | null = null;
+
+    const setTitle = (value: string) => {
+      if (document.title === value) return;
+      applying = true;
+      document.title = value;
+      queueMicrotask(() => {
+        applying = false;
+      });
+    };
+
+    const attentionTitle = () => {
+      if (!enabled) return base;
+      return applyTabAttentionTitle(base, attentionLabel);
+    };
+
+    const shouldBlink = () =>
+      enabled &&
+      attentionLabel !== null &&
+      document.visibilityState === 'hidden' &&
+      !prefersReducedMotion();
+
     const apply = () => {
-      const next = withTitleAttention(document.title, unreadMessages, bookingAttention);
-      if (document.title !== next) {
-        document.title = next;
+      const next = attentionTitle();
+      if (shouldBlink()) {
+        setTitle(blinkOn ? next : base);
+        return;
+      }
+      blinkOn = true;
+      setTitle(enabled ? next : stripTabAttentionPrefix(document.title) || fallbackTitle);
+    };
+
+    const stopBlink = () => {
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+        intervalId = null;
       }
     };
 
+    const startBlink = () => {
+      stopBlink();
+      if (!shouldBlink()) return;
+      intervalId = window.setInterval(() => {
+        blinkOn = !blinkOn;
+        apply();
+      }, TAB_ATTENTION_BLINK_MS);
+    };
+
     apply();
+    startBlink();
 
     const titleEl = document.querySelector('title');
-    if (!titleEl) return;
+    const observer =
+      titleEl === null
+        ? null
+        : new MutationObserver(() => {
+            if (applying) return;
+            base = stripTabAttentionPrefix(document.title) || fallbackTitle;
+            apply();
+          });
+    observer?.observe(titleEl as Node, { childList: true, characterData: true, subtree: true });
 
-    const observer = new MutationObserver(() => {
+    const onVisibility = () => {
+      blinkOn = true;
       apply();
-    });
+      startBlink();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
 
-    observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
-    return () => observer.disconnect();
-  }, [enabled, unreadMessages, bookingAttention]);
+    return () => {
+      observer?.disconnect();
+      document.removeEventListener('visibilitychange', onVisibility);
+      stopBlink();
+      const restored = stripTabAttentionPrefix(document.title) || fallbackTitle;
+      if (document.title !== restored) {
+        document.title = restored;
+      }
+    };
+  }, [enabled, attentionLabel, fallbackTitle]);
 }

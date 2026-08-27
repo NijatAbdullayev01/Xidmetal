@@ -55,6 +55,34 @@ async function loadServicesData(input: {
   }
 }
 
+async function ServicesPageBody({
+  q,
+  page,
+  categoryId,
+}: {
+  q: string;
+  page: number;
+  categoryId: string | null;
+}) {
+  const { categories, servicesPage } = await loadServicesData({
+    q,
+    page,
+    categoryId,
+  });
+
+  return (
+    <ServicesContent
+      categories={categories}
+      services={servicesPage.items}
+      total={servicesPage.total}
+      page={servicesPage.page}
+      totalPages={servicesPage.totalPages}
+      query={q}
+      categoryId={categoryId}
+    />
+  );
+}
+
 export default async function ServicesPage({
   searchParams,
 }: {
@@ -64,24 +92,11 @@ export default async function ServicesPage({
   const q = params.q?.trim() ?? '';
   const categoryId = params.categoryId?.trim() || null;
   const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1);
-
-  const { categories, servicesPage } = await loadServicesData({
-    q,
-    page,
-    categoryId,
-  });
+  const suspenseKey = `${q}|${categoryId ?? ''}|${page}`;
 
   return (
-    <Suspense fallback={<ServicesPageSkeleton />}>
-      <ServicesContent
-        categories={categories}
-        services={servicesPage.items}
-        total={servicesPage.total}
-        page={servicesPage.page}
-        totalPages={servicesPage.totalPages}
-        query={q}
-        categoryId={categoryId}
-      />
+    <Suspense key={suspenseKey} fallback={<ServicesPageSkeleton />}>
+      <ServicesPageBody q={q} page={page} categoryId={categoryId} />
     </Suspense>
   );
 }

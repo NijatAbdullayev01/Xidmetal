@@ -14,7 +14,12 @@ import {
   Trash2,
   User,
 } from 'lucide-react';
-import { UserRole } from '@xidmetal/shared';
+import {
+  bookingMessagingBlockedMessage,
+  isBookingMessagingEnabled,
+  toDisplayMediaUrl,
+  UserRole,
+} from '@xidmetal/shared';
 import type {
   ConversationDetail,
   ConversationSummary,
@@ -57,7 +62,7 @@ function ParticipantAvatar({
       {avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={avatarUrl}
+          src={toDisplayMediaUrl(avatarUrl)}
           alt={name}
           className="h-full w-full rounded-full object-cover"
         />
@@ -173,6 +178,12 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
   const messageCount = activeConversation?.messages.length ?? 0;
   const lastMessageId = activeConversation?.messages.at(-1)?.id;
   const peerTyping = activeConversation?.peerTyping ?? false;
+  const messagingEnabled =
+    !activeConversation?.bookingStatus ||
+    isBookingMessagingEnabled(activeConversation.bookingStatus);
+  const messagingClosedHint = activeConversation?.bookingStatus
+    ? bookingMessagingBlockedMessage(activeConversation.bookingStatus)
+    : null;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -256,7 +267,7 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
   }, [token, selectedId, activeConversation, queryClient, user?.id]);
 
   const notifyTyping = () => {
-    if (!token || !selectedId) return;
+    if (!token || !selectedId || !messagingEnabled) return;
     const now = Date.now();
     if (now - lastTypingSentRef.current < 2_000) return;
     lastTypingSentRef.current = now;
@@ -438,14 +449,14 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
   const handleSend = (event: React.FormEvent) => {
     event.preventDefault();
     const trimmed = messageText.trim();
-    if (!trimmed || sendMutation.isPending || imageUploading) return;
+    if (!trimmed || !messagingEnabled || sendMutation.isPending || imageUploading) return;
     sendMutation.mutate({ content: trimmed });
   };
 
   const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file || !token || !selectedId || sendMutation.isPending) return;
+    if (!file || !token || !selectedId || !messagingEnabled || sendMutation.isPending) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
       setSendError('Yalnız JPG, PNG və ya WEBP formatı qəbul edilir');
       return;
@@ -681,7 +692,7 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
                           {message.imageUrl && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
-                              src={message.imageUrl}
+                              src={toDisplayMediaUrl(message.imageUrl)}
                               alt="Mesaj şəkli"
                               className="mb-2 max-h-64 w-full rounded-lg object-cover"
                             />
@@ -737,59 +748,65 @@ export function MessagesPanel({ role }: MessagesPanelProps) {
               </div>
             </div>
 
-            <form
-              onSubmit={handleSend}
-              className="shrink-0 border-t border-border p-4"
-            >
-              {sendError && (
-                <p className="mb-2 text-sm text-destructive">{sendError}</p>
-              )}
-              <div className="flex items-center gap-2">
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  onChange={(event) => {
-                    void handleImageSelect(event);
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="min-h-[44px] min-w-[44px] shrink-0 px-3"
-                  disabled={sendMutation.isPending || imageUploading}
-                  onClick={() => imageInputRef.current?.click()}
-                  aria-label="Şəkil göndər"
-                >
-                  {imageUploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ImagePlus className="h-4 w-4" />
-                  )}
-                </Button>
-                <Input
-                  value={messageText}
-                  onChange={(event) => handleMessageChange(event.target.value)}
-                  placeholder="Mesajınızı yazın..."
-                  maxLength={2000}
-                  className="min-h-[44px] flex-1"
-                  disabled={sendMutation.isPending || imageUploading}
-                />
-                <Button
-                  type="submit"
-                  className="min-h-[44px] min-w-[44px] shrink-0 px-3"
-                  disabled={!messageText.trim() || sendMutation.isPending || imageUploading}
-                  aria-label="Mesaj göndər"
-                >
-                  {sendMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </form>
+            {messagingEnabled ? (
+              <form
+                onSubmit={handleSend}
+                className="shrink-0 border-t border-border p-4"
+              >
+                {sendError && (
+                  <p className="mb-2 text-sm text-destructive">{sendError}</p>
+                )}
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(event) => {
+                      void handleImageSelect(event);
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-[44px] min-w-[44px] shrink-0 px-3"
+                    disabled={sendMutation.isPending || imageUploading}
+                    onClick={() => imageInputRef.current?.click()}
+                    aria-label="Şəkil göndər"
+                  >
+                    {imageUploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ImagePlus className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Input
+                    value={messageText}
+                    onChange={(event) => handleMessageChange(event.target.value)}
+                    placeholder="Mesajınızı yazın..."
+                    maxLength={2000}
+                    className="min-h-[44px] flex-1"
+                    disabled={sendMutation.isPending || imageUploading}
+                  />
+                  <Button
+                    type="submit"
+                    className="min-h-[44px] min-w-[44px] shrink-0 px-3"
+                    disabled={!messageText.trim() || sendMutation.isPending || imageUploading}
+                    aria-label="Mesaj göndər"
+                  >
+                    {sendMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <p className="shrink-0 border-t border-border px-4 py-3 text-sm text-muted-foreground">
+                {messagingClosedHint ?? 'Bu söhbətdə mesaj yazıla bilməz'}
+              </p>
+            )}
           </>
         )}
       </div>

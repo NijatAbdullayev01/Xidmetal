@@ -1,5 +1,5 @@
 ---
-description: Bildiriş kanalları — inbox yalnız admin; sifariş/mesaj/rəy ayrı
+description: Bildiriş kanalları — inbox yalnız admin; sifariş/mesaj/rəy/xidmət yoxlaması ayrı
 globs: apps/**/notifications/**,packages/shared/src/enums/**,apps/web/src/components/notifications/**,apps/web/src/hooks/use-notifications*
 alwaysApply: false
 ---
@@ -8,9 +8,9 @@ alwaysApply: false
 
 ## Məhsul qərarı
 
-`/dashboard/*/notifications` (**NotificationsInbox**) və zəng paneli (**NotificationsBell**) **yalnız** admin/platforma tərəfindən göndərilən bildirişlər üçündür (`ADMIN_NOTIFICATION_TYPES`, hazırda `ADMIN_ANNOUNCEMENT`).
+`/dashboard/*/notifications` (**NotificationsInbox**) və zəng paneli (**NotificationsBell**) **yalnız** admin/platforma tərəfindən göndərilən elanlar üçündür (`ADMIN_NOTIFICATION_TYPES`, hazırda `ADMIN_ANNOUNCEMENT`).
 
-**Buraya düşməz:** sifariş, mesaj və rəy bildirişləri.
+**Buraya düşməz:** sifariş, mesaj, rəy və xidmət yoxlaması (təsdiq / düzəliş) bildirişləri.
 
 ## Kanal ayrılığı
 
@@ -20,15 +20,16 @@ alwaysApply: false
 | Sifariş | `BOOKING_NOTIFICATION_TYPES` | Sifarişlər nav badge; `booking-unread-count` / `booking-read-all` |
 | Mesaj | `MESSAGE_NOTIFICATION_TYPES` | Mesajlar; söhbət oxunanda `markMessageNotificationsRead` |
 | Rəy | `REVIEW_NOTIFICATION_TYPES` | Provider reytinq badge; `review-unread-count` / `review-read-all` |
+| Xidmət yoxlaması | `SERVICE_NOTIFICATION_TYPES` | Xidmətlərim badge; `service-unread-count` / `service-read-all` |
 
 ## Kod
 
-- `NotificationsService.findAll` / `getUnreadCount` / `markRead` / `markAllRead` → yalnız `adminTypes` (`inboxTypes`).
-- Shared allowlist: `ADMIN_NOTIFICATION_TYPES` — sifariş/mesaj/rəy əlavə etmə.
-- Inbox UI mətni: admin/platforma elanları; sifariş/mesajın buraya düşmədiyini izah et.
+- `NotificationsService.findAll` / `getUnreadCount` / `markRead` / `markAllRead` → yalnız `adminTypes` (`inboxTypes`); xidmət yoxlaması (`SERVICE_*` və köhnə `serviceApproved` / `serviceNeedsRevision` bayrağı) çıxarılır.
+- Shared allowlist: `ADMIN_NOTIFICATION_TYPES` — sifariş/mesaj/rəy/xidmət yoxlaması əlavə etmə.
+- Inbox UI mətni: admin/platforma elanları; sifariş/mesaj/xidmət yoxlamasının buraya düşmədiyini izah et.
 
 ## Qadağan
 
-- Sifariş və ya mesaj bildirişini inbox siyahısına / zəng panelinə qarışdırmaq.
-- `BOOKING_*` / `MESSAGE_*` / `REVIEW_*` tiplərini `ADMIN_NOTIFICATION_TYPES` və ya `inboxTypes`-ə əlavə etmək.
-- Booking/message diqqətini yalnız zəng unread sayına bağlamaq (ayrı badge/kanal saxla).
+- Sifariş, mesaj və ya xidmət yoxlaması bildirişini inbox siyahısına / zəng panelinə qarışdırmaq.
+- `BOOKING_*` / `MESSAGE_*` / `REVIEW_*` / `SERVICE_*` tiplərini `ADMIN_NOTIFICATION_TYPES` və ya `inboxTypes`-ə əlavə etmək.
+- Booking/message/xidmət diqqətini yalnız zəng unread sayına bağlamaq (ayrı badge/kanal saxla).

@@ -3,10 +3,15 @@
 import { useMemo } from 'react';
 import { MapPin } from 'lucide-react';
 import {
-  AZERBAIJAN_LOCATION_GROUPS,
-  AZERBAIJAN_LOCATIONS,
+  AZERBAIJAN_PICKER_LOCATIONS,
+  BAKU_CITY,
+  BAKU_DISTRICT_LOCATIONS,
+  bakuDistrictDisplayName,
+  parsePickerLocation,
 } from '@xidmetal/shared';
-import { Select, type SelectGroup } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Select, type SelectOption } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 export interface LocationPickerProps {
   id?: string;
@@ -19,6 +24,11 @@ export interface LocationPickerProps {
   clearable?: boolean;
   /** Siyahıda olmayan köhnə/xüsusi dəyərlər */
   extraOptions?: readonly string[];
+  /**
+   * Müştəri ünvanı: Bakı seçiləndə daxili inzibati rayon ayrıca dropdown-da məcburidir.
+   * Xidmət ərazisi (xidmət verən formları) üçün false saxla.
+   */
+  requireBakuDistrict?: boolean;
   className?: string;
 }
 
@@ -31,52 +41,96 @@ export function LocationPicker({
   placeholder = 'Şəhər və ya rayon seçin',
   clearable = true,
   extraOptions = [],
+  requireBakuDistrict = false,
   className,
 }: LocationPickerProps) {
-  const groups = useMemo((): SelectGroup[] => {
-    const known = new Set(AZERBAIJAN_LOCATIONS);
-    const extras = extraOptions.filter((item) => item && !known.has(item));
+  const { city, district } = parsePickerLocation(value);
+  const districtId = id ? `${id}-district` : undefined;
+  const showDistrict = requireBakuDistrict && city === BAKU_CITY;
+  const cityError = error && !showDistrict;
+  const districtError = error && showDistrict && !district;
 
-    const base: SelectGroup[] = AZERBAIJAN_LOCATION_GROUPS.map((group) => ({
-      label: group.label,
-      options: group.locations.map((location) => ({
+  const cityOptions = useMemo((): SelectOption[] => {
+    const known = new Set(AZERBAIJAN_PICKER_LOCATIONS);
+    const extras = extraOptions.filter((item) => item && !known.has(item));
+    if (city && !known.has(city) && !extras.includes(city)) {
+      extras.unshift(city);
+    }
+
+    return [...extras, ...AZERBAIJAN_PICKER_LOCATIONS].map((location) => ({
+      value: location,
+      label: location,
+      icon: MapPin,
+    }));
+  }, [extraOptions, city]);
+
+  const districtOptions = useMemo(
+    (): SelectOption[] =>
+      BAKU_DISTRICT_LOCATIONS.map((location) => ({
         value: location,
-        label: location,
+        label: bakuDistrictDisplayName(location),
         icon: MapPin,
       })),
-    }));
+    [],
+  );
 
-    if (extras.length === 0) return base;
+  const handleCityChange = (nextCity: string) => {
+    if (!nextCity) {
+      onChange('');
+      return;
+    }
+    if (requireBakuDistrict && nextCity === BAKU_CITY) {
+      onChange(BAKU_CITY);
+      return;
+    }
+    onChange(nextCity);
+  };
 
-    return [
-      {
-        label: 'Digər',
-        options: extras.map((location) => ({
-          value: location,
-          label: location,
-          icon: MapPin,
-        })),
-      },
-      ...base,
-    ];
-  }, [extraOptions]);
-
-  return (
+  const citySelect = (
     <Select
       id={id}
-      value={value}
-      onChange={onChange}
-      groups={groups}
+      value={city}
+      onChange={handleCityChange}
+      options={cityOptions}
       placeholder={placeholder}
       disabled={disabled}
-      error={error}
+      error={cityError}
       searchable
       searchPlaceholder="Şəhər və ya rayon axtarın..."
       clearable={clearable}
       clearLabel="Seçimi sil"
       triggerIcon={MapPin}
       ariaLabel="Ünvan seçimi"
-      className={className}
+      className={requireBakuDistrict ? undefined : className}
     />
+  );
+
+  if (!requireBakuDistrict) {
+    return citySelect;
+  }
+
+  return (
+    <div className={cn('space-y-4', className)}>
+      {citySelect}
+      {showDistrict ? (
+        <div className="space-y-2">
+          <Label htmlFor={districtId}>Bakı rayonu</Label>
+          <Select
+            id={districtId}
+            value={district}
+            onChange={onChange}
+            options={districtOptions}
+            placeholder="Rayon seçin"
+            disabled={disabled}
+            error={districtError}
+            searchable
+            searchPlaceholder="Rayon axtarın..."
+            clearable={false}
+            triggerIcon={MapPin}
+            ariaLabel="Bakı rayonu"
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }

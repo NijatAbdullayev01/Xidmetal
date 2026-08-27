@@ -1,17 +1,22 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
+import { useTabAttention } from '@/hooks/use-tab-attention';
 import {
   type AdminNavAttentionCounts,
+  type AdminTabQueueId,
+  adminQueueTabPrefix,
+  bumpedAdminQueueId,
   formatAttentionLiveMessage,
   shouldPlayAttentionSound,
 } from '@/lib/nav-attention';
 import { playAdminAttentionSound, unlockNotificationAudio } from '@/lib/notification-sound';
 
 const STATS_POLL_MS = 10_000;
+const ADMIN_TAB_FALLBACK = 'İdarə etmə paneli | Xidmətal';
 
 export function useAdminNavAttention(): {
   counts: AdminNavAttentionCounts | null;
@@ -20,6 +25,7 @@ export function useAdminNavAttention(): {
   const token = useAuthToken();
   const primedRef = useRef(false);
   const lastRef = useRef<AdminNavAttentionCounts | null>(null);
+  const [bumpedId, setBumpedId] = useState<AdminTabQueueId | null>(null);
 
   const { data } = useQuery({
     queryKey: ['admin', 'stats'],
@@ -31,18 +37,26 @@ export function useAdminNavAttention(): {
 
   const providersUnverified = data?.providersUnverified;
   const servicesPendingReview = data?.servicesPendingReview;
+  const reviewsPending = data?.reviewsPending;
+  const reportsPending = data?.reportsPending;
 
   const counts = useMemo<AdminNavAttentionCounts | null>(() => {
-    if (providersUnverified === undefined || servicesPendingReview === undefined) {
+    if (
+      providersUnverified === undefined ||
+      servicesPendingReview === undefined ||
+      reviewsPending === undefined ||
+      reportsPending === undefined
+    ) {
       return null;
     }
-    return { providersUnverified, servicesPendingReview };
-  }, [providersUnverified, servicesPendingReview]);
+    return { providersUnverified, servicesPendingReview, reviewsPending, reportsPending };
+  }, [providersUnverified, servicesPendingReview, reviewsPending, reportsPending]);
 
   useEffect(() => {
     if (!token) {
       primedRef.current = false;
       lastRef.current = null;
+      setBumpedId(null);
     }
   }, [token]);
 
@@ -71,11 +85,26 @@ export function useAdminNavAttention(): {
       return;
     }
 
+    const bumped = bumpedAdminQueueId(lastRef.current, counts);
+    if (bumped) {
+      setBumpedId(bumped);
+    }
     if (shouldPlayAttentionSound(lastRef.current, counts)) {
       void playAdminAttentionSound();
     }
     lastRef.current = counts;
   }, [counts]);
+
+  const tabAttentionLabel = useMemo(
+    () => (counts ? adminQueueTabPrefix(counts, bumpedId) : null),
+    [counts, bumpedId],
+  );
+
+  useTabAttention({
+    enabled: !!token,
+    attentionLabel: tabAttentionLabel,
+    fallbackTitle: ADMIN_TAB_FALLBACK,
+  });
 
   return {
     counts,

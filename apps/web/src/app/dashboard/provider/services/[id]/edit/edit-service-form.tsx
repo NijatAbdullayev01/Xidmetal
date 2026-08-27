@@ -39,6 +39,7 @@ import { ServiceImageUploader } from '@/components/services/service-image-upload
 import { VehicleDimensionsFields } from '@/components/services/vehicle-dimensions-fields';
 import { CargoRouteScopeSelector } from '@/components/services/cargo-route-scope-selector';
 import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
+import { useAckServiceNotifications } from '@/hooks/use-ack-service-notifications';
 
 const editServiceFormSchema = createServiceSchema.omit({ images: true }).extend({
   priceUnit: z.enum(PRICE_UNIT_VALUES),
@@ -69,6 +70,8 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
   const imagesDirty =
     images.length !== initialImages.length ||
     images.some((url, index) => url !== initialImages[index]);
+
+  useAckServiceNotifications(!!token);
 
   const {
     data: service,
@@ -171,17 +174,6 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
           : {}),
         images: serviceImages,
       });
-
-      // Düzəlişdən sonra yenidən yoxlamaya göndər
-      if (service?.status === ServiceStatus.NEEDS_REVISION) {
-        const profile = await queryClient.fetchQuery({
-          queryKey: ['users', 'me'],
-          queryFn: () => api.users.me(token),
-        });
-        if (profile.providerProfile?.isVerified) {
-          return api.submitServiceForReview(token, serviceId);
-        }
-      }
 
       return updated;
     },
@@ -372,10 +364,11 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
           className="rounded-xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-100"
           role="status"
         >
-          <p className="font-medium">Admin düzəliş tələb edir</p>
+          <p className="font-medium">Moderator qeydi</p>
           <p className="mt-1">{service.reviewNote}</p>
           <p className="mt-2 text-xs opacity-90">
-            Dəyişiklikləri yadda saxladıqdan sonra xidmət yenidən yoxlamaya göndəriləcək.
+            Dəyişiklikləri yadda saxlayın. Sonra xidmətlər siyahısından «Yoxlamaya göndər» aktiv
+            olacaq.
           </p>
         </div>
       ) : null}
@@ -663,11 +656,6 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Yadda saxlanılır...
-                  </>
-                ) : service?.status === ServiceStatus.NEEDS_REVISION ? (
-                  <>
-                    <Save className="h-4 w-4" />
-                    Saxla və yoxlamaya göndər
                   </>
                 ) : (
                   <>

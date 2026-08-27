@@ -1,4 +1,4 @@
-import { BookingStatus } from './enums';
+import { BookingStatus, BookingType } from './enums';
 
 /**
  * Provider icazəli keçidlər (hədəf lifecycle).
@@ -60,6 +60,67 @@ export function isCancellableBookingStatus(status: BookingStatus): boolean {
     status === BookingStatus.EN_ROUTE ||
     status === BookingStatus.ARRIVED
   );
+}
+
+/**
+ * Təcili sifariş qəbul olunub, iş hələ başlamayıb —
+ * müştəri qiyməti bəyənməsə başqa xidmət verən axtara bilər.
+ */
+export function isInstantProviderSkippable(
+  type: BookingType | string,
+  status: BookingStatus | string,
+): boolean {
+  return type === BookingType.INSTANT && status === BookingStatus.CONFIRMED;
+}
+
+/**
+ * Sifarişə bağlı söhbət — xidmət verən qəbul etdikdən sonra,
+ * tamamlanana qədər (təcili dispatch və rezervasiya eyni qayda).
+ */
+export function isBookingMessagingEnabled(status: BookingStatus | string): boolean {
+  return (
+    status === BookingStatus.CONFIRMED ||
+    status === BookingStatus.EN_ROUTE ||
+    status === BookingStatus.ARRIVED ||
+    status === BookingStatus.IN_PROGRESS
+  );
+}
+
+export function bookingMessagingBlockedMessage(status: BookingStatus | string): string {
+  if (status === BookingStatus.COMPLETED) {
+    return 'Tamamlanmış sifarişdə mesaj yazıla bilməz';
+  }
+  if (status === BookingStatus.CANCELLED) {
+    return 'Ləğv edilmiş sifarişdə mesaj yazıla bilməz';
+  }
+  if (status === BookingStatus.REJECTED) {
+    return 'Rədd edilmiş sifarişdə mesaj yazıla bilməz';
+  }
+  return 'Mesaj yazmaq üçün xidmət verən sifarişi qəbul etməlidir';
+}
+
+/**
+ * Sifariş qiyməti yalnız xidmət verən qəbul etdikdən sonra müştəridə görünür.
+ * Xidmət verən tərəfdə qiymət göstərilmir.
+ */
+export function isBookingPriceVisibleToCustomer(
+  status: BookingStatus | string,
+  acceptedAt?: string | Date | null,
+): boolean {
+  if (acceptedAt) return true;
+  return isBookingMessagingEnabled(status) || status === BookingStatus.COMPLETED;
+}
+
+/**
+ * Təcili sifarişdə xidmət verənin reytinqi yalnız qəbuldan sonra görünür.
+ * Axtarış zamanı kataloq sahibi hələ icraçı deyil.
+ */
+export function isBookingProviderRatingVisible(
+  type: BookingType | string,
+  acceptedAt?: string | Date | null,
+): boolean {
+  if (type === BookingType.INSTANT) return Boolean(acceptedAt);
+  return true;
 }
 
 export interface BookingLifecycleTimestamps {

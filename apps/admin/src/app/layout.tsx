@@ -5,8 +5,8 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Admin | Xidmətal',
-    template: '%s | Xidmətal Admin',
+    default: 'İdarə etmə paneli | Xidmətal',
+    template: '%s | İdarə etmə paneli',
   },
   description: 'Xidmətal platforma idarə paneli',
   robots: { index: false, follow: false },

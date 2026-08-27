@@ -20,8 +20,15 @@ import {
   allowsPerSqmPriceUnit,
   MAX_SERVICE_IMAGES,
   ACTIVE_BOOKING_STATUSES,
+  isAzerbaijanLocation,
+  locationLabelsForCity,
 } from '@xidmetal/shared';
 import { ReviewStatus, ServiceStatus } from '@prisma/client';
+import {
+  hashServiceRevisionListing,
+  hasAppliedServiceRevision,
+  listingFromService,
+} from './service-revision.util';
 
 const SERVICE_IMAGES_INCLUDE = { orderBy: { sortOrder: 'asc' as const } };
 
@@ -91,8 +98,23 @@ export class ServicesService {
   }
 
   async findAll(query: ServiceQueryDto) {
-    const { page = 1, limit = 20, categoryId, search, providerId } = query;
+    const {
+      page = 1,
+      limit = 20,
+      categoryId,
+      search,
+      providerId,
+      title,
+      location,
+    } = query;
     const skip = (page - 1) * limit;
+    const titleExact = title?.trim();
+    const locationRaw = location?.trim();
+    const locationFilter = locationRaw
+      ? isAzerbaijanLocation(locationRaw)
+        ? { location: { in: [...locationLabelsForCity(locationRaw)] } }
+        : { location: { equals: locationRaw, mode: 'insensitive' as const } }
+      : {};
 
     const where = {
       status: ServiceStatus.ACTIVE,
@@ -104,6 +126,8 @@ export class ServicesService {
       },
       ...(categoryId && { categoryId }),
       ...(providerId && { providerId }),
+      ...(titleExact ? { title: titleExact } : {}),
+      ...locationFilter,
       ...(search && {
         OR: [
           { title: { contains: search, mode: 'insensitive' as const } },
@@ -388,13 +412,16 @@ export class ServicesService {
     const normalizedImages =
       images !== undefined ? await this.normalizeServiceImages(images, service.providerId) : undefined;
 
-    const previousImages =
-      normalizedImages !== undefined
-        ? await this.prisma.serviceImage.findMany({
-            where: { serviceId: id },
-            select: { url: true },
-          })
-        : [];
+    const shouldTrackRevision = service.status === ServiceStatus.NEEDS_REVISION;
+    const needCurrentImages = shouldTrackRevision || normalizedImages !== undefined;
+    const currentImages = needCurrentImages
+      ? await this.prisma.serviceImage.findMany({
+          where: { serviceId: id },
+          orderBy: { sortOrder: 'asc' },
+          select: { url: true },
+        })
+      : [];
+    const previousImages = normalizedImages !== undefined ? currentImages : [];
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (normalizedImages !== undefined) {
@@ -417,7 +444,7 @@ export class ServicesService {
         vehicleHeight !== undefined ||
         cargoRouteScope !== undefined;
 
-      return tx.service.update({
+      const row = await tx.service.update({
         where: { id },
         data: {
           ...serviceFields,
@@ -431,6 +458,31 @@ export class ServicesService {
           ...(vehicleChanged
             ? this.resolveVehicleFields(effectiveTitle, effectiveVehicle)
             : {}),
+        },
+        include: {
+          category: { select: { id: true, name: true, slug: true } },
+          images: SERVICE_IMAGES_INCLUDE,
+        },
+      });
+
+      if (!shouldTrackRevision) return row;
+
+      const currentHash = hashServiceRevisionListing(
+        listingFromService(service, currentImages.map((image) => image.url)),
+      );
+      const baseline = service.revisionBaselineHash ?? currentHash;
+      const nextHash = hashServiceRevisionListing(
+        listingFromService(
+          row,
+          row.images.map((image) => image.url),
+        ),
+      );
+
+      return tx.service.update({
+        where: { id },
+        data: {
+          revisionBaselineHash: baseline,
+          revisionEditedAt: nextHash !== baseline ? new Date() : null,
         },
         include: {
           category: { select: { id: true, name: true, slug: true } },
@@ -489,6 +541,22 @@ export class ServicesService {
       throw new BadRequestException('Yoxlamaya göndərmək üçün ən azı 1 şəkil lazımdır');
     }
 
+    if (service.status === ServiceStatus.NEEDS_REVISION) {
+      const currentHash = hashServiceRevisionListing(
+        listingFromService(
+          service,
+          service.images.map((image) => image.url),
+        ),
+      );
+      const baseline = service.revisionBaselineHash;
+      const contentChanged = baseline != null && currentHash !== baseline;
+      if (!service.revisionEditedAt || !contentChanged) {
+        throw new BadRequestException(
+          'Yoxlamaya göndərmək üçün əvvəlcə adminin tələb etdiyi düzəlişi edin və yadda saxlayın',
+        );
+      }
+    }
+
     this.assertCargoVehicleImages(
       service.title,
       service.images.map((image) => image.url),
@@ -499,6 +567,8 @@ export class ServicesService {
       data: {
         status: ServiceStatus.PENDING_REVIEW,
         submittedAt: new Date(),
+        revisionBaselineHash: null,
+        revisionEditedAt: null,
         // Köhnə düzəliş qeydi saxlanılır ki, admin müqayisə edə bilsin; təsdiqdə silinir
       },
       include: {
@@ -826,6 +896,7 @@ export class ServicesService {
     reviewNote?: string | null;
     submittedAt?: Date | null;
     reviewedAt?: Date | null;
+    revisionEditedAt?: Date | null;
     location: string | null;
     isRemote: boolean;
     serviceVenue?: string | null;
@@ -882,6 +953,7 @@ export class ServicesService {
       reviewNote: service.reviewNote ?? null,
       submittedAt: service.submittedAt?.toISOString() ?? null,
       reviewedAt: service.reviewedAt?.toISOString() ?? null,
+      hasRevisionEdits: hasAppliedServiceRevision(service.status, service.revisionEditedAt),
       location: service.location ?? undefined,
       isRemote: service.isRemote,
       serviceVenue: service.serviceVenue ?? undefined,

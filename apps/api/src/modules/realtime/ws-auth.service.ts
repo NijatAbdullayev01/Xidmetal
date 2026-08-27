@@ -11,6 +11,10 @@ import {
 import { PrismaService } from '../../common/database/prisma.service';
 import { readAccessTokenFromCookieHeader } from '../../common/auth/auth-cookies';
 import {
+  getOrLoadJwtUser,
+  JWT_AUTH_USER_SELECT,
+} from '../../common/auth/jwt-user-cache';
+import {
   assertSessionAudience,
   normalizeTokenAudience,
 } from '../../common/auth/client-audience';
@@ -54,20 +58,12 @@ export class WsAuthService {
       throw new WsException('Sessiya etibarsızdır. Yenidən daxil olun');
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isActive: true,
-        isVerified: true,
-        deletedAt: true,
-        passwordChangedAt: true,
-      },
-    });
+    const user = await getOrLoadJwtUser(payload.sub, () =>
+      this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: JWT_AUTH_USER_SELECT,
+      }),
+    );
 
     if (!user || !user.isActive || user.deletedAt) {
       throw new WsException('İstifadəçi tapılmadı');

@@ -84,6 +84,8 @@ export interface ServiceSummary {
   reviewNote?: string | null;
   submittedAt?: string | null;
   reviewedAt?: string | null;
+  /** Düzəliş tələbindən sonra məzmun dəyişilib — «Yoxlamaya göndər» üçün */
+  hasRevisionEdits?: boolean;
   location?: string;
   isRemote: boolean;
   serviceVenue?: string;
@@ -104,12 +106,17 @@ export interface ServiceSummary {
 
 export interface BookingSummary {
   id: string;
+  /** İstifadəçiyə görünən sifariş nömrəsi (XM-YY-NNNNNN) */
+  orderNumber: string;
   serviceId: string;
   serviceTitle: string;
   customerId: string;
   customerName: string;
   providerId: string;
   providerName: string;
+  /** Xidmət verənin orta reytinqi (0–5). Təcili sifarişdə UI yalnız qəbuldan sonra göstərir. */
+  providerRating?: number;
+  providerReviewCount?: number;
   scheduledAt: string;
   proposedScheduledAt?: string;
   status: BookingStatus;
@@ -135,6 +142,10 @@ export interface BookingSummary {
   completedAt?: string;
   hasReview?: boolean;
   createdAt: string;
+  /** INSTANT axtarış pəncərəsinin başlanğıcı (skip sonrası yenilənir) */
+  dispatchWindowStartedAt?: string | null;
+  /** Müştəri «başqa xidmət verən axtar» sayı */
+  dispatchSkipCount?: number;
   /**
    * Xidmət verənin aktiv ani-sifariş təklifi (yalnız list/find cavabında,
    * PENDING INSTANT + uyğun DispatchOffer olduqda).
@@ -343,6 +354,7 @@ export interface ConversationSummary {
   providerName: string;
   providerAvatarUrl?: string;
   bookingId?: string;
+  bookingStatus?: BookingStatus;
   serviceTitle?: string;
   lastMessage?: string;
   lastMessageAt?: string;
@@ -382,6 +394,9 @@ export interface UnreadNotificationsSummary {
   /** Səs/toast üçün — ən son oxunmamış admin bildirişi */
   latestUnreadId?: string | null;
   latestUnreadAt?: string | null;
+  /** Brauzer tab başlığı — ən son oxunmamışın mövzusu */
+  latestTitle?: string | null;
+  latestType?: string | null;
 }
 
 /** Sifarişlər bölməsi üzərindəki diqqət badge-i */
@@ -390,6 +405,17 @@ export interface BookingAttentionSummary {
   /** Yeni sifariş səsi üçün — ən son oxunmamış bildiriş */
   latestUnreadId?: string | null;
   latestUnreadAt?: string | null;
+  /** Brauzer tab başlığı — ən son oxunmamışın mövzusu */
+  latestTitle?: string | null;
+  latestType?: string | null;
+  /** Xidmətlərim banneri — ən son oxunmamışın mətni */
+  latestBody?: string | null;
+}
+
+/** Xidmətlərim — təsdiq / düzəliş diqqəti (inbox-dan ayrı) */
+export interface ServiceAttentionSummary extends BookingAttentionSummary {
+  /** Oxunmamış təsdiq (düzəliş növbəsi status sayına daxil deyil) */
+  approvedCount: number;
 }
 
 /** Yaxın provider axtarışı cavabı */

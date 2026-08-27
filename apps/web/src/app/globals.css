@@ -165,20 +165,6 @@
     }
   }
 
-  /* LocationMapPicker — Google Maps konteyner */
-  .location-map-canvas {
-    background: var(--color-muted);
-    touch-action: none;
-  }
-
-  .location-map-canvas:focus {
-    outline: none;
-  }
-
-  .location-map-canvas:focus-visible {
-    outline: 2px solid var(--color-brand);
-    outline-offset: -2px;
-  }
 }
 
 @keyframes nav-attention-blink {

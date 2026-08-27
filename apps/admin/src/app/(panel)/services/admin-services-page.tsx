@@ -154,14 +154,23 @@ export function AdminServicesPage() {
                 <>
                   {(service.status === ServiceStatus.PENDING_REVIEW ||
                     service.status === ServiceStatus.NEEDS_REVISION) && (
-                    <Button
-                      size="sm"
-                      className="min-h-11 w-full"
-                      disabled={busy}
-                      onClick={() => approve.mutate(service.id)}
+                    <span
+                      className="w-full"
+                      title={
+                        service.status === ServiceStatus.NEEDS_REVISION
+                          ? 'Xidmət verən düzəlişi edib yoxlamaya göndərdikdən sonra təsdiqləyə bilərsiniz'
+                          : undefined
+                      }
                     >
-                      Təsdiqlə
-                    </Button>
+                      <Button
+                        size="sm"
+                        className="min-h-11 w-full"
+                        disabled={busy || service.status === ServiceStatus.NEEDS_REVISION}
+                        onClick={() => approve.mutate(service.id)}
+                      >
+                        Təsdiqlə
+                      </Button>
+                    </span>
                   )}
                   {(service.status === ServiceStatus.PENDING_REVIEW ||
                     service.status === ServiceStatus.ACTIVE) && (
@@ -261,6 +270,13 @@ export function AdminServicesPage() {
                     {service.reviewNote ? (
                       <p className="rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
                         Son düzəliş qeydi: {service.reviewNote}
+                      </p>
+                    ) : null}
+                    {service.status === ServiceStatus.NEEDS_REVISION ? (
+                      <p className="text-sm text-muted-foreground">
+                        {service.hasRevisionEdits
+                          ? 'Xidmət verən düzəlişi yadda saxlayıb — yoxlamaya göndərməsi gözlənilir.'
+                          : 'Xidmət verən hələ düzəlişi etməyib.'}
                       </p>
                     ) : null}
                   </div>

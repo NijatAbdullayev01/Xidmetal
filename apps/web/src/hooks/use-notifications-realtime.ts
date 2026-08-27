@@ -28,6 +28,7 @@ export function useNotificationsRealtime(enabled = true): { connected: boolean }
       void queryClient.invalidateQueries({ queryKey: ['bookings'] });
       void queryClient.invalidateQueries({ queryKey: ['notifications', 'booking-unread-count'] });
       void queryClient.invalidateQueries({ queryKey: ['notifications', 'review-unread-count'] });
+      void queryClient.invalidateQueries({ queryKey: ['notifications', 'service-unread-count'] });
       void queryClient.invalidateQueries({ queryKey: ['services', 'mine'] });
       void queryClient.invalidateQueries({ queryKey: ['users', 'dashboard-stats'] });
     };

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Bell, ClipboardList, MessageSquare, X } from 'lucide-react';
+import { Bell, Briefcase, ClipboardList, MessageSquare, X } from 'lucide-react';
 import type { LiveAttentionKind } from '@/lib/live-attention';
 import { cn } from '@/lib/utils';
 
@@ -29,7 +29,13 @@ export function LiveToastHost({ toasts, onDismiss }: LiveToastHostProps) {
     >
       {toasts.map((toast) => {
         const Icon =
-          toast.kind === 'message' ? MessageSquare : toast.kind === 'admin' ? Bell : ClipboardList;
+          toast.kind === 'message'
+            ? MessageSquare
+            : toast.kind === 'admin'
+              ? Bell
+              : toast.kind === 'service'
+                ? Briefcase
+                : ClipboardList;
         return (
           <div
             key={toast.id}

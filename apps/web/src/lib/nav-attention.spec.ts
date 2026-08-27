@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatAttentionCount, formatNavAttentionAria, isNewerAttentionEvent } from './nav-attention';
+import { formatAttentionCount, formatNavAttentionAria, isNewerAttentionEvent, providerServicesNavAttention } from './nav-attention';
 
 describe('formatAttentionCount', () => {
   it('99-dan yuxarı sayları qısaldır', () => {
@@ -13,6 +13,20 @@ describe('formatNavAttentionAria', () => {
   it('növbə olanda label əlavə edir', () => {
     expect(formatNavAttentionAria('Xidmətlərim', 0)).toBeUndefined();
     expect(formatNavAttentionAria('Xidmətlərim', 2)).toBe('Xidmətlərim, 2 gözləyən');
+  });
+});
+
+describe('providerServicesNavAttention', () => {
+  it('düzəliş növbəsi ilə oxunmamış təsdiqi toplayır', () => {
+    expect(
+      providerServicesNavAttention({ needsRevisionCount: 1, unreadApprovedCount: 1 }),
+    ).toBe(2);
+    expect(
+      providerServicesNavAttention({ needsRevisionCount: 2, unreadApprovedCount: 0 }),
+    ).toBe(2);
+    expect(
+      providerServicesNavAttention({ needsRevisionCount: 0, unreadApprovedCount: 1 }),
+    ).toBe(1);
   });
 });
 

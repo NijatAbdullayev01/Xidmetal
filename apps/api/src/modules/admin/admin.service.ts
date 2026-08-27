@@ -32,6 +32,12 @@ import {
 import { PrismaService } from '../../common/database/prisma.service';
 import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
 import { StorageService } from '../../common/storage/storage.service';
+import { invalidateJwtUserCache } from '../../common/auth/jwt-user-cache';
+import {
+  hashServiceRevisionListing,
+  hasAppliedServiceRevision,
+  listingFromService,
+} from '../services/service-revision.util';
 import {
   AdminBookingsQueryDto,
   AdminReportsQueryDto,
@@ -234,6 +240,7 @@ export class AdminService {
         },
       },
     });
+    invalidateJwtUserCache(id);
 
     if (adminId) {
       void this.writeAudit(adminId, 'USER_ACTIVE', 'USER', id, { isActive: dto.isActive });
@@ -454,6 +461,7 @@ export class AdminService {
         reviewNote: s.reviewNote ?? null,
         submittedAt: s.submittedAt?.toISOString() ?? null,
         reviewedAt: s.reviewedAt?.toISOString() ?? null,
+        hasRevisionEdits: hasAppliedServiceRevision(s.status, s.revisionEditedAt),
         location: s.location ?? undefined,
         isRemote: s.isRemote,
         serviceVenue: s.serviceVenue ?? undefined,
@@ -508,6 +516,11 @@ export class AdminService {
     if (!existing) {
       throw new NotFoundException('Xidmət tapılmadı');
     }
+    if (existing.status === ServiceStatus.NEEDS_REVISION) {
+      throw new BadRequestException(
+        'Düzəliş gözləyən xidməti təsdiqləmək olmaz. Xidmət verən yoxlamaya göndərdikdən sonra təsdiqləyin',
+      );
+    }
     if (!existing.provider.providerProfile?.isVerified) {
       throw new BadRequestException(
         'Əvvəlcə xidmət verənin profilini təsdiqləyin — sonra xidməti aktivləşdirmək olar',
@@ -520,6 +533,8 @@ export class AdminService {
         status: ServiceStatus.ACTIVE,
         reviewNote: null,
         reviewedAt: new Date(),
+        revisionBaselineHash: null,
+        revisionEditedAt: null,
       },
       include: this.serviceAdminInclude(),
     });
@@ -530,7 +545,7 @@ export class AdminService {
     const notification = await this.prisma.notification.create({
       data: {
         userId: updated.providerId,
-        type: NotificationType.ADMIN_ANNOUNCEMENT,
+        type: NotificationType.SERVICE_APPROVED,
         title,
         body,
         data: { source: 'admin', href, serviceId: updated.id, serviceApproved: true },
@@ -540,7 +555,7 @@ export class AdminService {
       userId: updated.providerId,
       title,
       body,
-      type: NotificationType.ADMIN_ANNOUNCEMENT,
+      type: NotificationType.SERVICE_APPROVED,
       notificationId: notification.id,
       data: { source: 'admin', href, serviceId: updated.id, serviceApproved: true },
     });
@@ -552,7 +567,12 @@ export class AdminService {
     id: string,
     dto: RequestServiceRevisionDto,
   ): Promise<ServiceSummary> {
-    const existing = await this.prisma.service.findUnique({ where: { id } });
+    const existing = await this.prisma.service.findUnique({
+      where: { id },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' }, select: { url: true } },
+      },
+    });
     if (!existing) {
       throw new NotFoundException('Xidmət tapılmadı');
     }
@@ -566,12 +586,20 @@ export class AdminService {
     }
 
     const note = dto.note.trim();
+    const baselineHash = hashServiceRevisionListing(
+      listingFromService(
+        existing,
+        existing.images.map((image) => image.url),
+      ),
+    );
     const updated = await this.prisma.service.update({
       where: { id },
       data: {
         status: ServiceStatus.NEEDS_REVISION,
         reviewNote: note,
         reviewedAt: new Date(),
+        revisionBaselineHash: baselineHash,
+        revisionEditedAt: null,
       },
       include: this.serviceAdminInclude(),
     });
@@ -582,7 +610,7 @@ export class AdminService {
     const notification = await this.prisma.notification.create({
       data: {
         userId: updated.providerId,
-        type: NotificationType.ADMIN_ANNOUNCEMENT,
+        type: NotificationType.SERVICE_NEEDS_REVISION,
         title,
         body,
         data: {
@@ -597,7 +625,7 @@ export class AdminService {
       userId: updated.providerId,
       title,
       body,
-      type: NotificationType.ADMIN_ANNOUNCEMENT,
+      type: NotificationType.SERVICE_NEEDS_REVISION,
       notificationId: notification.id,
       data: {
         source: 'admin',
@@ -639,6 +667,7 @@ export class AdminService {
     reviewNote: string | null;
     submittedAt: Date | null;
     reviewedAt: Date | null;
+    revisionEditedAt?: Date | null;
     location: string | null;
     isRemote: boolean;
     serviceVenue: string | null;
@@ -683,6 +712,7 @@ export class AdminService {
       reviewNote: updated.reviewNote ?? null,
       submittedAt: updated.submittedAt?.toISOString() ?? null,
       reviewedAt: updated.reviewedAt?.toISOString() ?? null,
+      hasRevisionEdits: hasAppliedServiceRevision(updated.status, updated.revisionEditedAt),
       location: updated.location ?? undefined,
       isRemote: updated.isRemote,
       serviceVenue: updated.serviceVenue ?? undefined,
@@ -712,6 +742,14 @@ export class AdminService {
 
     const where: Prisma.BookingWhereInput = {
       ...(query.status ? { status: query.status } : {}),
+      ...(query.search?.trim()
+        ? {
+            orderNumber: {
+              contains: query.search.trim(),
+              mode: 'insensitive' as const,
+            },
+          }
+        : {}),
     };
 
     const [rows, total] = await Promise.all([
@@ -733,6 +771,7 @@ export class AdminService {
     return {
       items: await Promise.all(rows.map(async (b) => ({
         id: b.id,
+        orderNumber: b.orderNumber,
         serviceId: b.serviceId,
         serviceTitle: b.service.title,
         customerId: b.customerId,

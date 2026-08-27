@@ -3,6 +3,8 @@ import {
   BookingStatus,
   isBookingTransitionAllowed,
   isCancellableBookingStatus,
+  isBookingMessagingEnabled,
+  isBookingPriceVisibleToCustomer,
   bookingLifecycleFieldsForStatus,
   ACTIVE_BOOKING_STATUSES,
 } from '@xidmetal/shared';
@@ -119,6 +121,36 @@ describe('booking status transitions (shared lifecycle)', () => {
   it('ACTIVE_BOOKING_STATUSES EN_ROUTE/ARRIVED daxildir', () => {
     expect(ACTIVE_BOOKING_STATUSES).toContain(BookingStatus.EN_ROUTE);
     expect(ACTIVE_BOOKING_STATUSES).toContain(BookingStatus.ARRIVED);
+  });
+
+  it('qiymət yalnız xidmət verən qəbul etdikdən sonra müştəridə görünür', () => {
+    expect(isBookingPriceVisibleToCustomer(BookingStatus.PENDING)).toBe(false);
+    expect(isBookingPriceVisibleToCustomer(BookingStatus.REJECTED)).toBe(false);
+    expect(
+      isBookingPriceVisibleToCustomer(BookingStatus.CANCELLED, null),
+    ).toBe(false);
+    expect(isBookingPriceVisibleToCustomer(BookingStatus.CONFIRMED)).toBe(true);
+    expect(isBookingPriceVisibleToCustomer(BookingStatus.EN_ROUTE)).toBe(true);
+    expect(isBookingPriceVisibleToCustomer(BookingStatus.ARRIVED)).toBe(true);
+    expect(isBookingPriceVisibleToCustomer(BookingStatus.IN_PROGRESS)).toBe(true);
+    expect(isBookingPriceVisibleToCustomer(BookingStatus.COMPLETED)).toBe(true);
+    expect(
+      isBookingPriceVisibleToCustomer(
+        BookingStatus.CANCELLED,
+        '2026-08-27T10:00:00.000Z',
+      ),
+    ).toBe(true);
+  });
+
+  it('mesaj yalnız qəbuldan sonra (təcili və rezervasiya eyni qayda)', () => {
+    expect(isBookingMessagingEnabled(BookingStatus.PENDING)).toBe(false);
+    expect(isBookingMessagingEnabled(BookingStatus.REJECTED)).toBe(false);
+    expect(isBookingMessagingEnabled(BookingStatus.CANCELLED)).toBe(false);
+    expect(isBookingMessagingEnabled(BookingStatus.CONFIRMED)).toBe(true);
+    expect(isBookingMessagingEnabled(BookingStatus.EN_ROUTE)).toBe(true);
+    expect(isBookingMessagingEnabled(BookingStatus.ARRIVED)).toBe(true);
+    expect(isBookingMessagingEnabled(BookingStatus.IN_PROGRESS)).toBe(true);
+    expect(isBookingMessagingEnabled(BookingStatus.COMPLETED)).toBe(false);
   });
 
   it('lifecycle timestamp sahələri', () => {

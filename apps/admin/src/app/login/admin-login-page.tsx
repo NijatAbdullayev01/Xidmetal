@@ -77,7 +77,7 @@ export function AdminLoginPage() {
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand/20">
             <Shield className="h-6 w-6 text-brand-dark" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight">Admin paneli</h1>
+          <h1 className="text-xl font-bold tracking-tight">İdarə etmə paneli</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Yalnız administrator hesabı ilə daxil olun
           </p>

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { Camera, Trash2, X } from 'lucide-react';
-import { MAX_SERVICE_IMAGES } from '@xidmetal/shared';
+import { MAX_SERVICE_IMAGES, toDisplayMediaUrl } from '@xidmetal/shared';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -109,7 +109,7 @@ export function ServiceImageUploader({
             className="relative h-24 w-24 overflow-hidden rounded-lg border border-border"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={url} alt="" className="h-full w-full object-cover" />
+            <img src={toDisplayMediaUrl(url)} alt="" className="h-full w-full object-cover" />
             <button
               type="button"
               onClick={() => handleRemove(index)}

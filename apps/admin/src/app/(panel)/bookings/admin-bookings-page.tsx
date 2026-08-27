@@ -2,13 +2,15 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookingStatus, BookingType } from '@xidmetal/shared';
+import { BookingStatus, BookingType, formatBookingDateTime } from '@xidmetal/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { BookingOrderNumber } from '@/components/booking-order-number';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { formatPrice } from '@/lib/utils';
@@ -73,6 +75,7 @@ export function AdminBookingsPage() {
   const token = useAuthToken();
   const queryClient = useQueryClient();
   const [status, setStatus] = useState('');
+  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<{
@@ -83,6 +86,7 @@ export function AdminBookingsPage() {
 
   const params: Record<string, string> = { page: String(page), limit: '20' };
   if (status) params.status = status;
+  if (search.trim()) params.search = search.trim();
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'bookings', params],
@@ -150,19 +154,34 @@ export function AdminBookingsPage() {
         </div>
       )}
 
-      <div className="max-w-xs">
-        <Label htmlFor="booking-status">Status filteri</Label>
-        <Select
-          id="booking-status"
-          className="mt-1.5"
-          value={status}
-          onChange={(value) => {
-            setStatus(value);
-            setPage(1);
-          }}
-          options={STATUS_OPTIONS}
-          placeholder="Status"
-        />
+      <div className="grid gap-3 sm:grid-cols-2 sm:max-w-xl">
+        <div>
+          <Label htmlFor="booking-search">Sifariş nömrəsi</Label>
+          <Input
+            id="booking-search"
+            className="mt-1.5"
+            placeholder="XM-26-000421"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <div>
+          <Label htmlFor="booking-status">Status filteri</Label>
+          <Select
+            id="booking-status"
+            className="mt-1.5"
+            value={status}
+            onChange={(value) => {
+              setStatus(value);
+              setPage(1);
+            }}
+            options={STATUS_OPTIONS}
+            placeholder="Status"
+          />
+        </div>
       </div>
 
       {isLoading && <p className="text-sm text-muted-foreground">Yüklənir…</p>}
@@ -191,6 +210,7 @@ export function AdminBookingsPage() {
                       <p className="mt-1 text-sm text-muted-foreground">
                         {booking.customerName} → {booking.providerName}
                       </p>
+                      <BookingOrderNumber value={booking.orderNumber} className="mt-1" />
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Badge variant={STATUS_BADGE[booking.status] ?? 'muted'}>
@@ -207,11 +227,7 @@ export function AdminBookingsPage() {
                 <CardContent className="space-y-3">
                   <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                     <span>
-                      Tarix:{' '}
-                      {new Date(booking.scheduledAt).toLocaleString('az-AZ', {
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                      })}
+                      Tarix və saat: {formatBookingDateTime(booking)}
                     </span>
                     <span>Qiymət: {formatPrice(booking.totalPrice)}</span>
                   </div>

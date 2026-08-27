@@ -1,17 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Briefcase, ClipboardList, Star, PlusCircle, ArrowRight, MessageSquare } from 'lucide-react';
 import { ServiceStatus, type ProviderDashboardStats } from '@xidmetal/shared';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { buttonStyles } from '@/components/ui/button';
+import { BookingStatusBadge } from '@/components/bookings/booking-status-badge';
+import { DashboardListSkeleton } from '@/components/ui/page-skeletons';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { formatPrice } from '@/lib/utils';
 import { DispatchOffersCard } from '@/components/dispatch/dispatch-offers-card';
 import { ProviderVerificationBanner } from '@/components/provider/provider-verification-banner';
 import { DASHBOARD_LIST_POLL_MS, PROVIDER_VERIFICATION_POLL_MS } from '@/lib/live-attention';
+import { DEFAULT_BOOKING_LIST_PARAMS } from '@/lib/booking-list-query';
 
 export function ProviderOverviewPage() {
   const token = useAuthToken();
@@ -20,16 +23,15 @@ export function ProviderOverviewPage() {
     queryKey: ['users', 'dashboard-stats'],
     queryFn: () => api.users.dashboardStats(token!),
     enabled: !!token,
+    placeholderData: keepPreviousData,
     refetchInterval: DASHBOARD_LIST_POLL_MS,
-    refetchOnWindowFocus: true,
   });
 
-  const { data: services } = useQuery({
+  const { data: services, isLoading: servicesLoading } = useQuery({
     queryKey: ['services', 'mine'],
-    queryFn: () => api.myServices(token!, { limit: '10' }),
+    queryFn: () => api.myServices(token!, { limit: '50' }),
     enabled: !!token,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    placeholderData: keepPreviousData,
     refetchInterval: (query) => {
       const items = query.state.data?.items;
       if (!items?.length) return false;
@@ -42,22 +44,22 @@ export function ProviderOverviewPage() {
     },
   });
 
-  const { data: bookings } = useQuery({
-    queryKey: ['bookings', 'recent'],
-    queryFn: () => api.bookings(token!, { limit: '10' }),
+  const { data: bookings, isLoading: bookingsLoading } = useQuery({
+    queryKey: ['bookings', 'provider', DEFAULT_BOOKING_LIST_PARAMS],
+    queryFn: () => api.bookings(token!, DEFAULT_BOOKING_LIST_PARAMS),
     enabled: !!token,
+    placeholderData: keepPreviousData,
     refetchInterval: DASHBOARD_LIST_POLL_MS,
     refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
   });
 
-  const { data: conversations } = useQuery({
+  const { data: conversations, isLoading: conversationsLoading } = useQuery({
     queryKey: ['conversations'],
     queryFn: () => api.messages.conversations(token!, { limit: '100' }),
     enabled: !!token,
+    placeholderData: keepPreviousData,
     refetchInterval: DASHBOARD_LIST_POLL_MS,
     refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
   });
 
   const statsSummary: ProviderDashboardStats = dashboardStats ?? {
@@ -166,22 +168,25 @@ export function ProviderOverviewPage() {
             </Link>
           </CardHeader>
           <CardContent>
-            {bookings?.items.length === 0 && (
+            {bookingsLoading && !bookings ? (
+              <DashboardListSkeleton />
+            ) : bookings?.items.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 Hələ sifariş yoxdur
               </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {bookings?.items.slice(0, 5).map((booking) => (
+                  <li key={booking.id} className="flex items-center justify-between py-3">
+                    <div>
+                      <p className="text-sm font-medium">{booking.serviceTitle}</p>
+                      <p className="text-xs text-muted-foreground">{booking.customerName}</p>
+                    </div>
+                    <BookingStatusBadge booking={booking} className="text-xs" />
+                  </li>
+                ))}
+              </ul>
             )}
-            <ul className="divide-y divide-border">
-              {bookings?.items.slice(0, 5).map((booking) => (
-                <li key={booking.id} className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="text-sm font-medium">{booking.serviceTitle}</p>
-                    <p className="text-xs text-muted-foreground">{booking.customerName}</p>
-                  </div>
-                  <p className="text-sm font-medium">{formatPrice(booking.totalPrice)}</p>
-                </li>
-              ))}
-            </ul>
           </CardContent>
         </Card>
 
@@ -200,33 +205,36 @@ export function ProviderOverviewPage() {
             </Link>
           </CardHeader>
           <CardContent>
-            {conversations?.items.length === 0 && (
+            {conversationsLoading && !conversations ? (
+              <DashboardListSkeleton />
+            ) : conversations?.items.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 Hələ mesaj yoxdur
               </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {conversations?.items.slice(0, 5).map((conv) => (
+                  <li key={conv.id}>
+                    <Link
+                      href={`/dashboard/provider/messages?conversationId=${conv.id}`}
+                      className="flex min-h-[44px] items-center justify-between gap-3 py-3 transition-colors hover:text-foreground"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{conv.customerName}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {conv.lastMessage ?? 'Yeni söhbət'}
+                        </p>
+                      </div>
+                      {conv.unreadCount > 0 && (
+                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-medium text-brand-foreground">
+                          {conv.unreadCount}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             )}
-            <ul className="divide-y divide-border">
-              {conversations?.items.slice(0, 5).map((conv) => (
-                <li key={conv.id}>
-                  <Link
-                    href={`/dashboard/provider/messages?conversationId=${conv.id}`}
-                    className="flex min-h-[44px] items-center justify-between gap-3 py-3 transition-colors hover:text-foreground"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{conv.customerName}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {conv.lastMessage ?? 'Yeni söhbət'}
-                      </p>
-                    </div>
-                    {conv.unreadCount > 0 && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-medium text-brand-foreground">
-                        {conv.unreadCount}
-                      </span>
-                    )}
-                  </Link>
-                </li>
-              ))}
-            </ul>
           </CardContent>
         </Card>
       </div>
@@ -248,7 +256,9 @@ export function ProviderOverviewPage() {
           </Link>
         </CardHeader>
         <CardContent>
-          {services?.items.length === 0 && (
+          {servicesLoading && !services ? (
+            <DashboardListSkeleton />
+          ) : services?.items.length === 0 ? (
             <div className="py-8 text-center">
               <p className="text-sm text-muted-foreground">Hələ xidmət yoxdur</p>
               <Link
@@ -258,18 +268,19 @@ export function ProviderOverviewPage() {
                 İlk xidməti yarat
               </Link>
             </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {services?.items.slice(0, 5).map((service) => (
+                <li key={service.id} className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-sm font-medium">{service.title}</p>
+                    <p className="text-xs text-muted-foreground">{service.categoryName}</p>
+                  </div>
+                  <p className="text-sm font-medium">{formatPrice(service.price)}</p>
+                </li>
+              ))}
+            </ul>
           )}
-          <ul className="divide-y divide-border">
-            {services?.items.slice(0, 5).map((service) => (
-              <li key={service.id} className="flex items-center justify-between py-3">
-                <div>
-                  <p className="text-sm font-medium">{service.title}</p>
-                  <p className="text-xs text-muted-foreground">{service.categoryName}</p>
-                </div>
-                <p className="text-sm font-medium">{formatPrice(service.price)}</p>
-              </li>
-            ))}
-          </ul>
         </CardContent>
       </Card>
     </div>

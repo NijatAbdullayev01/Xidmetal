@@ -48,11 +48,15 @@ export class BookingsController {
       query.limit,
       query.status,
       query.statuses,
+      query.search,
     );
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Sifariş detalları' })
+  @ApiOperation({
+    summary: 'Sifariş detalları',
+    description: 'UUID və ya sifariş nömrəsi (XM-26-000421) ilə tapılır.',
+  })
   findOne(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
@@ -124,5 +128,23 @@ export class BookingsController {
   @ApiOperation({ summary: 'Yeni tarix təklifini rədd et (müştəri)' })
   rejectReschedule(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.bookingsService.rejectReschedule(id, userId);
+  }
+
+  @Post(':id/skip-provider')
+  @UseGuards(RolesGuard, EmailVerifiedGuard)
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  @RequireEmailVerified()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Təcili sifarişdə başqa xidmət verən axtar',
+    description:
+      'Qəbul olunmuş icraçını buraxır (qiymət uyğun gəlməyəndə) və onlayn namizədlərə yenidən təklif göndərir. Yalnız CONFIRMED INSTANT, iş başlamazdan əvvəl.',
+  })
+  skipProvider(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return this.bookingsService.skipProvider(id, userId, role);
   }
 }

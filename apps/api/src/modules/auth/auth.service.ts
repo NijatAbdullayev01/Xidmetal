@@ -26,6 +26,7 @@ import { generateNumericOtp } from '../../common/auth/otp';
 import { hashRefreshToken } from '../../common/auth/refresh-token';
 import { CaptchaService } from '../../common/captcha/captcha.service';
 import { StorageService } from '../../common/storage/storage.service';
+import { invalidateJwtUserCache } from '../../common/auth/jwt-user-cache';
 
 const UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
 const EMAIL_CODE_EXPIRY_MS = 15 * 60 * 1000;
@@ -326,6 +327,7 @@ export class AuthService {
         where: { userId: user.id, purpose: EmailVerificationPurpose.PASSWORD_RESET },
       }),
     ]);
+    invalidateJwtUserCache(user.id);
 
     return { message: 'Şifrə uğurla yeniləndi. Yenidən daxil olun' };
   }

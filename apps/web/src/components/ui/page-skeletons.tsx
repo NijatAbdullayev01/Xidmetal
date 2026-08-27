@@ -76,3 +76,50 @@ export function MainPageSkeleton() {
     </div>
   );
 }
+
+export function DashboardListSkeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <ul className="divide-y divide-border" aria-busy aria-label="Yüklənir">
+      {Array.from({ length: rows }).map((_, index) => (
+        <li key={index} className="py-3">
+          <Pulse className="h-4 w-2/3" />
+          <Pulse className="mt-2 h-3 w-1/3" />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function DashboardPageSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy aria-label="Yüklənir">
+      <Pulse className="h-8 w-48" />
+      <Pulse className="h-4 w-72 max-w-full" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Pulse key={index} className="h-24 rounded-xl" />
+        ))}
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Pulse className="h-56 rounded-xl" />
+        <Pulse className="h-56 rounded-xl" />
+      </div>
+    </div>
+  );
+}
+
+export function ServiceDetailSkeleton() {
+  return (
+    <div
+      className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8"
+      aria-busy
+      aria-label="Yüklənir"
+    >
+      <Pulse className="h-64 w-full rounded-2xl sm:h-80" />
+      <Pulse className="mt-6 h-8 w-2/3 max-w-lg" />
+      <Pulse className="mt-3 h-4 w-full max-w-xl" />
+      <Pulse className="mt-8 h-40 w-full rounded-xl" />
+    </div>
+  );
+}
+

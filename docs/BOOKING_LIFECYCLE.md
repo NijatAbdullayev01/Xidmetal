@@ -104,6 +104,9 @@ Hər keçiddə müvafiq `Booking` sahəsi doldurulur:
    `DISPATCH_DECLINE_REOFFER_COOLDOWN_SEC` (default 2 dəq) sonra yenidən təklif
    (axtarış pəncərəsi açıq qaldıqca və sifariş qəbul olunmayana qədər təkrarlanır).
    Rediscovery yeni ONLINE tutur.
+6b. Müştəri CONFIRMED-də (iş başlamazdan əvvəl) «Başqa xidmət verən axtar»:
+   qəbul etmiş icraçı SKIPPED, sifariş yenidən PENDING, axtarış pəncərəsi yenilənir,
+   digər onlayn namizədlərə yenidən təklif. Limit: `DISPATCH.MAX_CUSTOMER_PROVIDER_SKIPS`.
 7. Axtarış pəncərəsi bitib + hələ PENDING → auto-CANCELLED + müştəri bildirişi
 ```
 
@@ -117,9 +120,10 @@ Hər keçiddə müvafiq `Booking` sahəsi doldurulur:
 
 Hər status dəyişikliyi:
 1. DB update (transaction daxilində timestamp + status).
-2. In-app notification (+ best-effort e-poçt).
-3. WS yayımı — Phase 3.
-4. Ödəniş — məhsul qərarı / Phase 5.
+2. In-app notification + push/WS.
+3. Müştəriyə best-effort e-poçt yalnız **təsdiq** (`CONFIRMED` — SCHEDULED status + INSTANT offer accept) və **tamamlanma** (`COMPLETED`) zamanı.
+4. Ləğv (`CANCELLED`) — qarşı tərəfə best-effort e-poçt (mövcud axın).
+5. Ödəniş — məhsul qərarı / Phase 5.
 
 ---
 
@@ -137,6 +141,32 @@ Hər status dəyişikliyi:
 - Rəy yalnız `COMPLETED` sifarişə yazıla bilər.
 - Yalnız həmin sifarişin **müştərisi** rəy yaza bilər.
 - Bir sifarişə bir rəy (`Review.bookingId @unique`).
+
+---
+
+## 8b. Mesaj qapısı
+
+Sifarişə bağlı söhbət (`POST /messages/conversations` + `bookingId`) yalnız **xidmət verən qəbul etdikdən sonra, tamamlanana qədər** açıqdır — təcili (`INSTANT`) və rezervasiya (`SCHEDULED`) eyni qayda:
+
+| Status | Mesaj |
+|--------|-------|
+| `PENDING` (axtarış / təsdiq gözlənilir) | ✗ |
+| `CONFIRMED` / `EN_ROUTE` / `ARRIVED` / `IN_PROGRESS` | ✓ |
+| `COMPLETED` / `CANCELLED` / `REJECTED` | ✗ |
+
+Mənbə: `packages/shared` `isBookingMessagingEnabled`. UI «Mesaj yaz» düyməsi `PENDING`-də görünür, amma deaktivdir; `COMPLETED`-də gizlidir.
+
+Tarix təklifi (`reschedule`) PENDING-də sistem mesajı yaza bilər; müştəri söhbəti «Mesaj yaz» ilə aça bilməz.
+
+## 8c. Qiymət görünürlüyü
+
+Sifariş qiyməti **xidmət verən tərəfdə göstərilmir**. Müştəridə yalnız xidmət verən qəbul etdikdən sonra görünür (`isBookingPriceVisibleToCustomer`).
+
+| Tərəf / status | Qiymət |
+|----------------|--------|
+| Xidmət verən (bütün statuslar, o cümlədən dispatch təklifi) | ✗ |
+| Müştəri `PENDING` / `REJECTED` / qəbuldan əvvəl `CANCELLED` | ✗ |
+| Müştəri `CONFIRMED`+ (və ya `acceptedAt` dolu) | ✓ |
 
 ---
 

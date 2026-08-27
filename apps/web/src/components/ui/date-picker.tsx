@@ -175,7 +175,7 @@ export function DatePicker({
     onOpenChange(false);
   };
 
-  const displayLabel = selectedDate ? formatDate(selectedDate) : placeholder;
+  const displayLabel = value ? formatDate(value) : placeholder;
 
   return (
     <div ref={rootRef} className={cn('relative', className)}>
@@ -275,7 +275,7 @@ export function DatePicker({
                   type="button"
                   disabled={isDisabled}
                   onClick={() => handleSelect(date)}
-                  aria-label={formatDate(date)}
+                  aria-label={formatDate(key)}
                   aria-pressed={isSelected}
                   className={cn(
                     'relative flex h-10 items-center justify-center rounded-lg text-sm font-medium transition-colors',

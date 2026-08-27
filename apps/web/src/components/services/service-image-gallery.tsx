@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import type { ServiceImageSummary } from '@xidmetal/shared';
+import { toDisplayMediaUrl, type ServiceImageSummary } from '@xidmetal/shared';
 import { cn } from '@/lib/utils';
 
 interface ServiceImageGalleryProps {
@@ -64,7 +64,7 @@ export function ServiceImageGallery({
       <div className="relative overflow-hidden rounded-xl bg-muted ring-1 ring-border/60">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={active.url}
+          src={toDisplayMediaUrl(active.url)}
           alt={active.alt ?? `Xidmət şəkli ${activeIndex + 1}`}
           className={cn(
             'mx-auto max-h-[min(50dvh,420px)] w-full object-contain',
@@ -115,7 +115,7 @@ export function ServiceImageGallery({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={image.url}
+                  src={toDisplayMediaUrl(image.url)}
                   alt=""
                   className="h-full w-full object-cover"
                 />

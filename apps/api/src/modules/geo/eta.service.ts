@@ -35,7 +35,7 @@ function parseGoogleDurationSeconds(value: unknown): number | null {
 
 /**
  * Bolt üslubu yol ETA:
- * 1) Google Routes API (New) — `GOOGLE_MAPS_API_KEY` və ya `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+ * 1) Google Routes API (New) — `GOOGLE_MAPS_API_KEY` (köhnə `.env`-də `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` fallback)
  * 2) OSRM — `OSRM_BASE_URL` (default public)
  * 3) Mapbox — `MAPBOX_ACCESS_TOKEN`
  * 4) Haversine × yol əmsalı

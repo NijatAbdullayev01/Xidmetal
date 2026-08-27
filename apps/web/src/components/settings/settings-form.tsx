@@ -15,6 +15,7 @@ import {
   type RequestEmailChangeInput,
   type ConfirmEmailChangeInput,
   type DeleteAccountInput,
+  toDisplayMediaUrl,
 } from '@xidmetal/shared';
 import {
   Camera,
@@ -58,7 +59,7 @@ function UserAvatarPreview({
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={avatarUrl}
+        src={toDisplayMediaUrl(avatarUrl)}
         alt="Profil şəkli"
         className={cn('h-full w-full rounded-full object-cover', className)}
       />

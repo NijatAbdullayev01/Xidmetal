@@ -75,13 +75,31 @@ function buildSecurityHeaders() {
     localPublicApp ? localApiOrigin.replace(/^http/, 'ws') : '',
   ].filter(Boolean);
 
+  const httpMediaOrigins = [
+    process.env.STORAGE_PUBLIC_BASE_URL,
+    process.env.S3_PUBLIC_URL,
+    apiOrigin,
+    publicApiOrigin,
+    localPublicApp ? localApiOrigin : '',
+  ]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value))
+    .map((value) => {
+      try {
+        return new URL(value).origin;
+      } catch {
+        return '';
+      }
+    })
+    .filter((origin, index, all) => origin.startsWith('http:') && all.indexOf(origin) === index);
+
   const csp = [
     "default-src 'self'",
     "base-uri 'self'",
     "frame-ancestors 'none'",
     "form-action 'self'",
     "object-src 'none'",
-    "img-src 'self' data: blob: https:",
+    `img-src 'self' data: blob: https: ${httpMediaOrigins.join(' ')}`.trim(),
     "font-src 'self' data:",
     "style-src 'self' 'unsafe-inline'",
     "script-src 'self' 'unsafe-inline'" +

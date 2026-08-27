@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   PlusCircle,
@@ -21,7 +21,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { UserRole } from '@xidmetal/shared';
+import { toDisplayMediaUrl, UserRole } from '@xidmetal/shared';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth.store';
@@ -99,6 +99,7 @@ function isMyServicesNavItem(href: string) {
 
 export function DashboardSidebar({ variant }: DashboardSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const mobileHeaderRef = useRef<HTMLDivElement>(null);
   const [mobilePanelTop, setMobilePanelTop] = useState(56);
@@ -110,14 +111,22 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
     !!user && variant === 'provider',
   );
   const { unreadCount: adminUnread } = useNotifications(!!user);
-  const { needsRevisionCount } = useProviderServiceAttention(
-    !!user && variant === 'provider',
-  );
+  const {
+    needsRevisionCount,
+    unreadApprovedCount,
+    attentionCount: servicesAttention,
+  } = useProviderServiceAttention(!!user && variant === 'provider');
 
   const navItems = variant === 'provider' ? PROVIDER_NAV : CUSTOMER_NAV;
   const roleLabel = ROLE_LABELS[variant];
 
   useScrollLock(mobileOpen);
+
+  useEffect(() => {
+    for (const item of navItems) {
+      void router.prefetch(item.href);
+    }
+  }, [navItems, router]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -159,7 +168,7 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
       {user?.avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={user.avatarUrl}
+          src={toDisplayMediaUrl(user.avatarUrl)}
           alt={`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()}
           className="h-full w-full object-cover"
         />
@@ -190,6 +199,9 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
   if (needsRevisionCount > 0) {
     liveParts.push(`${needsRevisionCount} xidmət düzəliş gözləyir`);
   }
+  if (unreadApprovedCount > 0) {
+    liveParts.push(`${unreadApprovedCount} xidmət təsdiqi`);
+  }
   const liveMessage = liveParts.join('. ');
 
   const navContent = (
@@ -207,12 +219,13 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
         else if (isBookingsNavItem(item.href)) attention = bookingAttention;
         else if (isRatingsNavItem(item.href)) attention = reviewAttention;
         else if (isNotificationsNavItem(item.href)) attention = adminUnread;
-        else if (isMyServicesNavItem(item.href)) attention = needsRevisionCount;
+        else if (isMyServicesNavItem(item.href)) attention = servicesAttention;
         const attentionLabel = formatNavAttentionAria(item.label, attention);
         return (
           <Link
             key={item.href}
             href={item.href}
+            prefetch
             onClick={closeMobile}
             aria-label={attentionLabel}
             title={attentionLabel}

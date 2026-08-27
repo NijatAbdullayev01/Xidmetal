@@ -89,6 +89,12 @@ export class AdminBookingsQueryDto extends AdminPaginationQueryDto {
   @IsOptional()
   @IsEnum(BookingStatus)
   status?: BookingStatus;
+
+  @ApiPropertyOptional({ description: 'Sifariş nömrəsi (XM-26-000421)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  search?: string;
 }
 
 export class AdminReviewsQueryDto extends AdminPaginationQueryDto {

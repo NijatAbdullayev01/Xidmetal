@@ -46,18 +46,6 @@ export const BOOKING_STATUS_VARIANTS: Record<
   [BookingStatus.REJECTED]: 'destructive',
 };
 
-/** Düz mətn status rəngləri (badge olmadan) — hər status ayrı rəng */
-export const BOOKING_STATUS_TEXT_CLASSES: Record<BookingStatus, string> = {
-  [BookingStatus.PENDING]: 'text-amber-700 dark:text-amber-400',
-  [BookingStatus.CONFIRMED]: 'text-sky-600 dark:text-sky-400',
-  [BookingStatus.EN_ROUTE]: 'text-indigo-600 dark:text-indigo-400',
-  [BookingStatus.ARRIVED]: 'text-teal-600 dark:text-teal-400',
-  [BookingStatus.IN_PROGRESS]: 'text-orange-600 dark:text-orange-400',
-  [BookingStatus.COMPLETED]: 'text-success',
-  [BookingStatus.CANCELLED]: 'text-destructive',
-  [BookingStatus.REJECTED]: 'text-destructive',
-};
-
 export const BOOKING_TYPE_LABELS: Record<BookingType, string> = {
   [BookingType.SCHEDULED]: 'Planlaşdırılmış',
   [BookingType.INSTANT]: 'Təcili',
