@@ -8,11 +8,12 @@ describe('assertProductionRuntimeConfig', () => {
     mediaSigningSecret: 'media-secret-media-secret-media-1234',
     smtpHost: 'smtp.example.com',
     turnstileSecret: 'turnstile-secret',
-    redisUrl: 'redis://localhost:6379',
+    redisUrl: 'redis://:strong-redis-password@localhost:6379',
     metricsToken: 'metrics-secret',
     geocoderProvider: 'nominatim',
     paymentsEnabled: 'false',
     paymentProvider: 'noop',
+    databaseUrl: 'postgresql://xidmetal:long-random-db-pass@postgres:5432/xidmetal',
   };
 
   it('development-da heç nə etmir', () => {
@@ -93,13 +94,40 @@ describe('assertProductionRuntimeConfig', () => {
     ).toThrow(/PAYMENTS_ENABLED/);
   });
 
-  it('Cloudflare dummy Turnstile secret boot-u dayandırmır (captcha skip)', () => {
+  it('Cloudflare dummy Turnstile secret production-da qadağandır', () => {
     expect(() =>
       assertProductionRuntimeConfig({
         ...valid,
         turnstileSecret: '1x0000000000000000000000000000000AA',
       }),
-    ).not.toThrow();
+    ).toThrow(/TURNSTILE_SECRET_KEY/);
+  });
+
+  it('Cloudflare dummy Turnstile site key production-da qadağandır', () => {
+    expect(() =>
+      assertProductionRuntimeConfig({
+        ...valid,
+        turnstileSiteKey: '1x00000000000000000000AA',
+      }),
+    ).toThrow(/TURNSTILE_SITE_KEY/);
+  });
+
+  it('şifrəsiz Redis production-da qadağandır', () => {
+    expect(() =>
+      assertProductionRuntimeConfig({
+        ...valid,
+        redisUrl: 'redis://localhost:6379',
+      }),
+    ).toThrow(/REDIS_URL/);
+  });
+
+  it('xidmetal_dev DATABASE_URL production-da qadağandır', () => {
+    expect(() =>
+      assertProductionRuntimeConfig({
+        ...valid,
+        databaseUrl: 'postgresql://xidmetal:xidmetal_dev@postgres:5432/xidmetal',
+      }),
+    ).toThrow(/DATABASE_URL/);
   });
 
   it('PAYMENT_PROVIDER=stripe production-da qadağandır', () => {

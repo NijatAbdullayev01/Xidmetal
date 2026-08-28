@@ -9,11 +9,15 @@ import {
   changePasswordSchema,
   requestEmailChangeSchema,
   confirmEmailChangeSchema,
+  requestPhoneChangeSchema,
+  confirmPhoneChangeSchema,
   deleteAccountSchema,
   type UpdateProfileInput,
   type ChangePasswordInput,
   type RequestEmailChangeInput,
   type ConfirmEmailChangeInput,
+  type RequestPhoneChangeInput,
+  type ConfirmPhoneChangeInput,
   type DeleteAccountInput,
   toDisplayMediaUrl,
 } from '@xidmetal/shared';
@@ -94,7 +98,6 @@ export function SettingsForm() {
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
   const [profileServerError, setProfileServerError] = useState<string | null>(null);
-  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [passwordServerError, setPasswordServerError] = useState<string | null>(null);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -102,6 +105,9 @@ export function SettingsForm() {
   const [emailChangeStep, setEmailChangeStep] = useState<'idle' | 'editing' | 'verify'>('idle');
   const [emailChangeSuccess, setEmailChangeSuccess] = useState<string | null>(null);
   const [emailChangeServerError, setEmailChangeServerError] = useState<string | null>(null);
+  const [phoneChangeStep, setPhoneChangeStep] = useState<'idle' | 'editing' | 'verify'>('idle');
+  const [phoneChangeSuccess, setPhoneChangeSuccess] = useState<string | null>(null);
+  const [phoneChangeServerError, setPhoneChangeServerError] = useState<string | null>(null);
 
   const dismissTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
   useEffect(() => {
@@ -129,7 +135,6 @@ export function SettingsForm() {
     defaultValues: {
       firstName: authUser?.firstName ?? '',
       lastName: authUser?.lastName ?? '',
-      phone: authUser?.phone ?? '',
     },
   });
 
@@ -162,13 +167,22 @@ export function SettingsForm() {
     defaultValues: { newEmail: '', code: '' },
   });
 
+  const phoneRequestForm = useForm<RequestPhoneChangeInput>({
+    resolver: zodResolver(requestPhoneChangeSchema),
+    defaultValues: { newPhone: '' },
+  });
+
+  const phoneConfirmForm = useForm<ConfirmPhoneChangeInput>({
+    resolver: zodResolver(confirmPhoneChangeSchema),
+    defaultValues: { newPhone: '', code: '' },
+  });
+
   useEffect(() => {
     if (!source) return;
 
     profileForm.reset({
       firstName: source.firstName,
       lastName: source.lastName,
-      phone: source.phone ?? '',
     });
     setAvatarPreview(source.avatarUrl);
     setAvatarRemoved(false);
@@ -185,7 +199,6 @@ export function SettingsForm() {
       const payload: ProfileFormValues = {
         firstName: data.firstName,
         lastName: data.lastName,
-        phone: data.phone?.trim() || '',
       };
 
       if (avatarRemoved) {
@@ -223,9 +236,8 @@ export function SettingsForm() {
       }),
     onSuccess: () => {
       passwordForm.reset();
-      setPasswordSuccess('Şifrə uğurla dəyişdirildi');
-      setPasswordServerError(null);
-      autoDismiss(setPasswordSuccess, 4000);
+      logout();
+      router.replace('/login');
     },
     onError: (error) => {
       if (error instanceof ApiError) {
@@ -274,15 +286,12 @@ export function SettingsForm() {
   const confirmEmailChangeMutation = useMutation({
     mutationFn: (data: ConfirmEmailChangeInput) =>
       api.users.confirmEmailChange(token!, data),
-    onSuccess: (updatedUser) => {
-      updateUser(updatedUser);
-      queryClient.setQueryData(['users', 'me'], updatedUser);
+    onSuccess: () => {
       emailRequestForm.reset();
       emailConfirmForm.reset();
       setEmailChangeStep('idle');
-      setEmailChangeSuccess('E-poçt ünvanı uğurla dəyişdirildi');
-      setEmailChangeServerError(null);
-      autoDismiss(setEmailChangeSuccess, 4000);
+      logout();
+      router.replace('/login');
     },
     onError: (error) => {
       if (error instanceof ApiError) {
@@ -293,12 +302,62 @@ export function SettingsForm() {
     },
   });
 
+  const requestPhoneChangeMutation = useMutation({
+    mutationFn: (data: RequestPhoneChangeInput) =>
+      api.users.requestPhoneChange(token!, data),
+    onSuccess: (_, variables) => {
+      phoneConfirmForm.setValue('newPhone', variables.newPhone);
+      phoneConfirmForm.setValue('code', '');
+      setPhoneChangeStep('verify');
+      setPhoneChangeServerError(null);
+      setPhoneChangeSuccess('Təsdiq kodu cari e-poçt ünvanınıza göndərildi');
+      autoDismiss(setPhoneChangeSuccess, 5000);
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setPhoneChangeServerError(error.message);
+      } else {
+        setPhoneChangeServerError('Kod göndərilərkən xəta baş verdi');
+      }
+    },
+  });
+
+  const confirmPhoneChangeMutation = useMutation({
+    mutationFn: (data: ConfirmPhoneChangeInput) =>
+      api.users.confirmPhoneChange(token!, data),
+    onSuccess: (updatedUser) => {
+      updateUser(updatedUser);
+      queryClient.setQueryData(['users', 'me'], updatedUser);
+      phoneRequestForm.reset();
+      phoneConfirmForm.reset();
+      setPhoneChangeStep('idle');
+      setPhoneChangeSuccess('Telefon nömrəsi yeniləndi');
+      setPhoneChangeServerError(null);
+      autoDismiss(setPhoneChangeSuccess, 4000);
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setPhoneChangeServerError(error.message);
+      } else {
+        setPhoneChangeServerError('Telefon dəyişdirilərkən xəta baş verdi');
+      }
+    },
+  });
+
   const handleCancelEmailChange = () => {
     setEmailChangeStep('idle');
     emailRequestForm.reset();
     emailConfirmForm.reset();
     setEmailChangeServerError(null);
     setEmailChangeSuccess(null);
+  };
+
+  const handleCancelPhoneChange = () => {
+    setPhoneChangeStep('idle');
+    phoneRequestForm.reset();
+    phoneConfirmForm.reset();
+    setPhoneChangeServerError(null);
+    setPhoneChangeSuccess(null);
   };
 
   const handleAvatarSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -453,54 +512,6 @@ export function SettingsForm() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="phone">Mobil nömrə</Label>
-              <Controller
-                name="phone"
-                control={profileForm.control}
-                render={({ field }) => (
-                  <div
-                    className={cn(
-                      'flex h-10 w-full overflow-hidden rounded-lg border bg-background transition-colors',
-                      'focus-within:border-brand focus-within:ring-2 focus-within:ring-inset focus-within:ring-brand/40',
-                      profileForm.formState.errors.phone ? 'border-destructive' : 'border-border',
-                    )}
-                  >
-                    <span
-                      className="flex shrink-0 items-center border-r border-border bg-muted/40 px-2.5 text-sm text-muted-foreground select-none sm:px-3"
-                      aria-hidden
-                    >
-                      {AZ_PHONE_PREFIX}
-                    </span>
-                    <input
-                      id="phone"
-                      type="tel"
-                      autoComplete="tel"
-                      inputMode="numeric"
-                      placeholder="501234567"
-                      name={field.name}
-                      ref={field.ref}
-                      onBlur={field.onBlur}
-                      value={azPhoneLocalPart(field.value)}
-                      onChange={(event) => {
-                        field.onChange(toAzPhoneValue(event.target.value));
-                      }}
-                      className={cn(
-                        'min-w-0 flex-1 bg-transparent px-2.5 py-2 text-sm outline-none sm:px-3',
-                        'placeholder:text-muted-foreground',
-                      )}
-                      aria-invalid={!!profileForm.formState.errors.phone}
-                    />
-                  </div>
-                )}
-              />
-              {profileForm.formState.errors.phone && (
-                <p className="text-sm text-destructive">
-                  {profileForm.formState.errors.phone.message}
-                </p>
-              )}
-            </div>
-
             {profileServerError && (
               <p className="text-sm text-destructive">{profileServerError}</p>
             )}
@@ -523,6 +534,203 @@ export function SettingsForm() {
               )}
             </Button>
           </form>
+
+          <div className="space-y-3 border-t border-border pt-6">
+            <div>
+              <h3 className="text-base font-semibold">Mobil nömrə</h3>
+              <p className="text-sm text-muted-foreground">
+                Nömrə dəyişəndə təsdiq kodu cari e-poçtunuza göndərilir.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <Label>Cari nömrə</Label>
+                {phoneChangeStep === 'idle' && (
+                  <p className="mt-1 text-sm">{source.phone || '—'}</p>
+                )}
+              </div>
+              {phoneChangeStep === 'idle' && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-[44px] shrink-0"
+                  onClick={() => {
+                    setPhoneChangeStep('editing');
+                    setPhoneChangeServerError(null);
+                    setPhoneChangeSuccess(null);
+                    phoneRequestForm.reset({ newPhone: '' });
+                  }}
+                >
+                  Nömrəni dəyiş
+                </Button>
+              )}
+            </div>
+
+            {phoneChangeStep === 'editing' && (
+              <form
+                onSubmit={phoneRequestForm.handleSubmit((values) =>
+                  requestPhoneChangeMutation.mutate(values),
+                )}
+                className="space-y-3"
+                noValidate
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="newPhone">Yeni nömrə</Label>
+                  <Controller
+                    name="newPhone"
+                    control={phoneRequestForm.control}
+                    render={({ field }) => (
+                      <div
+                        className={cn(
+                          'flex h-10 w-full overflow-hidden rounded-lg border bg-background transition-colors',
+                          'focus-within:border-brand focus-within:ring-2 focus-within:ring-inset focus-within:ring-brand/40',
+                          phoneRequestForm.formState.errors.newPhone
+                            ? 'border-destructive'
+                            : 'border-border',
+                        )}
+                      >
+                        <span
+                          className="flex shrink-0 items-center border-r border-border bg-muted/40 px-2.5 text-sm text-muted-foreground select-none sm:px-3"
+                          aria-hidden
+                        >
+                          {AZ_PHONE_PREFIX}
+                        </span>
+                        <input
+                          id="newPhone"
+                          type="tel"
+                          autoComplete="tel"
+                          inputMode="numeric"
+                          placeholder="501234567"
+                          name={field.name}
+                          ref={field.ref}
+                          onBlur={field.onBlur}
+                          value={azPhoneLocalPart(field.value)}
+                          onChange={(event) => {
+                            field.onChange(toAzPhoneValue(event.target.value));
+                          }}
+                          className={cn(
+                            'min-w-0 flex-1 bg-transparent px-2.5 py-2 text-sm outline-none sm:px-3',
+                            'placeholder:text-muted-foreground',
+                          )}
+                          aria-invalid={!!phoneRequestForm.formState.errors.newPhone}
+                        />
+                      </div>
+                    )}
+                  />
+                  {phoneRequestForm.formState.errors.newPhone && (
+                    <p className="text-sm text-destructive">
+                      {phoneRequestForm.formState.errors.newPhone.message}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    type="submit"
+                    className="min-h-[44px]"
+                    disabled={requestPhoneChangeMutation.isPending}
+                  >
+                    {requestPhoneChangeMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Göndərilir...
+                      </>
+                    ) : (
+                      'Təsdiq kodu göndər'
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-[44px]"
+                    onClick={handleCancelPhoneChange}
+                  >
+                    Ləğv et
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {phoneChangeStep === 'verify' && (
+              <form
+                onSubmit={phoneConfirmForm.handleSubmit((values) =>
+                  confirmPhoneChangeMutation.mutate(values),
+                )}
+                className="space-y-3"
+                noValidate
+              >
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">
+                    {phoneConfirmForm.watch('newPhone')}
+                  </span>{' '}
+                  üçün e-poçtunuza göndərilən 8 rəqəmli kodu daxil edin.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="phoneVerificationCode">Təsdiq kodu</Label>
+                  <Input
+                    id="phoneVerificationCode"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="12345678"
+                    maxLength={8}
+                    className="max-w-xs tracking-widest"
+                    {...phoneConfirmForm.register('code')}
+                  />
+                  {phoneConfirmForm.formState.errors.code && (
+                    <p className="text-sm text-destructive">
+                      {phoneConfirmForm.formState.errors.code.message}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    type="submit"
+                    className="min-h-[44px]"
+                    disabled={confirmPhoneChangeMutation.isPending}
+                  >
+                    {confirmPhoneChangeMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Təsdiq edilir...
+                      </>
+                    ) : (
+                      'Nömrəni təsdiq et'
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-[44px]"
+                    disabled={requestPhoneChangeMutation.isPending}
+                    onClick={() => {
+                      const newPhone = phoneConfirmForm.getValues('newPhone');
+                      if (newPhone) {
+                        requestPhoneChangeMutation.mutate({ newPhone });
+                      }
+                    }}
+                  >
+                    Kodu yenidən göndər
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="min-h-[44px]"
+                    onClick={handleCancelPhoneChange}
+                  >
+                    Ləğv et
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {phoneChangeServerError && (
+              <p className="text-sm text-destructive">{phoneChangeServerError}</p>
+            )}
+            {phoneChangeSuccess && (
+              <p className="text-sm text-green-600 dark:text-green-400">{phoneChangeSuccess}</p>
+            )}
+          </div>
 
           <div className="space-y-3 border-t border-border pt-6">
             <div>
@@ -694,7 +902,8 @@ export function SettingsForm() {
             <div>
               <h3 className="text-base font-semibold">Şifrə</h3>
               <p className="text-sm text-muted-foreground">
-                Hesab təhlükəsizliyi üçün güclü şifrə istifadə edin.
+                Hesab təhlükəsizliyi üçün güclü şifrə istifadə edin. Tövsiyə: ən azı 10 simvol və
+                xüsusi işarə (!@#$).
               </p>
             </div>
 
@@ -797,9 +1006,6 @@ export function SettingsForm() {
 
               {passwordServerError && (
                 <p className="text-sm text-destructive">{passwordServerError}</p>
-              )}
-              {passwordSuccess && (
-                <p className="text-sm text-green-600 dark:text-green-400">{passwordSuccess}</p>
               )}
 
               <Button

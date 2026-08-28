@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
-import { formatPrice, formatDate } from '@/lib/utils';
+import { formatPrice, formatDate, cn } from '@/lib/utils';
 import {
   SERVICE_STATUS_LABELS,
   SERVICE_STATUS_VARIANTS,
@@ -192,7 +192,7 @@ export function MyServicesPage() {
         </Card>
       )}
 
-      <div className="grid gap-4">
+      <div className="grid gap-3 sm:gap-4">
         {data?.items.map((service) => {
           const hasBookingHistory = (service.bookingCount ?? 0) > 0;
           const hasActiveBookings = (service.activeBookingCount ?? 0) > 0;
@@ -204,7 +204,7 @@ export function MyServicesPage() {
 
           return (
           <Card key={service.id}>
-            <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-6">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="font-semibold">{service.title}</h3>
@@ -216,11 +216,11 @@ export function MyServicesPage() {
                   {service.description}
                 </p>
                 {service.status === ServiceStatus.PENDING_REVIEW ? (
-                  <p className="mt-2 text-sm text-muted-foreground">
+                  <p className="mt-1.5 text-sm text-muted-foreground sm:mt-2">
                     Admin yoxlamasındadır — təsdiqdən sonra müştərilərə görünəcək.
                   </p>
                 ) : null}
-                <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                <div className="mt-1.5 flex flex-col gap-1 text-xs text-muted-foreground sm:mt-2 sm:flex-row sm:flex-wrap sm:gap-3">
                   <span>Kateqoriya: {service.categoryName}</span>
                   <span>
                     Qiymət:{' '}
@@ -232,7 +232,7 @@ export function MyServicesPage() {
                 </div>
                 {needsRevision && service.reviewNote ? (
                   <p
-                    className="mt-2 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-100"
+                    className="mt-1.5 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-100 sm:mt-2"
                     role="status"
                   >
                     Moderator qeydi: {service.reviewNote}
@@ -240,10 +240,10 @@ export function MyServicesPage() {
                 ) : null}
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex min-w-0 flex-nowrap gap-1.5 overflow-x-auto overscroll-x-contain scrollbar-none sm:flex-wrap sm:justify-end sm:gap-2 sm:overflow-visible">
                 <Link
                   href={`/dashboard/provider/services/${service.id}/edit`}
-                  className={buttonStyles('outline', 'sm')}
+                  className={cn(buttonStyles('outline', 'sm'), 'shrink-0')}
                   aria-label={`${service.title} xidmətini düzəliş et`}
                 >
                   <Pencil className="h-4 w-4" />
@@ -253,6 +253,7 @@ export function MyServicesPage() {
                   service.status === ServiceStatus.NEEDS_REVISION) && (
                   <Button
                     size="sm"
+                    className="shrink-0"
                     disabled={actionId === service.id || !isVerified || !canSubmit}
                     title={
                       !isVerified
@@ -274,6 +275,7 @@ export function MyServicesPage() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="shrink-0"
                     disabled={actionId === service.id}
                     onClick={() => handleStatusChange(service.id, ServiceStatus.PAUSED)}
                   >
@@ -283,6 +285,7 @@ export function MyServicesPage() {
                 {service.status === ServiceStatus.PAUSED && (
                   <Button
                     size="sm"
+                    className="shrink-0"
                     disabled={actionId === service.id || !isVerified}
                     title={
                       !isVerified
@@ -297,6 +300,7 @@ export function MyServicesPage() {
                 <Button
                   size="sm"
                   variant="destructive"
+                  className="shrink-0"
                   disabled={actionId === service.id || hasActiveBookings}
                   title={
                     hasActiveBookings

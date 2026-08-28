@@ -17,6 +17,7 @@ function user(id: string): JwtAuthUser {
     isVerified: true,
     deletedAt: null,
     passwordChangedAt: null,
+    sessionsRevokedAt: null,
   };
 }
 

@@ -108,14 +108,21 @@ describe('booking status transitions (shared lifecycle)', () => {
     expect(isCancellableBookingStatus(BookingStatus.IN_PROGRESS)).toBe(false);
   });
 
-  it('admin hər keçidi edə bilər', () => {
+  it('admin sifariş statusunu dəyişə bilməz', () => {
     expect(
       isBookingTransitionAllowed(BookingStatus.PENDING, BookingStatus.COMPLETED, {
         isProvider: false,
         isCustomer: false,
         isAdmin: true,
       }),
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      isBookingTransitionAllowed(BookingStatus.EN_ROUTE, BookingStatus.CANCELLED, {
+        isProvider: false,
+        isCustomer: false,
+        isAdmin: true,
+      }),
+    ).toBe(false);
   });
 
   it('ACTIVE_BOOKING_STATUSES EN_ROUTE/ARRIVED daxildir', () => {

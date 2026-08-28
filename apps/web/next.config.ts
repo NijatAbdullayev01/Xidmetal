@@ -79,8 +79,7 @@ function buildSecurityHeaders() {
     'https://challenges.cloudflare.com',
   ].filter(Boolean);
 
-  // `https:` bütün HTTPS media-nı açır; lokal API isə HTTP-dir (`http://localhost:4100`)
-  const httpMediaOrigins = [
+  const mediaOrigins = [
     process.env.STORAGE_PUBLIC_BASE_URL,
     process.env.S3_PUBLIC_URL,
     apiOrigin,
@@ -96,7 +95,7 @@ function buildSecurityHeaders() {
         return '';
       }
     })
-    .filter((origin, index, all) => origin.startsWith('http:') && all.indexOf(origin) === index);
+    .filter((origin, index, all) => origin.length > 0 && all.indexOf(origin) === index);
 
   const csp = [
     "default-src 'self'",
@@ -104,7 +103,7 @@ function buildSecurityHeaders() {
     "frame-ancestors 'none'",
     "form-action 'self'",
     "object-src 'none'",
-    `img-src 'self' data: blob: https: ${httpMediaOrigins.join(' ')}`.trim(),
+    `img-src 'self' data: blob: https://challenges.cloudflare.com ${mediaOrigins.join(' ')}`.trim(),
     "font-src 'self' data: https://fonts.gstatic.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "script-src 'self' 'unsafe-inline'" +
@@ -119,14 +118,22 @@ function buildSecurityHeaders() {
     csp.push('upgrade-insecure-requests');
   }
 
-  return [
+  const headers = [
     { key: 'Content-Security-Policy', value: csp.join('; ') },
-    // Safari `(self)` / Feature-Policy-ni PERMISSION_DENIED kimi oxuyur
-    { key: 'Permissions-Policy', value: 'geolocation=*' },
+    { key: 'Permissions-Policy', value: 'geolocation=(self)' },
     { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
     { key: 'X-Content-Type-Options', value: 'nosniff' },
     { key: 'X-Frame-Options', value: 'DENY' },
   ];
+
+  if (process.env.NODE_ENV === 'production') {
+    headers.push({
+      key: 'Strict-Transport-Security',
+      value: 'max-age=31536000; includeSubDomains',
+    });
+  }
+
+  return headers;
 }
 
 const nextConfig: NextConfig = {

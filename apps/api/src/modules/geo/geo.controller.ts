@@ -54,7 +54,7 @@ export class GeoController {
 
   @Public()
   @Get('nearby')
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @ApiOperation({
     summary: 'Yaxın onlayn xidmət verənlər (PostGIS ST_DWithin; fallback haversine)',
   })
@@ -62,16 +62,25 @@ export class GeoController {
     return this.geoService.findNearby(query);
   }
 
-  @Public()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Get('route')
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({
-    summary: 'Sürücülük marşrutu — ETA, məsafə, polyline (Google Routes / OSRM)',
+    summary: 'Sürücülük marşrutu — yalnız sifariş iştirakçısı, təyinat booking dest-dir',
   })
-  async route(@Query() query: DrivingRouteQueryDto) {
+  async route(
+    @CurrentUser() user: { id: string; role: string },
+    @Query() query: DrivingRouteQueryDto,
+  ) {
+    const dest = await this.geoService.assertDrivingRouteDest(
+      user.id,
+      user.role,
+      query.bookingId,
+    );
     const estimate = await this.etaService.estimate(
       { lat: query.fromLat, lng: query.fromLng },
-      { lat: query.toLat, lng: query.toLng },
+      dest,
     );
     return {
       etaSeconds: estimate.etaSeconds,

@@ -47,4 +47,6 @@ packages/database/prisma/migrations/**/migration_lock.toml
 # Misc
 *.tsbuildinfo
 .vercel
-uploads/
+# Local object storage (repo root / API cwd) — NestJS `modules/uploads` deyil
+/uploads/
+/apps/api/uploads/

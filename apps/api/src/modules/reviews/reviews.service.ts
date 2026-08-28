@@ -256,7 +256,7 @@ export class ReviewsService {
   private mapReview(review: ReviewWithRelations, authorMode: 'full' | 'public') {
     return {
       id: review.id,
-      bookingId: review.bookingId,
+      ...(authorMode === 'full' ? { bookingId: review.bookingId } : {}),
       serviceTitle: review.booking.service.title,
       authorName:
         authorMode === 'public'

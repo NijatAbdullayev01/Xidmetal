@@ -37,6 +37,7 @@ import {
   type BookingSummary,
 } from '@xidmetal/shared';
 import { DispatchOfferStatus, ServiceStatus } from '@prisma/client';
+import { redactBookingPiiForOffer } from './booking-pii';
 import { AvailabilityService } from '../availability/availability.service';
 import { shouldNotifyCustomerOnConfirmOrReject } from './booking-status-notify';
 import { RealtimeService } from '../realtime/realtime.service';
@@ -142,7 +143,7 @@ export class BookingsService {
         (offer.status === DispatchOfferStatus.PENDING &&
           offer.expiresAt <= new Date())
       ) {
-        throw new ForbiddenException('Bu sifarişə baxmaq icazəniz yoxdur');
+        throw new NotFoundException('Sifariş tapılmadı');
       }
       if (offer.status === DispatchOfferStatus.PENDING) {
         dispatchOffer = {
@@ -152,7 +153,7 @@ export class BookingsService {
         };
       }
     } else if (role !== UserRole.ADMIN && !isParticipant) {
-      throw new ForbiddenException('Bu sifarişə baxmaq icazəniz yoxdur');
+      throw new NotFoundException('Sifariş tapılmadı');
     } else if (
       role === UserRole.PROVIDER &&
       booking.type === BookingType.INSTANT &&
@@ -417,7 +418,7 @@ export class BookingsService {
 
       const address = dto.address?.trim();
       if (!service.isRemote && !address) {
-        throw new BadRequestException('Yazılı ünvan daxil edin');
+        throw new BadRequestException('Ünvan daxil edin');
       }
 
       if (isInstant && !destCoords) {
@@ -784,9 +785,10 @@ export class BookingsService {
     });
     if (!booking) throw new NotFoundException('Sifariş tapılmadı');
 
-    const isAdmin = role === UserRole.ADMIN;
-    const isCustomer = booking.customerId === userId;
-    if (!isCustomer && !isAdmin) {
+    if (role === UserRole.ADMIN) {
+      throw new ForbiddenException('İdarəçi sifarişə müdaxilə edə bilməz');
+    }
+    if (booking.customerId !== userId) {
       throw new ForbiddenException('Bu sifarişi idarə etmək icazəniz yoxdur');
     }
 
@@ -803,11 +805,14 @@ export class BookingsService {
     const booking = await this.prisma.booking.findUnique({ where: { id } });
     if (!booking) throw new NotFoundException('Sifariş tapılmadı');
 
+    if (role === UserRole.ADMIN) {
+      throw new ForbiddenException('İdarəçi sifarişə müdaxilə edə bilməz');
+    }
+
     const isProvider = isAssignedProvider(userId, booking);
     const isCustomer = booking.customerId === userId;
-    const isAdmin = role === UserRole.ADMIN;
 
-    if (!isProvider && !isCustomer && !isAdmin) {
+    if (!isProvider && !isCustomer) {
       throw new ForbiddenException('Bu sifarişi idarə etmək icazəniz yoxdur');
     }
 
@@ -815,7 +820,7 @@ export class BookingsService {
       !isBookingTransitionAllowed(booking.status as BookingStatus, dto.status, {
         isProvider,
         isCustomer,
-        isAdmin,
+        isAdmin: false,
       })
     ) {
       throw new BadRequestException('Bu status dəyişikliyi icazəli deyil');
@@ -825,7 +830,6 @@ export class BookingsService {
     if (
       booking.type === BookingType.INSTANT &&
       booking.status === BookingStatus.PENDING &&
-      !isAdmin &&
       (dto.status === BookingStatus.CONFIRMED ||
         dto.status === BookingStatus.REJECTED)
     ) {
@@ -854,11 +858,7 @@ export class BookingsService {
         dto.status === BookingStatus.CANCELLED
           ? {
               cancelReason: dto.cancelReason!.trim(),
-              cancelledBy: isAdmin
-                ? 'ADMIN'
-                : isCustomer
-                  ? 'CUSTOMER'
-                  : 'PROVIDER',
+              cancelledBy: isCustomer ? 'CUSTOMER' : 'PROVIDER',
               cancelledAt: now,
             }
           : dto.status === BookingStatus.REJECTED
@@ -894,7 +894,7 @@ export class BookingsService {
 
       if (
         dto.status === BookingStatus.CONFIRMED &&
-        shouldNotifyCustomerOnConfirmOrReject(isProvider, isAdmin)
+        shouldNotifyCustomerOnConfirmOrReject(isProvider, false)
       ) {
         await tx.notification.create({
           data: {
@@ -909,9 +909,9 @@ export class BookingsService {
 
       if (
         dto.status === BookingStatus.REJECTED &&
-        shouldNotifyCustomerOnConfirmOrReject(isProvider, isAdmin)
+        shouldNotifyCustomerOnConfirmOrReject(isProvider, false)
       ) {
-        const actorLabel = isAdmin ? 'idarəçi' : 'xidmət verən';
+        const actorLabel = 'xidmət verən';
         const reasonSuffix = dto.cancelReason?.trim()
           ? ` Səbəb: ${dto.cancelReason.trim()}`
           : '';
@@ -984,11 +984,7 @@ export class BookingsService {
             : null
           : booking.customerId;
         if (recipientId) {
-          const actorLabel = isAdmin
-            ? 'idarəçi'
-            : isCustomer
-              ? 'müştəri'
-              : 'xidmət verən';
+          const actorLabel = isCustomer ? 'müştəri' : 'xidmət verən';
           const reasonSuffix = dto.cancelReason?.trim()
             ? ` Səbəb: ${dto.cancelReason.trim()}`
             : '';
@@ -1013,7 +1009,7 @@ export class BookingsService {
     this.enqueueStatusEmails(updated, {
       isProvider,
       isCustomer,
-      isAdmin,
+      isAdmin: false,
       cancelReason: dto.cancelReason?.trim(),
       status: dto.status,
       notifyAssignedProvider: hasAssignedProvider,
@@ -1354,13 +1350,28 @@ export class BookingsService {
       expiresAt: Date;
     },
   ) {
+    const offerPii = dispatchOffer
+      ? redactBookingPiiForOffer({
+          address: booking.address ?? null,
+          destLat: booking.destLat ?? null,
+          destLng: booking.destLng ?? null,
+          originLat: booking.originLat ?? null,
+          originLng: booking.originLng ?? null,
+          notes: booking.notes,
+          customerFirstName: booking.customer.firstName,
+          customerLastName: booking.customer.lastName,
+        })
+      : null;
+
     return {
       id: booking.id,
       orderNumber: booking.orderNumber,
       serviceId: booking.serviceId,
       serviceTitle: booking.service.title,
       customerId: booking.customerId,
-      customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+      customerName: offerPii
+        ? offerPii.customerName
+        : `${booking.customer.firstName} ${booking.customer.lastName}`,
       providerId: booking.providerId,
       providerName: `${booking.provider.firstName} ${booking.provider.lastName}`,
       providerRating: booking.provider.providerProfile?.rating ?? 0,
@@ -1370,13 +1381,15 @@ export class BookingsService {
       status: booking.status,
       type: (booking.type as BookingType | undefined) ?? BookingType.SCHEDULED,
       totalPrice: booking.totalPrice.toNumber(),
-      notes: booking.notes ?? undefined,
-      address: booking.address ?? undefined,
-      destLat: booking.destLat ?? null,
-      destLng: booking.destLng ?? null,
-      originLat: booking.originLat ?? null,
-      originLng: booking.originLng ?? null,
-      imageUrl: await this.storageService.toReadableMediaUrl(booking.imageUrl),
+      notes: offerPii ? undefined : booking.notes ?? undefined,
+      address: offerPii ? offerPii.address ?? undefined : booking.address ?? undefined,
+      destLat: offerPii ? offerPii.destLat : booking.destLat ?? null,
+      destLng: offerPii ? offerPii.destLng : booking.destLng ?? null,
+      originLat: offerPii ? null : booking.originLat ?? null,
+      originLng: offerPii ? null : booking.originLng ?? null,
+      imageUrl: offerPii
+        ? null
+        : await this.storageService.toReadableMediaUrl(booking.imageUrl),
       cancelReason: booking.cancelReason ?? undefined,
       cancelledBy: booking.cancelledBy ?? undefined,
       cancelledAt: booking.cancelledAt?.toISOString(),

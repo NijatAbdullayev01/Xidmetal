@@ -4,6 +4,8 @@ import {
   ConflictException,
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -26,7 +28,8 @@ import { generateNumericOtp } from '../../common/auth/otp';
 import { hashRefreshToken } from '../../common/auth/refresh-token';
 import { CaptchaService } from '../../common/captcha/captcha.service';
 import { StorageService } from '../../common/storage/storage.service';
-import { invalidateJwtUserCache } from '../../common/auth/jwt-user-cache';
+import { RedisService } from '../../common/redis/redis.service';
+import { SessionRevocationService } from '../../common/auth/session-revocation.service';
 
 const UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
 const EMAIL_CODE_EXPIRY_MS = 15 * 60 * 1000;
@@ -34,8 +37,14 @@ const EMAIL_CODE_EXPIRY_MS = 15 * 60 * 1000;
 /** İstifadəçi enumeration / timing attack-ə qarşı vahid cavab */
 const FORGOT_PASSWORD_MESSAGE =
   'Əgər bu e-poçt qeydiyyatdadırsa, təsdiq kodu göndərildi';
+const REGISTER_CONFLICT_MESSAGE =
+  'Bu e-poçt və ya telefon artıq qeydiyyatdadır';
 const VERIFY_REQUEST_MESSAGE =
   'Əgər bu e-poçt təsdiqlənməyibsə, təsdiq kodu göndərildi';
+
+const LOGIN_FAIL_LIMIT = 5;
+const LOGIN_FAIL_TTL_SEC = 15 * 60;
+const loginFailMemory = new Map<string, { count: number; resetAt: number }>();
 
 /** Login timing pad — mövcud olmayan email üçün də bcrypt dəyəri */
 let timingPadHash: string | null = null;
@@ -59,6 +68,8 @@ export class AuthService {
     private mailService: MailService,
     private captcha: CaptchaService,
     private storageService: StorageService,
+    private redis: RedisService,
+    private sessions: SessionRevocationService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -72,10 +83,7 @@ export class AuthService {
     });
 
     if (existing) {
-      if (existing.email === email) {
-        throw new ConflictException('Bu e-poçt artıq qeydiyyatdan keçib');
-      }
-      throw new ConflictException('Bu telefon nömrəsi artıq qeydiyyatdan keçib');
+      throw new ConflictException(REGISTER_CONFLICT_MESSAGE);
     }
 
     const role = dto.role ?? UserRole.CUSTOMER;
@@ -119,7 +127,7 @@ export class AuthService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === UNIQUE_CONSTRAINT_VIOLATION
       ) {
-        throw new ConflictException(this.uniqueConstraintMessage(error));
+        throw new ConflictException(REGISTER_CONFLICT_MESSAGE);
       }
       throw error;
     }
@@ -147,6 +155,7 @@ export class AuthService {
   async login(dto: LoginDto, clientApp: ClientApp) {
     await this.captcha.assertValid(dto.captchaToken);
     const email = dto.email.trim().toLowerCase();
+    await this.assertLoginNotLocked(email);
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { providerProfile: true },
@@ -159,8 +168,11 @@ export class AuthService {
       usable?.passwordHash ?? null,
     );
     if (!usable || !valid) {
+      await this.recordLoginFailure(email);
       throw new UnauthorizedException('E-poçt və ya şifrə səhvdir');
     }
+
+    await this.clearLoginFailures(email);
 
     this.assertClientAudience(usable.role, clientApp);
 
@@ -244,8 +256,7 @@ export class AuthService {
       where: { id: stored.id, token: tokenHash },
     });
     if (count === 0) {
-      // Reuse aşkarlandı — oğurlanmış refresh artıq işlədilmiş ola bilər; bütün ailəni ləğv et
-      await this.prisma.refreshToken.deleteMany({ where: { userId: stored.userId } });
+      await this.sessions.revokeAll(stored.userId);
       throw new UnauthorizedException('Refresh token etibarsızdır');
     }
 
@@ -269,9 +280,9 @@ export class AuthService {
     return { message: 'Çıxış edildi' };
   }
 
-  /** İstifadəçinin bütün sessiyalarını ləğv edir */
+  /** İstifadəçinin bütün sessiyalarını ləğv edir (refresh + mövcud access JWT) */
   async logoutAll(userId: string) {
-    await this.prisma.refreshToken.deleteMany({ where: { userId } });
+    await this.sessions.revokeAll(userId);
     return { message: 'Bütün cihazlardan çıxış edildi' };
   }
 
@@ -283,15 +294,15 @@ export class AuthService {
       select: { id: true, email: true, isActive: true, deletedAt: true },
     });
 
-    // Enumeration-a qarşı: həmişə eyni mesaj; previewCode yalnız mövcud user + DEV
     if (user?.isActive && !user.deletedAt) {
-      const mail = await this.issueEmailCode(
+      await this.issueEmailCode(
         user.id,
         user.email,
         EmailVerificationPurpose.PASSWORD_RESET,
         (to, code) => this.mailService.sendPasswordResetCode(to, code),
       );
-      return { message: FORGOT_PASSWORD_MESSAGE, ...this.mailMeta(mail) };
+    } else {
+      await bcrypt.hash('__xidmetal_mail_pad__', 10);
     }
 
     return { message: FORGOT_PASSWORD_MESSAGE };
@@ -320,14 +331,18 @@ export class AuthService {
     await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: user.id },
-        data: { passwordHash, passwordChangedAt: new Date() },
+        data: {
+          passwordHash,
+          passwordChangedAt: new Date(),
+          sessionsRevokedAt: new Date(),
+        },
       }),
       this.prisma.refreshToken.deleteMany({ where: { userId: user.id } }),
       this.prisma.emailVerificationCode.deleteMany({
         where: { userId: user.id, purpose: EmailVerificationPurpose.PASSWORD_RESET },
       }),
     ]);
-    invalidateJwtUserCache(user.id);
+    await this.sessions.publish(user.id);
 
     return { message: 'Şifrə uğurla yeniləndi. Yenidən daxil olun' };
   }
@@ -341,13 +356,14 @@ export class AuthService {
     });
 
     if (user?.isActive && !user.deletedAt && !user.isVerified) {
-      const mail = await this.issueEmailCode(
+      await this.issueEmailCode(
         user.id,
         user.email,
         EmailVerificationPurpose.SIGNUP_VERIFY,
         (to, code) => this.mailService.sendSignupVerificationCode(to, code),
       );
-      return { message: VERIFY_REQUEST_MESSAGE, ...this.mailMeta(mail) };
+    } else {
+      await bcrypt.hash('__xidmetal_mail_pad__', 10);
     }
 
     return { message: VERIFY_REQUEST_MESSAGE };
@@ -454,6 +470,66 @@ export class AuthService {
     };
   }
 
+  private loginFailKey(email: string): string {
+    return `login:fail:${email.trim().toLowerCase()}`;
+  }
+
+  private async assertLoginNotLocked(email: string): Promise<void> {
+    const key = this.loginFailKey(email);
+    const count = await this.readLoginFailCount(key);
+    if (count >= LOGIN_FAIL_LIMIT) {
+      throw new HttpException(
+        'Çox uğursuz cəhd. 15 dəqiqə sonra yenidən yoxlayın',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  private async recordLoginFailure(email: string): Promise<void> {
+    const key = this.loginFailKey(email);
+    if (this.redis.isAvailable) {
+      const n = await this.redis.incr(key);
+      if (n != null) {
+        if (n === 1) {
+          await this.redis.expire(key, LOGIN_FAIL_TTL_SEC);
+        }
+        return;
+      }
+    }
+    const now = Date.now();
+    const current = loginFailMemory.get(key);
+    if (!current || current.resetAt <= now) {
+      loginFailMemory.set(key, {
+        count: 1,
+        resetAt: now + LOGIN_FAIL_TTL_SEC * 1000,
+      });
+      return;
+    }
+    current.count += 1;
+  }
+
+  private async clearLoginFailures(email: string): Promise<void> {
+    const key = this.loginFailKey(email);
+    if (this.redis.isAvailable) {
+      await this.redis.del(key);
+    }
+    loginFailMemory.delete(key);
+  }
+
+  private async readLoginFailCount(key: string): Promise<number> {
+    if (this.redis.isAvailable) {
+      const raw = await this.redis.get(key);
+      const n = raw ? Number.parseInt(raw, 10) : 0;
+      return Number.isFinite(n) ? n : 0;
+    }
+    const current = loginFailMemory.get(key);
+    if (!current || current.resetAt <= Date.now()) {
+      loginFailMemory.delete(key);
+      return 0;
+    }
+    return current.count;
+  }
+
   private async generateTokens(
     userId: string,
     email: string,
@@ -479,21 +555,6 @@ export class AuthService {
     });
 
     return { accessToken, refreshToken };
-  }
-
-  private uniqueConstraintMessage(error: Prisma.PrismaClientKnownRequestError): string {
-    const target = error.meta?.target;
-    const fields = Array.isArray(target)
-      ? target.map(String)
-      : typeof target === 'string'
-        ? [target]
-        : [];
-
-    if (fields.some((field) => field.includes('phone'))) {
-      return 'Bu telefon nömrəsi artıq qeydiyyatdan keçib';
-    }
-
-    return 'Bu e-poçt artıq qeydiyyatdan keçib';
   }
 
   private async sanitizeUser(user: {

@@ -68,17 +68,17 @@ REJECTED   → (son)
 
 | Keçid | CUSTOMER | PROVIDER | ADMIN |
 |-------|:--------:|:--------:|:-----:|
-| PENDING → CONFIRMED | ✗ | ✓ | ✓ |
-| PENDING → REJECTED | ✗ | ✓ | ✓ |
-| CONFIRMED → EN_ROUTE | ✗ | ✓ | ✓ |
-| EN_ROUTE → ARRIVED | ✗ | ✓ | ✓ |
-| ARRIVED → IN_PROGRESS | ✗ | ✓ | ✓ |
-| IN_PROGRESS → COMPLETED | ✗ | ✓ | ✓ |
-| PENDING/CONFIRMED/EN_ROUTE/ARRIVED → CANCELLED | ✓ | ✓* | ✓ |
+| PENDING → CONFIRMED | ✗ | ✓ | ✗ |
+| PENDING → REJECTED | ✗ | ✓ | ✗ |
+| CONFIRMED → EN_ROUTE | ✗ | ✓ | ✗ |
+| EN_ROUTE → ARRIVED | ✗ | ✓ | ✗ |
+| ARRIVED → IN_PROGRESS | ✗ | ✓ | ✗ |
+| IN_PROGRESS → COMPLETED | ✗ | ✓ | ✗ |
+| PENDING/CONFIRMED/EN_ROUTE/ARRIVED → CANCELLED | ✓ | ✓* | ✗ |
 
 \* Provider `PENDING`-dən ləğv etmir (rədd `REJECTED`); `CONFIRMED`+ üçün ləğv edə bilər.
 
-Admin API-də bypass (istənilən keçid).
+Admin sifarişə müdaxilə etmir (yalnız izləmə).
 
 ---
 
@@ -132,7 +132,7 @@ Hər status dəyişikliyi:
 | Nə vaxt ləğv | Nəticə |
 |--------------|--------|
 | PENDING/CONFIRMED/EN_ROUTE/ARRIVED | `cancelReason` + `cancelledBy` məcburi |
-| IN_PROGRESS | Provider/müştəri ləğv edə bilməz (yalnız admin bypass) |
+| IN_PROGRESS | Provider/müştəri ləğv edə bilməz |
 
 ---
 

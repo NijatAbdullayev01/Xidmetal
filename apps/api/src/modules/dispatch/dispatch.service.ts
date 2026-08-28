@@ -38,6 +38,7 @@ import { MailService } from '../../common/mail/mail.service';
 import { buildBookingMailContent } from '../../common/mail/booking-mail';
 import { RealtimeService } from '../realtime/realtime.service';
 import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
+import { redactBookingPiiForOffer } from '../bookings/booking-pii';
 import {
   DispatchQueueService,
   type DeclineReofferJobData,
@@ -1189,13 +1190,24 @@ export class DispatchService implements OnModuleInit {
       serviceTitle: booking.serviceTitle,
     });
 
+    const redactedOffer = redactBookingPiiForOffer({
+      address: booking.address,
+      destLat: booking.destLat,
+      destLng: booking.destLng,
+      originLat: null,
+      originLng: null,
+      notes: null,
+      customerFirstName: '',
+      customerLastName: '',
+    });
+
     const payload: DispatchOfferPayload = {
       offerId: offer.id,
       bookingId: booking.id,
       serviceTitle: booking.serviceTitle,
-      address: booking.address,
-      destLat: booking.destLat,
-      destLng: booking.destLng,
+      address: redactedOffer.address,
+      destLat: redactedOffer.destLat,
+      destLng: redactedOffer.destLng,
       distanceM: Number.isFinite(candidate.distanceM)
         ? candidate.distanceM
         : null,
@@ -1357,6 +1369,21 @@ export class DispatchService implements OnModuleInit {
       totalPrice = Number(String(price));
     }
 
+    const pending = offer.status === DispatchOfferStatus.PENDING;
+    const redacted =
+      pending && offer.booking
+        ? redactBookingPiiForOffer({
+            address: offer.booking.address,
+            destLat: offer.booking.destLat,
+            destLng: offer.booking.destLng,
+            originLat: null,
+            originLng: null,
+            notes: offer.booking.notes,
+            customerFirstName: offer.booking.customer.firstName,
+            customerLastName: offer.booking.customer.lastName,
+          })
+        : null;
+
     return {
       id: offer.id,
       bookingId: offer.bookingId,
@@ -1371,13 +1398,15 @@ export class DispatchService implements OnModuleInit {
         ? {
             id: offer.booking.id,
             serviceTitle: offer.booking.service.title,
-            address: offer.booking.address,
-            destLat: offer.booking.destLat,
-            destLng: offer.booking.destLng,
+            address: redacted?.address ?? offer.booking.address,
+            destLat: redacted?.destLat ?? offer.booking.destLat,
+            destLng: redacted?.destLng ?? offer.booking.destLng,
             scheduledAt: offer.booking.scheduledAt.toISOString(),
-            notes: offer.booking.notes,
+            notes: redacted ? null : offer.booking.notes,
             totalPrice,
-            customerName: `${offer.booking.customer.firstName} ${offer.booking.customer.lastName}`,
+            customerName: redacted
+              ? redacted.customerName
+              : `${offer.booking.customer.firstName} ${offer.booking.customer.lastName}`,
           }
         : undefined,
     };

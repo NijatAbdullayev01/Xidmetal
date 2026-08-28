@@ -89,6 +89,7 @@ export const emailSchema = z.string().email('Düzgün e-poçt daxil edin');
 export const passwordSchema = z
   .string()
   .min(8, 'Şifrə minimum 8 simvol olmalıdır')
+  .max(128, 'Şifrə maksimum 128 simvol ola bilər')
   .regex(/[A-Z]/, 'Şifrədə ən azı bir böyük hərf olmalıdır')
   .regex(/[0-9]/, 'Şifrədə ən azı bir rəqəm olmalıdır');
 
@@ -177,7 +178,7 @@ export const registerSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   phone: phoneSchema,
-  role: z.nativeEnum(UserRole).default(UserRole.CUSTOMER),
+  role: z.enum([UserRole.CUSTOMER, UserRole.PROVIDER]).default(UserRole.CUSTOMER),
   providerAccountType: z.nativeEnum(ProviderAccountType).optional(),
   companyName: z
     .string()
@@ -188,7 +189,10 @@ export const registerSchema = z.object({
 
 export const loginSchema = z.object({
   email: emailSchema,
-  password: z.string().min(1, 'Şifrə tələb olunur'),
+  password: z
+    .string()
+    .min(1, 'Şifrə tələb olunur')
+    .max(128, 'Şifrə maksimum 128 simvol ola bilər'),
   captchaToken: z.string().optional(),
 });
 
@@ -271,7 +275,7 @@ export const createBookingSchema = withOptionalCoordPairs(
       .trim()
       .max(1000, 'Qeyd maksimum 1000 simvol ola bilər')
       .optional(),
-    address: z.string().trim().min(1, 'Yazılı ünvan daxil edin').max(500).optional(),
+    address: z.string().trim().min(1, 'Ünvan daxil edin').max(500).optional(),
     imageUrl: imageUrlSchema.optional(),
     /** Default SCHEDULED. INSTANT → avto-dispatch (Faza 4). */
     type: z.nativeEnum(BookingType).optional(),
@@ -309,7 +313,7 @@ export const createBookingSchema = withOptionalCoordPairs(
     if (!data.address?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Yazılı ünvan daxil edin',
+        message: 'Ünvan daxil edin',
         path: ['address'],
       });
     }
@@ -411,7 +415,6 @@ export const updateServiceSchema = z.object({
 export const updateProfileSchema = z.object({
   firstName: z.string().min(2, 'Ad minimum 2 simvol olmalıdır').optional(),
   lastName: z.string().min(2, 'Soyad minimum 2 simvol olmalıdır').optional(),
-  phone: phoneSchema.optional(),
   avatarUrl: z.union([imageUrlSchema, z.literal(''), z.null()]).optional(),
   experience: z
     .number()
@@ -492,6 +495,15 @@ export const requestEmailChangeSchema = z.object({
 
 export const confirmEmailChangeSchema = z.object({
   newEmail: emailSchema,
+  code: verificationCodeSchema,
+});
+
+export const requestPhoneChangeSchema = z.object({
+  newPhone: phoneSchema,
+});
+
+export const confirmPhoneChangeSchema = z.object({
+  newPhone: phoneSchema,
   code: verificationCodeSchema,
 });
 
@@ -742,6 +754,8 @@ export type ContactFormInput = z.infer<typeof contactFormSchema>;
 export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
 export type RequestEmailChangeInput = z.infer<typeof requestEmailChangeSchema>;
 export type ConfirmEmailChangeInput = z.infer<typeof confirmEmailChangeSchema>;
+export type RequestPhoneChangeInput = z.infer<typeof requestPhoneChangeSchema>;
+export type ConfirmPhoneChangeInput = z.infer<typeof confirmPhoneChangeSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 export type SubmitKycDocumentInput = z.infer<typeof submitKycDocumentSchema>;

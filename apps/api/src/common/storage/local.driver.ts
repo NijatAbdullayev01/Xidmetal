@@ -28,7 +28,16 @@ export class LocalStorageDriver implements StorageDriver {
   }
 
   async delete(key: string): Promise<void> {
+    if (!this.isSafeStorageKey(key)) {
+      return;
+    }
     const absolutePath = path.join(this.rootDir, key);
+    const root = path.resolve(this.rootDir);
+    const resolved = path.resolve(absolutePath);
+    const prefix = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
+    if (resolved !== root && !resolved.startsWith(prefix)) {
+      return;
+    }
     try {
       await unlink(absolutePath);
     } catch (error) {
@@ -48,9 +57,16 @@ export class LocalStorageDriver implements StorageDriver {
       return null;
     }
     const key = url.slice(base.length + 1);
-    if (!key || key.includes('..') || path.isAbsolute(key)) {
+    if (!this.isSafeStorageKey(key)) {
       return null;
     }
     return key;
+  }
+
+  /** `..` / absolute / boş seqment — path traversal qarşısı */
+  private isSafeStorageKey(key: string): boolean {
+    if (!key || key.includes('\0') || path.isAbsolute(key)) return false;
+    const parts = key.split(/[/\\]/);
+    return parts.every((part) => part.length > 0 && part !== '.' && part !== '..');
   }
 }

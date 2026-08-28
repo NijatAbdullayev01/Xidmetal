@@ -13,6 +13,7 @@ export const JWT_AUTH_USER_SELECT = {
   isVerified: true,
   deletedAt: true,
   passwordChangedAt: true,
+  sessionsRevokedAt: true,
 } as const;
 
 export type JwtAuthUser = {
@@ -25,9 +26,10 @@ export type JwtAuthUser = {
   isVerified: boolean;
   deletedAt: Date | null;
   passwordChangedAt: Date | null;
+  sessionsRevokedAt: Date | null;
 };
 
-export const JWT_USER_CACHE_TTL_MS = 5_000;
+export const JWT_USER_CACHE_TTL_MS = 1_000;
 
 type CacheEntry = {
   value: JwtAuthUser;

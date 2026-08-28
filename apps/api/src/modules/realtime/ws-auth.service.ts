@@ -9,6 +9,8 @@ import {
   type ClientApp,
 } from '@xidmetal/shared';
 import { PrismaService } from '../../common/database/prisma.service';
+import { isAccessJwtRevoked } from '../../common/auth/access-jwt';
+import { SessionRevocationService } from '../../common/auth/session-revocation.service';
 import { readAccessTokenFromCookieHeader } from '../../common/auth/auth-cookies';
 import {
   getOrLoadJwtUser,
@@ -40,6 +42,7 @@ export class WsAuthService {
     private jwtService: JwtService,
     private config: ConfigService,
     private prisma: PrismaService,
+    private sessions: SessionRevocationService,
   ) {}
 
   async authenticateSocket(client: Socket): Promise<WsAuthenticatedUser> {
@@ -58,6 +61,7 @@ export class WsAuthService {
       throw new WsException('Sessiya etibarsızdır. Yenidən daxil olun');
     }
 
+    const redisRevokedAt = await this.sessions.readRevokedAt(payload.sub);
     const user = await getOrLoadJwtUser(payload.sub, () =>
       this.prisma.user.findUnique({
         where: { id: payload.sub },
@@ -70,9 +74,12 @@ export class WsAuthService {
     }
 
     if (
-      user.passwordChangedAt &&
-      typeof payload.iat === 'number' &&
-      payload.iat * 1000 < user.passwordChangedAt.getTime()
+      isAccessJwtRevoked(
+        payload.iat,
+        user.passwordChangedAt,
+        user.sessionsRevokedAt,
+        redisRevokedAt,
+      )
     ) {
       throw new WsException('Sessiya etibarsızdır. Yenidən daxil olun');
     }

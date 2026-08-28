@@ -22,7 +22,7 @@ Bu sənəd hədəf arxitekturaya çatmaq üçün mərhələli, prioritetləşdir
 - [x] **Reviews modulu** — yaratma + rating aggregate (transaction); admin REJECT var.
 - [x] **Notifications modulu** — in-app siyahı + oxundu; push ✅ Faza 5.
 - [x] **Messages modulu** — REST chat (WebSocket ayrı fazada).
-- [x] **Booking state machine (əsas)** — icazəli keçidlər + rol matrisi (`PENDING`…`COMPLETED`); admin bypass.
+- [x] **Booking state machine (əsas)** — icazəli keçidlər + rol matrisi (`PENDING`…`COMPLETED`); admin sifarişə müdaxilə etmir.
 - [x] Booking lifecycle tam hədəf: `EN_ROUTE`, `ARRIVED`; `BookingType` (INSTANT/SCHEDULED); timestamp sahələri (`acceptedAt`/`enRouteAt`/`arrivedAt`/`startedAt`/`completedAt`/`cancelledAt`). INSTANT avto-dispatch Phase 4.
 - [x] Bildiriş tamlığı: `BOOKING_COMPLETED`, `BOOKING_REJECTED`, `BOOKING_EN_ROUTE`, `BOOKING_ARRIVED`, `REVIEW_RECEIVED`, ləğv emit-ləri (admin announce ✅); kritik statuslar e-poçt (best-effort).
 - [x] Admin səthi: kateqoriya CRUD, provider verify, rəy moderation, şikayət moderation, stats, user/service idarə, announce API.

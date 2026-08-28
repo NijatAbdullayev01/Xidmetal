@@ -233,7 +233,7 @@ Qəbul olunmuş **INSTANT** icraçını buraxır (qiymət uyğun gəlməyəndə)
 
 Env: `DISPATCH_SEARCH_WINDOW_SEC` (default 600), `DISPATCH_REDISCOVERY_INTERVAL_SEC` (default 30), `DISPATCH_DECLINE_REOFFER_COOLDOWN_SEC` (default 120 — imtina sonrası yenidən təklif), `REDIS_URL` (BullMQ; yoxdursa dev setTimeout). Tək təklif timeout yoxdur — eyni xidmət növü + şəhər üzrə ONLINE xidmət verənlərə fan-out; imtina edənə 2 dəq sonra yenidən təklif (pəncərə bitənə / qəbul olunana qədər); pəncərə bitəndə auto-cancel.
 
-### PATCH /bookings/:id/status 🔒
+### PATCH /bookings/:id/status 🔒 CUSTOMER | PROVIDER
 
 **Body:** `{ "status": "EN_ROUTE" }` (ləğv üçün `cancelReason` məcburi)
 
@@ -242,11 +242,11 @@ Env: `DISPATCH_SEARCH_WINDOW_SEC` (default 600), `DISPATCH_REDISCOVERY_INTERVAL_
 İcazəli keçidlər (qısaca; mənbə: shared `booking-lifecycle`):
 - Provider: `PENDING→CONFIRMED|REJECTED`, `CONFIRMED→EN_ROUTE|CANCELLED`, `EN_ROUTE→ARRIVED|CANCELLED`, `ARRIVED→IN_PROGRESS|CANCELLED`, `IN_PROGRESS→COMPLETED`
 - Customer: `PENDING|CONFIRMED|EN_ROUTE|ARRIVED→CANCELLED`
-- Admin: bypass
+- Admin: status dəyişə bilməz (yalnız izləmə)
 
 Lifecycle timestamp-lər: `acceptedAt`, `enRouteAt`, `arrivedAt`, `startedAt`, `completedAt`, `cancelledAt`.
 
-Müştəriyə sifariş e-poçtu: `CONFIRMED` (xidmət verən/admin təsdiqi və ya INSTANT offer accept) və `COMPLETED`. Digər statuslar in-app + push. Ləğv e-poçtu qarşı tərəfə gedir.
+Müştəriyə sifariş e-poçtu: `CONFIRMED` (xidmət verən təsdiqi və ya INSTANT offer accept) və `COMPLETED`. Digər statuslar in-app + push. Ləğv e-poçtu qarşı tərəfə gedir.
 
 ### PATCH /bookings/:id/reschedule 🔒 PROVIDER
 
@@ -401,7 +401,7 @@ Yalnız admin inbox bildirişlərini oxundu edir.
 > **Kanal qaydası:** zəng / `/notifications` = yalnız `ADMIN_*`; sifariş = booking badge; mesaj = söhbət; rəy = review badge; xidmət yoxlaması = Xidmətlərim.
 > Review unread: `GET/POST …/review-unread-count` / `review-read-all`.
 > Xidmət yoxlaması: `GET/POST …/service-unread-count` / `service-read-all` (`SERVICE_APPROVED`, `SERVICE_NEEDS_REVISION` — Xidmətlərim badge).
-> Emit olunanlar: `BOOKING_CREATED`, `BOOKING_CONFIRMED`, `BOOKING_REJECTED`, `BOOKING_CANCELLED`, `BOOKING_IN_PROGRESS`, `BOOKING_COMPLETED`, `BOOKING_RESCHEDULE_PROPOSED`, `BOOKING_RESCHEDULE_REJECTED` (tarix təklifi rədd — sifariş PENDING qalır), `REVIEW_RECEIVED`, `MESSAGE_RECEIVED` (söhbət üzrə dedupe), `ADMIN_ANNOUNCEMENT`, `SERVICE_APPROVED`, `SERVICE_NEEDS_REVISION`. Admin `CONFIRMED`/`REJECTED` keçidləri də müştəriyə in-app bildiriş göndərir.
+> Emit olunanlar: `BOOKING_CREATED`, `BOOKING_CONFIRMED`, `BOOKING_REJECTED`, `BOOKING_CANCELLED`, `BOOKING_IN_PROGRESS`, `BOOKING_COMPLETED`, `BOOKING_RESCHEDULE_PROPOSED`, `BOOKING_RESCHEDULE_REJECTED` (tarix təklifi rədd — sifariş PENDING qalır), `REVIEW_RECEIVED`, `MESSAGE_RECEIVED` (söhbət üzrə dedupe), `ADMIN_ANNOUNCEMENT`, `SERVICE_APPROVED`, `SERVICE_NEEDS_REVISION`.
 > In-app create-dən sonra best-effort **push** (DeviceToken + FCM/noop).
 
 ---

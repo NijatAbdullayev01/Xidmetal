@@ -2,6 +2,7 @@ import { cn } from '@/lib/utils';
 
 type BadgeVariant =
   | 'default'
+  | 'brand'
   | 'success'
   | 'warning'
   | 'destructive'
@@ -19,6 +20,7 @@ interface BadgeProps {
 
 const variants: Record<BadgeVariant, string> = {
   default: 'bg-brand/15 text-brand-foreground',
+  brand: 'bg-brand text-brand-foreground',
   success: 'bg-success/15 text-success',
   warning: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
   destructive: 'bg-destructive/15 text-destructive',

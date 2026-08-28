@@ -28,7 +28,10 @@ import { BookingAddressBlock } from '@/components/bookings/booking-address-block
 import { BookingStatusBadge } from '@/components/bookings/booking-status-badge';
 import { CancelBookingDialog } from '@/components/bookings/cancel-booking-dialog';
 import { BookingOrderNumber } from '@/components/bookings/booking-order-number';
-import { BookingMessageButton } from '@/components/bookings/booking-message-button';
+import {
+  BookingCardActions,
+  BookingMessageButton,
+} from '@/components/bookings/booking-message-button';
 import {
   BookingStatusFilters,
   buildBookingStatusTabs,
@@ -374,7 +377,7 @@ export function ProviderBookingsPage() {
         </Card>
       )}
 
-      <div className="grid gap-4">
+      <div className="grid gap-3 sm:gap-4">
         {visibleBookings.map((booking) => {
           const isPending = booking.status === BookingStatus.PENDING;
           const isInstantPending =
@@ -399,8 +402,8 @@ export function ProviderBookingsPage() {
                   'border-brand ring-2 ring-brand ring-offset-2 ring-offset-background',
               )}
             >
-              <CardContent className="p-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                   <h3 className="min-w-0 font-semibold">
                     <Link
                       href={`/dashboard/provider/bookings/${booking.id}`}
@@ -409,7 +412,7 @@ export function ProviderBookingsPage() {
                       {booking.serviceTitle}
                     </Link>
                   </h3>
-                  <div className="flex shrink-0 flex-wrap gap-2">
+                  <BookingCardActions>
                     {isInstantPending && offerId && (
                       <>
                         <Button
@@ -545,10 +548,10 @@ export function ProviderBookingsPage() {
                       loading={messageLoadingId === booking.id}
                       onClick={() => handleMessage(booking.id)}
                     />
-                  </div>
+                  </BookingCardActions>
                 </div>
 
-                <div className="mt-1.5 space-y-1.5 text-sm">
+                <div className="mt-2.5 space-y-1 text-sm sm:mt-1.5 sm:space-y-1.5">
                   <BookingOrderNumber value={booking.orderNumber} />
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-foreground">Sifariş növü:</span>
@@ -612,7 +615,7 @@ export function ProviderBookingsPage() {
                 </div>
 
                 {booking.imageUrl && (
-                  <div className="mt-3">
+                  <div className="mt-2.5 sm:mt-3">
                     <p className="mb-1.5 text-xs font-medium text-muted-foreground">
                       İşin şəkli
                     </p>

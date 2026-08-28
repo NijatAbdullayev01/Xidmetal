@@ -125,11 +125,11 @@ export function InstantSkipProviderCard({
           </p>
         </div>
         {!limitReached && (
-          <div className="flex shrink-0 flex-col items-end gap-2 self-end sm:self-center">
+          <div className="flex w-full shrink-0 flex-col items-stretch gap-2 sm:w-auto sm:items-end sm:self-center">
             <Button
               type="button"
               size="sm"
-              className="min-h-11"
+              className="min-h-11 w-full touch-manipulation sm:w-auto"
               disabled={disabled || pending}
               onClick={() => setConfirmOpen(true)}
             >

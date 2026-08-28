@@ -1,3 +1,4 @@
+import { isTurnstileDummySecret, isTurnstileDummySiteKey } from '@xidmetal/shared';
 import { isLoopbackSmtpHost, normalizeSmtpHost } from '../mail/smtp-host';
 import { isPaymentsEnabled } from '../../modules/payments/payments-flag';
 
@@ -7,12 +8,42 @@ export type ProductionGuardEnv = {
   mediaSigningSecret?: string | null;
   smtpHost?: string | null;
   turnstileSecret?: string | null;
+  turnstileSiteKey?: string | null;
   redisUrl?: string | null;
   metricsToken?: string | null;
   geocoderProvider?: string | null;
   paymentsEnabled?: string | null;
   paymentProvider?: string | null;
+  databaseUrl?: string | null;
 };
+
+const WEAK_DB_FRAGMENTS = ['xidmetal_dev', ':xidmetal@'] as const;
+const WEAK_REDIS_PASSWORDS = ['xidmetal_dev', 'changeme', 'change-me'] as const;
+
+export function databaseUrlLooksWeak(url: string): boolean {
+  const lower = url.toLowerCase();
+  return WEAK_DB_FRAGMENTS.some((fragment) => lower.includes(fragment));
+}
+
+export function redisUrlHasPassword(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return Boolean(parsed.password);
+  } catch {
+    return false;
+  }
+}
+
+function redisPasswordLooksWeak(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const password = decodeURIComponent(parsed.password || '').toLowerCase();
+    if (!password) return true;
+    return WEAK_REDIS_PASSWORDS.some((fragment) => password.includes(fragment));
+  } catch {
+    return true;
+  }
+}
 
 /**
  * Production boot fail-fast — zəif/əskik ops konfiq ilə “işləyən” deqradasiya yox.
@@ -46,14 +77,32 @@ export function assertProductionRuntimeConfig(env: ProductionGuardEnv): void {
   }
   if (!env.turnstileSecret?.trim()) {
     missing.push('TURNSTILE_SECRET_KEY (auth/contact captcha)');
+  } else if (isTurnstileDummySecret(env.turnstileSecret)) {
+    missing.push(
+      'TURNSTILE_SECRET_KEY (Cloudflare dummy/test açarı production-da qadağandır)',
+    );
   }
-  // Cloudflare dummy/test secret boot-u dayandırmır: CaptchaService skip edir,
-  // frontend widget göstərmir. Real widget: ops/cloudflare/provision-turnstile.sh
+  if (env.turnstileSiteKey && isTurnstileDummySiteKey(env.turnstileSiteKey)) {
+    missing.push(
+      'TURNSTILE_SITE_KEY (Cloudflare dummy/test site key production-da qadağandır)',
+    );
+  }
   if (!env.redisUrl?.trim()) {
     missing.push('REDIS_URL (ready/WS/dispatch/throttle)');
+  } else if (!redisUrlHasPassword(env.redisUrl) || redisPasswordLooksWeak(env.redisUrl)) {
+    missing.push(
+      'REDIS_URL (production-da Redis AUTH parolu məcburidir; zəif/placeholder olmamalıdır)',
+    );
   }
   if (!env.metricsToken?.trim()) {
     missing.push('METRICS_TOKEN (/metrics Bearer)');
+  }
+
+  const databaseUrl = env.databaseUrl?.trim();
+  if (databaseUrl && databaseUrlLooksWeak(databaseUrl)) {
+    missing.push(
+      'DATABASE_URL (production-da xidmetal_dev / default parol qadağandır)',
+    );
   }
 
   const geocoder = (env.geocoderProvider?.trim() || 'mock').toLowerCase();

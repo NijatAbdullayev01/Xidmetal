@@ -1,5 +1,4 @@
 import {
-  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -173,7 +172,7 @@ export class TrackingService {
 
     const isParticipant = isBookingParticipant(userId, role, booking);
     if (!isParticipant) {
-      throw new ForbiddenException('Bu sifarişə baxmaq icazəniz yoxdur');
+      throw new NotFoundException('Sifariş tapılmadı');
     }
 
     const take = Math.min(Math.max(limit, 1), 500);
@@ -212,7 +211,7 @@ export class TrackingService {
     }
     const { canJoinBookingRoom } = await import('../realtime/realtime-auth');
     if (!canJoinBookingRoom(user, booking)) {
-      throw new ForbiddenException('Bu sifariş otağına qoşulmaq icazəniz yoxdur');
+      throw new NotFoundException('Sifariş tapılmadı');
     }
     return booking;
   }

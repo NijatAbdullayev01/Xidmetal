@@ -3,6 +3,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
   Optional,
   forwardRef,
 } from '@nestjs/common';
@@ -22,8 +23,13 @@ import {
   isProviderDutyAvailability,
 } from '../../common/provider/assert-provider-verified';
 import { StorageService } from '../../common/storage/storage.service';
+import { isBookingParticipant } from '../bookings/booking-access';
 import { DispatchService } from '../dispatch/dispatch.service';
 import { GEOCODER_ADAPTER, type GeocoderAdapter } from './geocoder';
+import {
+  coarsenPublicCoordinate,
+  coarsenPublicDistanceM,
+} from './geo-query';
 import type {
   NearbyProvidersQueryDto,
   OnlineProvidersCountQueryDto,
@@ -71,6 +77,36 @@ export class GeoService {
   async reverseGeocode(lat: number, lng: number) {
     this.assertCoords(lat, lng);
     return this.geocoder.reverse(lat, lng);
+  }
+
+  /**
+   * Directions yalnız sifariş iştirakçısı + booking dest üçün.
+   * Təyinat müştəri `to` parametrindən gəlmir — ödənişli API sui-istifadəsi olmasın.
+   */
+  async assertDrivingRouteDest(
+    userId: string,
+    role: string,
+    bookingId: string,
+  ): Promise<{ lat: number; lng: number }> {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        customerId: true,
+        providerId: true,
+        type: true,
+        acceptedAt: true,
+        destLat: true,
+        destLng: true,
+      },
+    });
+    if (!booking || !isBookingParticipant(userId, role, booking)) {
+      throw new NotFoundException('Sifariş tapılmadı');
+    }
+    if (booking.destLat == null || booking.destLng == null) {
+      throw new BadRequestException('Sifarişin təyinat koordinatı yoxdur');
+    }
+    this.assertCoords(booking.destLat, booking.destLng);
+    return { lat: booking.destLat, lng: booking.destLng };
   }
 
   async updateMyLocation(userId: string, dto: UpdateProviderLocationDto) {
@@ -458,10 +494,10 @@ export class GeoService {
         reviewCount: p.reviewCount,
         isVerified: p.isVerified,
         availability: p.availability as NearbyProviderSummary['availability'],
-        lastLat: p.lastLat,
-        lastLng: p.lastLng,
-        locationUpdatedAt: p.locationUpdatedAt?.toISOString() ?? null,
-        distanceM,
+        lastLat: coarsenPublicCoordinate(p.lastLat),
+        lastLng: coarsenPublicCoordinate(p.lastLng),
+        locationUpdatedAt: null,
+        distanceM: coarsenPublicDistanceM(distanceM),
       });
     }
 
@@ -479,10 +515,10 @@ export class GeoService {
       reviewCount: Number(row.review_count),
       isVerified: row.is_verified,
       availability: row.availability as NearbyProviderSummary['availability'],
-      lastLat: Number(row.last_lat),
-      lastLng: Number(row.last_lng),
-      locationUpdatedAt: row.location_updated_at?.toISOString() ?? null,
-      distanceM: Number(row.distance_m),
+      lastLat: coarsenPublicCoordinate(Number(row.last_lat)),
+      lastLng: coarsenPublicCoordinate(Number(row.last_lng)),
+      locationUpdatedAt: null,
+      distanceM: coarsenPublicDistanceM(Number(row.distance_m)),
     };
   }
 

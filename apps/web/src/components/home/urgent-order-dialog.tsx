@@ -66,8 +66,8 @@ const urgentOrderSchema = z
     address: z
       .string()
       .trim()
-      .min(1, 'Yazılı ünvan daxil edin')
-      .max(500, 'Yazılı ünvan maksimum 500 simvol ola bilər'),
+      .min(1, 'Ünvan daxil edin')
+      .max(500, 'Ünvan maksimum 500 simvol ola bilər'),
     addressBlock: z.string().trim().max(30, 'Blok maksimum 30 simvol ola bilər').optional(),
     addressFloor: z.string().trim().max(20, 'Mərtəbə maksimum 20 simvol ola bilər').optional(),
     addressDoor: z.string().trim().max(30, 'Qapı maksimum 30 simvol ola bilər').optional(),
@@ -83,7 +83,7 @@ const urgentOrderSchema = z
     if (composed.length > 500) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Yazılı ünvan və detallar birlikdə maksimum 500 simvol ola bilər',
+        message: 'Ünvan və detallar birlikdə maksimum 500 simvol ola bilər',
         path: ['address'],
       });
     }
@@ -612,7 +612,7 @@ export function UrgentOrderDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="urgent-address">Yazılı ünvan</Label>
+            <Label htmlFor="urgent-address">Ünvan</Label>
             <Input
               id="urgent-address"
               placeholder={

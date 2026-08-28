@@ -24,7 +24,10 @@ import { ReviewDialog } from '@/components/bookings/review-dialog';
 import { CancelBookingDialog } from '@/components/bookings/cancel-booking-dialog';
 import { InstantWaitingCard } from '@/components/bookings/instant-waiting-card';
 import { InstantSkipProviderCard } from '@/components/bookings/instant-skip-provider-card';
-import { BookingMessageButton } from '@/components/bookings/booking-message-button';
+import {
+  BookingCardActions,
+  BookingMessageButton,
+} from '@/components/bookings/booking-message-button';
 import { BookingOrderNumber } from '@/components/bookings/booking-order-number';
 import { BookingProviderName } from '@/components/bookings/booking-provider-name';
 import { BookingStatusBadge } from '@/components/bookings/booking-status-badge';
@@ -281,7 +284,7 @@ export function CustomerBookingsPage() {
         </Card>
       )}
 
-      <div className="grid gap-4">
+      <div className="grid gap-3 sm:gap-4">
         {data?.items.map((booking) => {
           const isInstantPending =
             booking.type === BookingType.INSTANT &&
@@ -302,8 +305,8 @@ export function CustomerBookingsPage() {
                   'border-brand ring-2 ring-brand ring-offset-2 ring-offset-background',
               )}
             >
-              <CardContent className="p-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                   <h3 className="min-w-0 font-semibold">
                     <Link
                       href={`/dashboard/customer/bookings/${booking.id}`}
@@ -312,7 +315,7 @@ export function CustomerBookingsPage() {
                       {booking.serviceTitle}
                     </Link>
                   </h3>
-                  <div className="flex shrink-0 flex-wrap gap-2">
+                  <BookingCardActions>
                     {booking.proposedScheduledAt &&
                       booking.status === BookingStatus.PENDING && (
                         <>
@@ -362,20 +365,6 @@ export function CustomerBookingsPage() {
                         )}
                       </Button>
                     )}
-                    {booking.status === BookingStatus.COMPLETED && !booking.hasReview && (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          setReviewBooking({
-                            id: booking.id,
-                            serviceTitle: booking.serviceTitle,
-                          })
-                        }
-                      >
-                        <Star className="h-4 w-4" />
-                        İşi təsdiqlə və rəy yaz
-                      </Button>
-                    )}
                     {booking.status === BookingStatus.COMPLETED && booking.hasReview && (
                       <Badge variant="success">Rəy verildi</Badge>
                     )}
@@ -384,10 +373,10 @@ export function CustomerBookingsPage() {
                       loading={messageLoadingId === booking.id}
                       onClick={() => handleMessage(booking.id)}
                     />
-                  </div>
+                  </BookingCardActions>
                 </div>
 
-                <div className="mt-1.5 space-y-1.5 text-sm">
+                <div className="mt-2.5 space-y-1 text-sm sm:mt-1.5 sm:space-y-1.5">
                   <BookingOrderNumber value={booking.orderNumber} />
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-foreground">Sifariş növü:</span>
@@ -461,6 +450,21 @@ export function CustomerBookingsPage() {
                     destLng={booking.destLng}
                   />
                 </div>
+
+                {booking.status === BookingStatus.COMPLETED && !booking.hasReview && (
+                  <Button
+                    className="mt-3 w-full"
+                    onClick={() =>
+                      setReviewBooking({
+                        id: booking.id,
+                        serviceTitle: booking.serviceTitle,
+                      })
+                    }
+                  >
+                    <Star className="h-4 w-4" />
+                    İşi təsdiqlə və rəy yaz
+                  </Button>
+                )}
 
                 {canSkipProvider && (
                   <div className="mt-3">

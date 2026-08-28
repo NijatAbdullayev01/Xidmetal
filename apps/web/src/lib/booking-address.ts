@@ -34,7 +34,7 @@ export function composeBookingAddress(parts: {
   return segments.join(', ');
 }
 
-/** Saxlanmış ünvanı göstərmək üçün: Şəhər, Rayon, yazılı ünvan, blok, mərtəbə, qapı. */
+/** Saxlanmış ünvanı göstərmək üçün: Şəhər, Rayon, ünvan, blok, mərtəbə, qapı. */
 export function formatBookingAddressDisplay(address: string): string {
   const trimmed = address.trim();
   if (!trimmed) return '';

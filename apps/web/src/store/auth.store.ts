@@ -12,6 +12,20 @@ interface AuthState {
   isAuthenticated: () => boolean;
 }
 
+function persistableUser(user: UserProfile | null): UserProfile | null {
+  if (!user?.providerProfile) return user;
+  return {
+    ...user,
+    providerProfile: {
+      ...user.providerProfile,
+      lastLat: null,
+      lastLng: null,
+      lastHeading: null,
+      locationUpdatedAt: null,
+    },
+  };
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -27,7 +41,10 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'xidmetal-auth-v2',
-      partialize: (state) => ({ user: state.user, session: state.session }),
+      partialize: (state) => ({
+        user: persistableUser(state.user),
+        session: state.session,
+      }),
     },
   ),
 );

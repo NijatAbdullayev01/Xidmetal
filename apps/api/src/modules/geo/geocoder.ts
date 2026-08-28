@@ -96,6 +96,7 @@ export class NominatimGeocoder implements GeocoderAdapter {
           'User-Agent': this.userAgent,
         },
         signal: AbortSignal.timeout(8_000),
+        redirect: 'error',
       });
       if (!res.ok) {
         this.logger.warn(`Nominatim HTTP ${res.status}`);

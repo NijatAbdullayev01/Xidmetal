@@ -141,6 +141,7 @@ server {
   listen 443 ssl;
   http2 on;
   server_name ${ADMIN_HOST};
+  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 EOF
       write_proxy_locations "admin:3021"
       echo "}"

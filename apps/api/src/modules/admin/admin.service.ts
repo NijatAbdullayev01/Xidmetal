@@ -31,8 +31,8 @@ import {
 } from '@xidmetal/shared';
 import { PrismaService } from '../../common/database/prisma.service';
 import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
+import { SessionRevocationService } from '../../common/auth/session-revocation.service';
 import { StorageService } from '../../common/storage/storage.service';
-import { invalidateJwtUserCache } from '../../common/auth/jwt-user-cache';
 import {
   hashServiceRevisionListing,
   hasAppliedServiceRevision,
@@ -87,6 +87,7 @@ export class AdminService {
   constructor(
     private prisma: PrismaService,
     private storageService: StorageService,
+    private sessions: SessionRevocationService,
     @Optional() private channels?: NotificationChannelsService,
   ) {}
 
@@ -228,7 +229,10 @@ export class AdminService {
 
     const updated = await this.prisma.user.update({
       where: { id },
-      data: { isActive: dto.isActive },
+      data: {
+        isActive: dto.isActive,
+        ...(!dto.isActive ? { sessionsRevokedAt: new Date() } : {}),
+      },
       include: {
         providerProfile: true,
         _count: {
@@ -240,7 +244,9 @@ export class AdminService {
         },
       },
     });
-    invalidateJwtUserCache(id);
+    if (!dto.isActive) {
+      await this.sessions.publish(id);
+    }
 
     if (adminId) {
       void this.writeAudit(adminId, 'USER_ACTIVE', 'USER', id, { isActive: dto.isActive });

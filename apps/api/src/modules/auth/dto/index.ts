@@ -25,6 +25,7 @@ export class RegisterDto {
   @ApiProperty({ example: 'SecurePass1' })
   @IsString()
   @MinLength(8, { message: 'Şifrə minimum 8 simvol olmalıdır' })
+  @MaxLength(128, { message: 'Şifrə maksimum 128 simvol ola bilər' })
   @Matches(/[A-Z]/, { message: 'Şifrədə ən azı bir böyük hərf olmalıdır' })
   @Matches(/[0-9]/, { message: 'Şifrədə ən azı bir rəqəm olmalıdır' })
   password!: string;
@@ -54,9 +55,11 @@ export class RegisterDto {
   })
   phone!: string;
 
-  @ApiPropertyOptional({ enum: UserRole, default: UserRole.CUSTOMER })
+  @ApiPropertyOptional({ enum: [UserRole.CUSTOMER, UserRole.PROVIDER], default: UserRole.CUSTOMER })
   @IsOptional()
-  @IsEnum(UserRole)
+  @IsIn([UserRole.CUSTOMER, UserRole.PROVIDER], {
+    message: 'Bu hesab növü ilə qeydiyyat mümkün deyil',
+  })
   role?: UserRole;
 
   @ApiPropertyOptional({
@@ -89,6 +92,7 @@ export class LoginDto {
 
   @ApiProperty()
   @IsString()
+  @MaxLength(128, { message: 'Şifrə maksimum 128 simvol ola bilər' })
   password!: string;
 
   @ApiProperty({
@@ -145,6 +149,7 @@ export class ResetPasswordDto {
   @ApiProperty({ example: 'SecurePass1' })
   @IsString()
   @MinLength(8, { message: 'Şifrə minimum 8 simvol olmalıdır' })
+  @MaxLength(128, { message: 'Şifrə maksimum 128 simvol ola bilər' })
   @Matches(/[A-Z]/, { message: 'Şifrədə ən azı bir böyük hərf olmalıdır' })
   @Matches(/[0-9]/, { message: 'Şifrədə ən azı bir rəqəm olmalıdır' })
   newPassword!: string;

@@ -58,7 +58,7 @@ export class AnalyticsBeaconDto {
   @IsUUID()
   sessionId!: string;
 
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({ format: 'uuid', description: 'İgnor edilir — yalnız JWT sub' })
   @IsOptional()
   @IsUUID()
   userId?: string;

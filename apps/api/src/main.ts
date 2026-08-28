@@ -43,22 +43,44 @@ async function bootstrap() {
     mediaSigningSecret,
     smtpHost: configService.get<string>('SMTP_HOST'),
     turnstileSecret: configService.get<string>('TURNSTILE_SECRET_KEY'),
+    turnstileSiteKey:
+      configService.get<string>('TURNSTILE_SITE_KEY') ||
+      configService.get<string>('NEXT_PUBLIC_TURNSTILE_SITE_KEY'),
     redisUrl: configService.get<string>('REDIS_URL'),
     metricsToken: configService.get<string>('METRICS_TOKEN'),
     geocoderProvider: configService.get<string>('GEOCODER_PROVIDER'),
     paymentsEnabled: configService.get<string>('PAYMENTS_ENABLED'),
     paymentProvider: configService.get<string>('PAYMENT_PROVIDER'),
+    databaseUrl: configService.get<string>('DATABASE_URL'),
   });
 
   if (nodeEnv === 'production' && !configService.get<string>('SENTRY_DSN')?.trim()) {
     logger.warn('SENTRY_DSN təyin olunmayıb — xəta izləmə deaktivdir', 'Bootstrap');
   }
 
-  const trustProxy = configService.get<string>('TRUST_PROXY', '');
+  // api-proxy X-Forwarded-For-u host nginx X-Real-IP (Cloudflare) ilə əvəz edir → 1 hop.
+  // İki qat XFF append olsa TRUST_PROXY=2.
+  const trustProxyRaw = configService.get<string>(
+    'TRUST_PROXY',
+    nodeEnv === 'production' ? '1' : '',
+  );
+  const trustProxy = trustProxyRaw.trim();
   if (trustProxy === 'true' || trustProxy === '1') {
-    // Rate-limit / real IP üçün reverse proxy arxasında
     app.set('trust proxy', 1);
+  } else if (trustProxy === '2') {
+    app.set('trust proxy', 2);
   }
+
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      referrerPolicy: { policy: 'no-referrer' },
+      hsts:
+        nodeEnv === 'production'
+          ? { maxAge: 31_536_000, includeSubDomains: true, preload: false }
+          : false,
+    }),
+  );
 
   const port = configService.get<number>('API_PORT', 4100);
   const corsOriginRaw = configService.get<string>(
@@ -79,13 +101,15 @@ async function bootstrap() {
   app.use('/uploads', createPrivateUploadsGuard(mediaSigningSecret));
   app.useStaticAssets(join(process.cwd(), localUploadDir), {
     prefix: '/uploads/',
+    setHeaders(res) {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('Referrer-Policy', 'no-referrer');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    },
   });
 
-  app.use(
-    helmet({
-      crossOriginResourcePolicy: { policy: 'cross-origin' },
-    }),
-  );
   app.enableCors({
     origin: corsOrigins.length <= 1 ? corsOrigins[0] : corsOrigins,
     credentials: true,

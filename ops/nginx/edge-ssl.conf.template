@@ -61,6 +61,8 @@ server {
   http2 on;
   server_name __WEB_HOST__;
 
+  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
   client_max_body_size 25m;
   include /etc/nginx/cloudflare-realip.conf;
 

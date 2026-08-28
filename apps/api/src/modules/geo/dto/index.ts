@@ -161,31 +161,21 @@ export class ReverseGeocodeQueryDto {
 }
 
 export class DrivingRouteQueryDto {
-  @ApiProperty({ example: 40.4093, description: 'Başlanğıc enlik' })
+  @ApiProperty({ description: 'Sifariş ID — yalnız iştirakçı marşrut ala bilər' })
+  @IsUUID()
+  bookingId!: string;
+
+  @ApiProperty({ example: 40.4093, description: 'Başlanğıc enlik (cari mövqe)' })
   @Type(() => Number)
   @IsNumber()
   @Min(-90)
   @Max(90)
   fromLat!: number;
 
-  @ApiProperty({ example: 49.8671, description: 'Başlanğıc uzunluq' })
+  @ApiProperty({ example: 49.8671, description: 'Başlanğıc uzunluq (cari mövqe)' })
   @Type(() => Number)
   @IsNumber()
   @Min(-180)
   @Max(180)
   fromLng!: number;
-
-  @ApiProperty({ example: 40.3777, description: 'Təyinat enlik' })
-  @Type(() => Number)
-  @IsNumber()
-  @Min(-90)
-  @Max(90)
-  toLat!: number;
-
-  @ApiProperty({ example: 49.852, description: 'Təyinat uzunluq' })
-  @Type(() => Number)
-  @IsNumber()
-  @Min(-180)
-  @Max(180)
-  toLng!: number;
 }

@@ -1,6 +1,6 @@
 import type { CookieOptions, Response, Request } from 'express';
 import { ConfigService } from '@nestjs/config';
-import { CLIENT_APP, type ClientApp } from '@xidmetal/shared';
+import { API, CLIENT_APP, type ClientApp } from '@xidmetal/shared';
 
 /** Legacy (pre-namespace) — oxuma fallback; yazıda təmizlənir */
 export const ACCESS_COOKIE = 'xidmetal_access';
@@ -11,10 +11,22 @@ export const REFRESH_COOKIE_MARKETPLACE = 'xidmetal_refresh_marketplace';
 export const ACCESS_COOKIE_ADMIN = 'xidmetal_access_admin';
 export const REFRESH_COOKIE_ADMIN = 'xidmetal_refresh_admin';
 
-export function accessCookieName(clientApp: ClientApp): string {
-  return clientApp === CLIENT_APP.ADMIN
-    ? ACCESS_COOKIE_ADMIN
-    : ACCESS_COOKIE_MARKETPLACE;
+const HOST_PREFIX = '__Host-';
+const REFRESH_COOKIE_PATH = `${API.prefix}/auth`;
+
+function isProduction(config: ConfigService): boolean {
+  return config.get<string>('NODE_ENV') === 'production';
+}
+
+export function accessCookieName(
+  clientApp: ClientApp,
+  hostPrefix = false,
+): string {
+  const base =
+    clientApp === CLIENT_APP.ADMIN
+      ? ACCESS_COOKIE_ADMIN
+      : ACCESS_COOKIE_MARKETPLACE;
+  return hostPrefix ? `${HOST_PREFIX}${base}` : base;
 }
 
 export function refreshCookieName(clientApp: ClientApp): string {
@@ -37,8 +49,8 @@ export function parseDurationMs(duration: string, fallbackMs: number): number {
   return num * (multipliers[unit!] ?? fallbackMs);
 }
 
-function baseCookieOptions(config: ConfigService): CookieOptions {
-  const isProd = config.get<string>('NODE_ENV') === 'production';
+function accessCookieOptions(config: ConfigService): CookieOptions {
+  const isProd = isProduction(config);
   return {
     httpOnly: true,
     secure: isProd,
@@ -47,20 +59,26 @@ function baseCookieOptions(config: ConfigService): CookieOptions {
   };
 }
 
-function clearCookiePair(
+function refreshCookieOptions(config: ConfigService): CookieOptions {
+  return {
+    ...accessCookieOptions(config),
+    path: REFRESH_COOKIE_PATH,
+  };
+}
+
+function clearNamedCookie(
   res: Response,
-  base: CookieOptions,
-  accessName: string,
-  refreshName: string,
+  options: CookieOptions,
+  name: string,
 ): void {
-  res.clearCookie(accessName, base);
-  res.clearCookie(refreshName, base);
+  res.clearCookie(name, options);
 }
 
 /**
  * App-scoped cookies — marketplace və admin eyni API host-da
  * bir-birinin sessiyasını üstünə yazmasın.
- * Legacy cookie adları təmizlənir (ambiguous shared session).
+ * Production access: `__Host-` (Secure + Path=/ + Domain yox).
+ * Refresh: Path yalnız `/api/v1/auth`.
  */
 export function setAuthCookies(
   res: Response,
@@ -76,21 +94,27 @@ export function setAuthCookies(
     config.get<string>('JWT_REFRESH_EXPIRES_IN', '30d'),
     30 * 24 * 60 * 60 * 1000,
   );
-  const base = baseCookieOptions(config);
-  const accessName = accessCookieName(clientApp);
+  const accessOpts = accessCookieOptions(config);
+  const refreshOpts = refreshCookieOptions(config);
+  const hostPrefix = isProduction(config);
+  const accessName = accessCookieName(clientApp, hostPrefix);
   const refreshName = refreshCookieName(clientApp);
 
   res.cookie(accessName, tokens.accessToken, {
-    ...base,
+    ...accessOpts,
     maxAge: accessMaxAge,
   });
   res.cookie(refreshName, tokens.refreshToken, {
-    ...base,
+    ...refreshOpts,
     maxAge: refreshMaxAge,
   });
 
-  // Köhnə shared adlar — qarışıqlığın qarşısı
-  clearCookiePair(res, base, ACCESS_COOKIE, REFRESH_COOKIE);
+  clearNamedCookie(res, accessOpts, ACCESS_COOKIE);
+  clearNamedCookie(res, refreshOpts, REFRESH_COOKIE);
+  clearNamedCookie(res, accessOpts, REFRESH_COOKIE);
+  if (hostPrefix) {
+    clearNamedCookie(res, accessOpts, accessCookieName(clientApp, false));
+  }
 }
 
 /** Yalnız göstərilən app (və legacy) cookie-lərini sil */
@@ -99,14 +123,22 @@ export function clearAuthCookies(
   config: ConfigService,
   clientApp?: ClientApp,
 ) {
-  const base = baseCookieOptions(config);
-  clearCookiePair(res, base, ACCESS_COOKIE, REFRESH_COOKIE);
+  const accessOpts = accessCookieOptions(config);
+  const refreshOpts = refreshCookieOptions(config);
 
-  if (!clientApp || clientApp === CLIENT_APP.MARKETPLACE) {
-    clearCookiePair(res, base, ACCESS_COOKIE_MARKETPLACE, REFRESH_COOKIE_MARKETPLACE);
-  }
-  if (!clientApp || clientApp === CLIENT_APP.ADMIN) {
-    clearCookiePair(res, base, ACCESS_COOKIE_ADMIN, REFRESH_COOKIE_ADMIN);
+  clearNamedCookie(res, accessOpts, ACCESS_COOKIE);
+  clearNamedCookie(res, refreshOpts, REFRESH_COOKIE);
+  clearNamedCookie(res, accessOpts, REFRESH_COOKIE);
+
+  const apps: ClientApp[] = clientApp
+    ? [clientApp]
+    : [CLIENT_APP.MARKETPLACE, CLIENT_APP.ADMIN];
+
+  for (const app of apps) {
+    clearNamedCookie(res, accessOpts, accessCookieName(app, false));
+    clearNamedCookie(res, accessOpts, accessCookieName(app, true));
+    clearNamedCookie(res, refreshOpts, refreshCookieName(app));
+    clearNamedCookie(res, accessOpts, refreshCookieName(app));
   }
 }
 
@@ -118,29 +150,36 @@ function readCookieValue(
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+function accessCookieCandidates(clientApp?: ClientApp): string[] {
+  if (clientApp) {
+    return [
+      accessCookieName(clientApp, true),
+      accessCookieName(clientApp, false),
+      ACCESS_COOKIE,
+    ];
+  }
+  return [
+    accessCookieName(CLIENT_APP.MARKETPLACE, true),
+    ACCESS_COOKIE_MARKETPLACE,
+    accessCookieName(CLIENT_APP.ADMIN, true),
+    ACCESS_COOKIE_ADMIN,
+    ACCESS_COOKIE,
+  ];
+}
+
 /**
  * Access JWT cookie — clientApp varsa yalnız o app (+ legacy fallback).
- * Header yoxdursa: marketplace → admin → legacy (Bearer üstünlük ayrıca).
  */
 export function readAccessTokenFromCookies(
   req: Request,
   clientApp?: ClientApp,
 ): string | null {
   const cookies = req.cookies as Record<string, unknown> | undefined;
-
-  if (clientApp) {
-    const scoped = readCookieValue(cookies, accessCookieName(clientApp));
-    if (scoped) return scoped;
-    const legacy = readCookieValue(cookies, ACCESS_COOKIE);
-    return legacy ?? null;
+  for (const name of accessCookieCandidates(clientApp)) {
+    const value = readCookieValue(cookies, name);
+    if (value) return value;
   }
-
-  return (
-    readCookieValue(cookies, ACCESS_COOKIE_MARKETPLACE) ??
-    readCookieValue(cookies, ACCESS_COOKIE_ADMIN) ??
-    readCookieValue(cookies, ACCESS_COOKIE) ??
-    null
-  );
+  return null;
 }
 
 export function readRefreshTokenFromRequest(
@@ -149,18 +188,13 @@ export function readRefreshTokenFromRequest(
   clientApp?: ClientApp,
 ): string | undefined {
   const cookies = req.cookies as Record<string, unknown> | undefined;
+  const names = clientApp
+    ? [refreshCookieName(clientApp), REFRESH_COOKIE]
+    : [REFRESH_COOKIE_MARKETPLACE, REFRESH_COOKIE_ADMIN, REFRESH_COOKIE];
 
-  if (clientApp) {
-    const scoped = readCookieValue(cookies, refreshCookieName(clientApp));
-    if (scoped) return scoped;
-    const legacy = readCookieValue(cookies, REFRESH_COOKIE);
-    if (legacy) return legacy;
-  } else {
-    const fromCookie =
-      readCookieValue(cookies, REFRESH_COOKIE_MARKETPLACE) ??
-      readCookieValue(cookies, REFRESH_COOKIE_ADMIN) ??
-      readCookieValue(cookies, REFRESH_COOKIE);
-    if (fromCookie) return fromCookie;
+  for (const name of names) {
+    const value = readCookieValue(cookies, name);
+    if (value) return value;
   }
 
   if (typeof bodyToken === 'string' && bodyToken.length > 0) {
@@ -174,11 +208,7 @@ export function readAccessTokenFromCookieHeader(
   cookieHeader: string,
   clientApp?: ClientApp,
 ): string | null {
-  const names = clientApp
-    ? [accessCookieName(clientApp), ACCESS_COOKIE]
-    : [ACCESS_COOKIE_MARKETPLACE, ACCESS_COOKIE_ADMIN, ACCESS_COOKIE];
-
-  for (const name of names) {
+  for (const name of accessCookieCandidates(clientApp)) {
     const value = parseCookie(cookieHeader, name);
     if (value) return value;
   }

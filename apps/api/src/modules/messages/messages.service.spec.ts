@@ -160,7 +160,7 @@ describe('MessagesService.sendMessage', () => {
 
     await expect(
       service.sendMessage('conv-1', 'stranger', { content: 'x' }),
-    ).rejects.toThrow('Bu söhbətə giriş icazəniz yoxdur');
+    ).rejects.toThrow('Söhbət tapılmadı');
   });
 
   it('COMPLETED sifarişə bağlı söhbətdə mesaj göndərməyə icazə vermir', async () => {

@@ -38,6 +38,8 @@ services:
       - random_page_cost=1.1
 
   redis:
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     command:
       - redis-server
       - --maxmemory
@@ -46,6 +48,10 @@ services:
       - allkeys-lru
       - --tcp-keepalive
       - '60'
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD .env-də təyin edin}
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" ping | grep PONG']
 
   api:
     image: ${XIDMETAL_API_IMAGE:-xidmetal-api:local}
@@ -64,8 +70,8 @@ services:
     environment:
       NODE_ENV: production
       API_PORT: 4000
-      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgresql://xidmetal:xidmetal_dev@postgres:5432/xidmetal?schema=public&connection_limit=15&pool_timeout=10}
-      REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgresql://xidmetal:${POSTGRES_PASSWORD:-xidmetal_dev}@postgres:5432/xidmetal?schema=public&connection_limit=15&pool_timeout=10}
+      REDIS_URL: ${REDIS_URL_DOCKER:-redis://:${REDIS_PASSWORD}@redis:6379}
       RUN_MIGRATIONS_ON_BOOT: ${RUN_MIGRATIONS_ON_BOOT:-true}
       STORAGE_LOCAL_DIR: /app/uploads
       TRUST_PROXY: ${TRUST_PROXY:-true}

@@ -28,6 +28,8 @@ model User {
   isActive      Boolean   @default(true) @map("is_active")
   /** Şifrə dəyişəndə access JWT-ləri etibarsız etmək üçün (iat müqayisəsi) */
   passwordChangedAt DateTime? @map("password_changed_at")
+  /** logout-all / deaktivasiya — bu vaxtdan əvvəlki access JWT etibarsız */
+  sessionsRevokedAt DateTime? @map("sessions_revoked_at")
   /** Soft-delete — hard delete əvəzinə; auth rədd edir */
   deletedAt     DateTime? @map("deleted_at")
   lastSeenAt    DateTime? @map("last_seen_at")

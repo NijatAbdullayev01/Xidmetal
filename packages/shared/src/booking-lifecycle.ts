@@ -42,7 +42,7 @@ export function isBookingTransitionAllowed(
   roles: { isProvider: boolean; isCustomer: boolean; isAdmin: boolean },
 ): boolean {
   if (current === next) return true;
-  if (roles.isAdmin) return true;
+  if (roles.isAdmin) return false;
 
   const allowed = roles.isProvider
     ? (PROVIDER_BOOKING_TRANSITIONS[current] ?? [])

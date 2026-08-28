@@ -34,7 +34,7 @@ describe('composeBookingAddress', () => {
 });
 
 describe('formatBookingAddressDisplay', () => {
-  it('köhnə sıranı şəhər, rayon, yazılı ünvan, blok, mərtəbə, qapı edir', () => {
+  it('köhnə sıranı şəhər, rayon, ünvan, blok, mərtəbə, qapı edir', () => {
     expect(
       formatBookingAddressDisplay(
         'Süleyman sani axundov, Blok 2, Mərtəbə 2, Qapı 2, Bakı, Binəqədi rayonu',

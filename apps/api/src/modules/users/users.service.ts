@@ -28,7 +28,7 @@ import { MailService } from '../../common/mail/mail.service';
 import { assertValidEmailCode } from '../../common/auth/email-verification-codes';
 import { generateNumericOtp } from '../../common/auth/otp';
 import { StorageService } from '../../common/storage/storage.service';
-import { invalidateJwtUserCache } from '../../common/auth/jwt-user-cache';
+import { SessionRevocationService } from '../../common/auth/session-revocation.service';
 import {
   ChangePasswordDto,
   UpdateProfileDto,
@@ -36,6 +36,8 @@ import {
   ConfirmEmailChangeDto,
   DeleteAccountDto,
   SubmitKycDocumentDto,
+  RequestPhoneChangeDto,
+  ConfirmPhoneChangeDto,
 } from './dto';
 
 const EMAIL_CODE_EXPIRY_MS = 15 * 60 * 1000;
@@ -46,6 +48,7 @@ export class UsersService {
     private prisma: PrismaService,
     private mailService: MailService,
     private storageService: StorageService,
+    private sessions: SessionRevocationService,
   ) {}
 
   async findById(id: string) {
@@ -169,18 +172,10 @@ export class UsersService {
       );
     }
 
-    const phone = dto.phone?.trim();
-    if (dto.phone !== undefined && !phone) {
-      throw new BadRequestException('Telefon nömrəsi tələb olunur');
-    }
-    if (phone) {
-      const phoneTaken = await this.prisma.user.findFirst({
-        where: { phone, NOT: { id: userId } },
-        select: { id: true },
-      });
-      if (phoneTaken) {
-        throw new ConflictException('Bu telefon nömrəsi artıq istifadə olunur');
-      }
+    if (dto.phone !== undefined) {
+      throw new BadRequestException(
+        'Telefon nömrəsini dəyişmək üçün e-poçt təsdiq kodundan istifadə edin',
+      );
     }
 
     const previousAvatarUrl = existing.avatarUrl;
@@ -202,12 +197,6 @@ export class UsersService {
       data: {
         ...(dto.firstName !== undefined && { firstName: dto.firstName }),
         ...(dto.lastName !== undefined && { lastName: dto.lastName }),
-        ...(dto.phone !== undefined && phone
-          ? {
-              phone,
-              phoneVerifiedAt: phone !== existing.phone ? null : undefined,
-            }
-          : {}),
         ...(dto.avatarUrl !== undefined && {
           avatarUrl: normalizedAvatarUrl || null,
         }),
@@ -265,15 +254,17 @@ export class UsersService {
     await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: userId },
-        data: { passwordHash, passwordChangedAt: new Date() },
+        data: {
+          passwordHash,
+          passwordChangedAt: new Date(),
+          sessionsRevokedAt: new Date(),
+        },
       }),
-      // Şifrə dəyişəndə oğurlanmış refresh token-lər etibarsızlaşsın deyə
-      // bütün mövcud sessiyaları ləğv edirik.
       this.prisma.refreshToken.deleteMany({ where: { userId } }),
     ]);
-    invalidateJwtUserCache(userId);
+    await this.sessions.publish(userId);
 
-    return { message: 'Şifrə uğurla dəyişdirildi' };
+    return { message: 'Şifrə uğurla dəyişdirildi. Yenidən daxil olun' };
   }
 
   async listMyKyc(userId: string): Promise<KycDocumentSummary[]> {
@@ -400,7 +391,11 @@ export class UsersService {
 
       return tx.user.update({
         where: { id: userId },
-        data: { email: newEmail, isVerified: true },
+        data: {
+          email: newEmail,
+          isVerified: true,
+          sessionsRevokedAt: new Date(),
+        },
         select: {
           id: true,
           email: true,
@@ -411,6 +406,101 @@ export class UsersService {
           role: true,
           isVerified: true,
           createdAt: true,
+          providerProfile: true,
+        },
+      });
+    });
+
+    await this.sessions.publish(userId);
+
+    return this.mapUserProfile(updatedUser);
+  }
+
+  async requestPhoneChange(userId: string, dto: RequestPhoneChangeDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('İstifadəçi tapılmadı');
+
+    const newPhone = dto.newPhone.trim();
+    if (newPhone === user.phone) {
+      throw new BadRequestException('Yeni nömrə cari nömrə ilə eyni ola bilməz');
+    }
+
+    const existing = await this.prisma.user.findFirst({
+      where: { phone: newPhone, NOT: { id: userId } },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new ConflictException('Bu telefon nömrəsi artıq istifadə olunur');
+    }
+
+    const code = generateNumericOtp();
+    const codeHash = await bcrypt.hash(code, 10);
+    const expiresAt = new Date(Date.now() + EMAIL_CODE_EXPIRY_MS);
+
+    await this.prisma.$transaction([
+      this.prisma.emailVerificationCode.deleteMany({
+        where: { userId, purpose: EmailVerificationPurpose.PHONE_VERIFY },
+      }),
+      this.prisma.emailVerificationCode.create({
+        data: {
+          userId,
+          email: newPhone,
+          codeHash,
+          purpose: EmailVerificationPurpose.PHONE_VERIFY,
+          expiresAt,
+        },
+      }),
+    ]);
+
+    const mail = await this.mailService.sendPhoneChangeCode(user.email, code, newPhone);
+
+    return {
+      message: mail.delivered
+        ? 'Təsdiq kodu cari e-poçt ünvanınıza göndərildi'
+        : 'SMTP qurulmayıb — təsdiq kodu server loguna yazıldı (DEV)',
+      ...(mail.previewCode ? { previewCode: mail.previewCode } : {}),
+    };
+  }
+
+  async confirmPhoneChange(userId: string, dto: ConfirmPhoneChangeDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('İstifadəçi tapılmadı');
+
+    const newPhone = dto.newPhone.trim();
+    await assertValidEmailCode(this.prisma, {
+      userId,
+      email: newPhone,
+      purpose: EmailVerificationPurpose.PHONE_VERIFY,
+      code: dto.code,
+    });
+
+    const existing = await this.prisma.user.findFirst({
+      where: { phone: newPhone, NOT: { id: userId } },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new ConflictException('Bu telefon nömrəsi artıq istifadə olunur');
+    }
+
+    const updatedUser = await this.prisma.$transaction(async (tx) => {
+      await tx.emailVerificationCode.deleteMany({
+        where: { userId, purpose: EmailVerificationPurpose.PHONE_VERIFY },
+      });
+
+      return tx.user.update({
+        where: { id: userId },
+        data: { phone: newPhone, phoneVerifiedAt: null },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          avatarUrl: true,
+          role: true,
+          isVerified: true,
+          createdAt: true,
+          phoneVerifiedAt: true,
           providerProfile: true,
         },
       });
@@ -484,6 +574,7 @@ export class UsersService {
           avatarUrl: null,
           passwordHash: scrambledHash,
           passwordChangedAt: new Date(),
+          sessionsRevokedAt: new Date(),
           firstName: 'Silinmiş',
           lastName: 'İstifadəçi',
         },
@@ -531,7 +622,7 @@ export class UsersService {
         },
       });
     });
-    invalidateJwtUserCache(userId);
+    await this.sessions.publish(userId);
 
     // PostGIS geography sütunu Prisma Unsupported — raw scrub
     try {

@@ -10,13 +10,6 @@ const MAX_QUEUE = 40;
 
 type QueuedEvent = AnalyticsBeaconEventInput;
 
-function resolveApiBaseUrl(): string {
-  const fromPublic = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (fromPublic) return fromPublic.replace(/\/$/, '');
-  if (typeof window !== 'undefined') return '';
-  return '';
-}
-
 function isBrowser(): boolean {
   return typeof window !== 'undefined';
 }
@@ -253,10 +246,10 @@ class AnalyticsClient {
     const events = this.queue.splice(0, 50);
     this.flushing = true;
 
+    const url = '/api/v1/analytics/beacon';
     const body = JSON.stringify({
       anonymousId: getOrCreateAnonymousId(),
       sessionId: getOrCreateSessionId(),
-      userId: this.userId,
       landingPath: this.landingPath ?? normalizePath(window.location.pathname),
       referrer: document.referrer ? document.referrer.slice(0, 1000) : undefined,
       language: navigator.language?.slice(0, 32),
@@ -264,8 +257,6 @@ class AnalyticsClient {
       durationMs: this.durationMs(),
       events,
     });
-
-    const url = `${resolveApiBaseUrl()}/api/v1/analytics/beacon`;
 
     try {
       if (useBeacon && typeof navigator.sendBeacon === 'function') {
@@ -279,7 +270,7 @@ class AnalyticsClient {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body,
-          credentials: 'omit',
+          credentials: 'include',
           keepalive: true,
         });
         if (!response.ok) {

@@ -16,6 +16,8 @@ import {
 import {
   buildStDistanceSelect,
   buildStDWithinPredicate,
+  coarsenPublicCoordinate,
+  coarsenPublicDistanceM,
   nearbyRadiusMeters,
 } from './geo-query';
 
@@ -54,6 +56,12 @@ describe('geo-query builders', () => {
     const sql = buildStDistanceSelect('pp');
     expect(sql).toContain('ST_Distance');
     expect(sql).toContain('distance_m');
+  });
+
+  it('ictimai nearby koordinatları ~110m grid-ə yuvarlaqlayır', () => {
+    expect(coarsenPublicCoordinate(40.40931234)).toBe(40.409);
+    expect(coarsenPublicDistanceM(12)).toBe(50);
+    expect(coarsenPublicDistanceM(51)).toBe(100);
   });
 });
 

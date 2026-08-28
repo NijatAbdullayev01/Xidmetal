@@ -166,7 +166,7 @@ export interface CategorySummary {
 
 export interface ReviewSummary {
   id: string;
-  bookingId: string;
+  bookingId?: string;
   serviceTitle: string;
   authorName: string;
   rating: number;

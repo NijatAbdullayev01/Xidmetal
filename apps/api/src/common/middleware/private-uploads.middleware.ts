@@ -62,6 +62,10 @@ export function createPrivateUploadsGuard(secret: string) {
       return;
     }
 
+    if (uploadKey.startsWith('kyc/')) {
+      res.setHeader('Content-Disposition', 'attachment');
+    }
+
     next();
   };
 }

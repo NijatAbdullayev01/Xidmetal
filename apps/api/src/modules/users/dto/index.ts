@@ -67,6 +67,7 @@ export class ChangePasswordDto {
   @ApiProperty({ example: 'SecurePass1' })
   @IsString()
   @MinLength(8, { message: 'Şifrə minimum 8 simvol olmalıdır' })
+  @MaxLength(128, { message: 'Şifrə maksimum 128 simvol ola bilər' })
   @Matches(/[A-Z]/, { message: 'Şifrədə ən azı bir böyük hərf olmalıdır' })
   @Matches(/[0-9]/, { message: 'Şifrədə ən azı bir rəqəm olmalıdır' })
   newPassword!: string;
@@ -82,6 +83,30 @@ export class ConfirmEmailChangeDto {
   @ApiProperty({ example: 'yeni@example.com' })
   @IsEmail({}, { message: 'Düzgün e-poçt daxil edin' })
   newEmail!: string;
+
+  @ApiProperty({ example: '12345678' })
+  @IsString()
+  @Length(8, 8, { message: 'Təsdiq kodu 8 rəqəm olmalıdır' })
+  @Matches(/^\d{8}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
+  code!: string;
+}
+
+export class RequestPhoneChangeDto {
+  @ApiProperty({ example: '+994501234567' })
+  @IsString()
+  @Matches(/^(\+994|0)[0-9]{9}$/, {
+    message: 'Düzgün telefon nömrəsi daxil edin (+994XXXXXXXXX)',
+  })
+  newPhone!: string;
+}
+
+export class ConfirmPhoneChangeDto {
+  @ApiProperty({ example: '+994501234567' })
+  @IsString()
+  @Matches(/^(\+994|0)[0-9]{9}$/, {
+    message: 'Düzgün telefon nömrəsi daxil edin (+994XXXXXXXXX)',
+  })
+  newPhone!: string;
 
   @ApiProperty({ example: '12345678' })
   @IsString()

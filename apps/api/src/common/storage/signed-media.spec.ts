@@ -96,4 +96,15 @@ describe('signed-media', () => {
       expect(isPrivateUploadKey(key)).toBe(true);
     }
   });
+
+  it('KYC default TTL 15 dəqiqədir', () => {
+    const before = Math.floor(Date.now() / 1000);
+    const signed = signPrivateMediaUrl(
+      'http://localhost:4000/uploads/kyc/doc.jpg',
+      secret,
+    );
+    const exp = Number(new URL(signed).searchParams.get('exp'));
+    expect(exp).toBeGreaterThanOrEqual(before + 15 * 60 - 2);
+    expect(exp).toBeLessThanOrEqual(before + 15 * 60 + 2);
+  });
 });

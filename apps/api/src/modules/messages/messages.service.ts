@@ -86,7 +86,7 @@ export class MessagesService {
   ): 'customerDeletedAt' | 'providerDeletedAt' {
     if (conversation.customerId === userId) return 'customerDeletedAt';
     if (conversation.providerId === userId) return 'providerDeletedAt';
-    throw new ForbiddenException('Bu söhbətə giriş icazəniz yoxdur');
+    throw new NotFoundException('Söhbət tapılmadı');
   }
 
   private isHiddenForUser(
@@ -445,7 +445,7 @@ export class MessagesService {
         throw new NotFoundException('Sifariş tapılmadı');
       }
       if (!isBookingParticipant(userId, role, booking)) {
-        throw new ForbiddenException('Bu sifarişə giriş icazəniz yoxdur');
+        throw new NotFoundException('Sifariş tapılmadı');
       }
       this.assertBookingAllowsMessaging(booking);
       customerId = booking.customerId;
@@ -647,7 +647,7 @@ export class MessagesService {
     userId: string,
   ) {
     if (conversation.customerId !== userId && conversation.providerId !== userId) {
-      throw new ForbiddenException('Bu söhbətə giriş icazəniz yoxdur');
+      throw new NotFoundException('Söhbət tapılmadı');
     }
   }
 

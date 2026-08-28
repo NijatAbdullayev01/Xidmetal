@@ -110,22 +110,22 @@ export function ProviderAvailabilityCard() {
       <div className="flex items-start gap-3">
         <StatusDot tone={copy.tone} />
 
-        <div className="min-w-0 flex-1 space-y-2">
-          <p className="text-sm leading-snug">
-            <span className="font-semibold text-foreground">{copy.label}</span>
-            {copy.hint ? (
-              <span className="text-muted-foreground">: {copy.hint}</span>
-            ) : null}
-          </p>
-
-          {isBusy ? (
-            <BusyBookingSummary
-              booking={activeBooking}
-              loading={activeBookingsLoading && !activeBooking}
-            />
+        <p className="min-w-0 flex-1 text-sm leading-snug">
+          <span className="font-semibold text-foreground">{copy.label}</span>
+          {copy.hint ? (
+            <span className="text-muted-foreground">: {copy.hint}</span>
           ) : null}
-        </div>
+        </p>
       </div>
+
+      {isBusy ? (
+        <div className="mt-2.5 w-full min-w-0">
+          <BusyBookingSummary
+            booking={activeBooking}
+            loading={activeBookingsLoading && !activeBooking}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -176,12 +176,12 @@ function BusyBookingSummary({
     .join(' · ');
 
   return (
-    <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-      <p className="truncate text-sm font-medium text-foreground">{booking.serviceTitle}</p>
-      <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">{meta}</p>
+    <div className="w-full min-w-0 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+      <p className="break-words text-sm font-medium text-foreground">{booking.serviceTitle}</p>
+      <p className="mt-0.5 break-words text-xs text-muted-foreground sm:text-sm">{meta}</p>
       {booking.address ? (
-        <p className="mt-0.5 truncate text-xs text-muted-foreground sm:text-sm">
-          Yazılı ünvan: {formatBookingAddressDisplay(booking.address)}
+        <p className="mt-0.5 break-words text-xs text-muted-foreground sm:text-sm">
+          Ünvan: {formatBookingAddressDisplay(booking.address)}
         </p>
       ) : null}
     </div>

@@ -61,6 +61,7 @@ export class AnalyticsService {
   async ingestBeacon(
     dto: AnalyticsBeaconDto,
     userAgent: string | undefined,
+    authUserId?: string,
   ): Promise<{ ok: true }> {
     if (userAgent && BOT_UA.test(userAgent)) {
       return { ok: true };
@@ -155,7 +156,7 @@ export class AnalyticsService {
                 data: {
                   id: dto.sessionId,
                   anonymousId: dto.anonymousId,
-                  userId: dto.userId ?? null,
+                  userId: authUserId ?? null,
                   startedAt: now,
                   lastSeenAt: now,
                   durationMs,
@@ -183,7 +184,7 @@ export class AnalyticsService {
                   exitPath: lastPath ?? undefined,
                   pageViews: nextPageViews,
                   isBounce: nextPageViews <= 1,
-                  ...(dto.userId ? { userId: dto.userId } : {}),
+                  ...(authUserId ? { userId: authUserId } : {}),
                   ...(referrer ? { referrer } : {}),
                   ...(language ? { language } : {}),
                   ...(dto.screenWidth != null ? { screenWidth: dto.screenWidth } : {}),

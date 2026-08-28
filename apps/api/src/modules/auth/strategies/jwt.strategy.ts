@@ -5,6 +5,8 @@ import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import { PrismaService } from '../../../common/database/prisma.service';
 import { readAccessTokenFromCookies } from '../../../common/auth/auth-cookies';
+import { isAccessJwtRevoked } from '../../../common/auth/access-jwt';
+import { SessionRevocationService } from '../../../common/auth/session-revocation.service';
 import {
   getOrLoadJwtUser,
   JWT_AUTH_USER_SELECT,
@@ -36,6 +38,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     @Inject(ConfigService) configService: ConfigService,
     private prisma: PrismaService,
+    private sessions: SessionRevocationService,
   ) {
     super({
       jwtFromRequest: extractAccessToken,
@@ -46,6 +49,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(req: Request, payload: JwtPayload) {
+    const redisRevokedAt = await this.sessions.readRevokedAt(payload.sub);
     const user = await getOrLoadJwtUser(payload.sub, () =>
       this.prisma.user.findUnique({
         where: { id: payload.sub },
@@ -57,11 +61,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('İstifadəçi tapılmadı');
     }
 
-    // Şifrə dəyişəndən əvvəl verilmiş access JWT keçərsizdir
     if (
-      user.passwordChangedAt &&
-      typeof payload.iat === 'number' &&
-      payload.iat * 1000 < user.passwordChangedAt.getTime()
+      isAccessJwtRevoked(
+        payload.iat,
+        user.passwordChangedAt,
+        user.sessionsRevokedAt,
+        redisRevokedAt,
+      )
     ) {
       throw new UnauthorizedException('Sessiya etibarsızdır. Yenidən daxil olun');
     }

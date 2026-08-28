@@ -22,6 +22,8 @@ import type {
   CreateReportInput,
   RequestEmailChangeInput,
   ConfirmEmailChangeInput,
+  RequestPhoneChangeInput,
+  ConfirmPhoneChangeInput,
   SubmitKycDocumentInput,
   KycDocumentSummary,
   ConversationSummary,
@@ -284,6 +286,18 @@ export const api = {
       }),
     confirmEmailChange: (token: string, data: ConfirmEmailChangeInput) =>
       apiClient<UserProfile>('/users/me/email/confirm-change', {
+        method: 'POST',
+        token,
+        body: JSON.stringify(data),
+      }),
+    requestPhoneChange: (token: string, data: RequestPhoneChangeInput) =>
+      apiClient<{ message: string }>('/users/me/phone/request-change', {
+        method: 'POST',
+        token,
+        body: JSON.stringify(data),
+      }),
+    confirmPhoneChange: (token: string, data: ConfirmPhoneChangeInput) =>
+      apiClient<UserProfile>('/users/me/phone/confirm-change', {
         method: 'POST',
         token,
         body: JSON.stringify(data),
@@ -681,18 +695,16 @@ export const api = {
         `/geo/nearby?${query}`,
       );
     },
-    /** Sürücülük ETA/məsafə/polyline — Bolt üslubu canlı izləmə */
+    /** Sürücülük ETA/məsafə/polyline — yalnız sifariş iştirakçısı */
     route: (params: {
+      bookingId: string;
       fromLat: number;
       fromLng: number;
-      toLat: number;
-      toLng: number;
     }) => {
       const query = new URLSearchParams({
+        bookingId: params.bookingId,
         fromLat: String(params.fromLat),
         fromLng: String(params.fromLng),
-        toLat: String(params.toLat),
-        toLng: String(params.toLng),
       });
       return apiClient<{
         etaSeconds: number;

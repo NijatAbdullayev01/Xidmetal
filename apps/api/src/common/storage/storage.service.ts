@@ -16,7 +16,12 @@ import {
   type UploadFolder,
 } from './storage.types';
 import { collectMediaBaseUrls, isAllowedMediaUrl } from './allowed-media-url';
-import { isPrivateUploadKey, signPrivateMediaUrl, stripMediaSignature } from './signed-media';
+import {
+  isPrivateUploadKey,
+  mediaTtlSecondsForKey,
+  signPrivateMediaUrl,
+  stripMediaSignature,
+} from './signed-media';
 
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -107,7 +112,7 @@ export class StorageService implements OnModuleInit {
     const key = this.driver.keyFromPublicUrl(canonical);
 
     if (key && isPrivateUploadKey(key) && this.driver.getSignedReadUrl) {
-      return this.driver.getSignedReadUrl(key);
+      return this.driver.getSignedReadUrl(key, mediaTtlSecondsForKey(key));
     }
 
     return signPrivateMediaUrl(canonical, this.mediaSigningSecret());
@@ -231,7 +236,8 @@ export class StorageService implements OnModuleInit {
 
   /**
    * Referenced olmayan köhnə upload-ları silir (TTL + DB check).
-   * Referenced: service_images, users.avatar_url, bookings.image_url.
+   * Referenced: service_images, users.avatar_url, bookings.image_url,
+   * provider_kyc_documents, messages.image_url.
    */
   async purgeOrphanUploads(): Promise<number> {
     const cutoff = new Date(Date.now() - UPLOAD_ORPHAN_TTL_MS);
@@ -244,7 +250,7 @@ export class StorageService implements OnModuleInit {
     if (candidates.length === 0) return 0;
 
     const urls = candidates.map((c) => c.url);
-    const [serviceHits, avatarHits, bookingHits] = await Promise.all([
+    const [serviceHits, avatarHits, bookingHits, kycHits, messageHits] = await Promise.all([
       this.prisma.serviceImage.findMany({
         where: { url: { in: urls } },
         select: { url: true },
@@ -257,12 +263,22 @@ export class StorageService implements OnModuleInit {
         where: { imageUrl: { in: urls } },
         select: { imageUrl: true },
       }),
+      this.prisma.providerKycDocument.findMany({
+        where: { url: { in: urls } },
+        select: { url: true },
+      }),
+      this.prisma.message.findMany({
+        where: { imageUrl: { in: urls } },
+        select: { imageUrl: true },
+      }),
     ]);
 
     const referenced = new Set<string>([
       ...serviceHits.map((r) => r.url),
       ...avatarHits.map((r) => r.avatarUrl).filter((u): u is string => Boolean(u)),
       ...bookingHits.map((r) => r.imageUrl).filter((u): u is string => Boolean(u)),
+      ...kycHits.map((r) => r.url),
+      ...messageHits.map((r) => r.imageUrl).filter((u): u is string => Boolean(u)),
     ]);
 
     let purged = 0;

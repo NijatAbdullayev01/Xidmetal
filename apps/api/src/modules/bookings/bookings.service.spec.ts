@@ -76,7 +76,7 @@ describe('BookingsService.findById', () => {
 
     await expect(
       service.findById('b1', 'stranger', UserRole.CUSTOMER),
-    ).rejects.toThrow('Bu sifarişə baxmaq icazəniz yoxdur');
+    ).rejects.toThrow('Sifariş tapılmadı');
   });
 
   it('müştəri iştirakçısına sifarişi qaytarır', async () => {
@@ -145,6 +145,19 @@ describe('BookingsService.updateStatus', () => {
       }),
     ).rejects.toThrow('Bu sifarişi idarə etmək icazəniz yoxdur');
   });
+
+  it('idarəçiyə status dəyişməyə icazə vermir', async () => {
+    const service = makeService({
+      booking: { findUnique: vi.fn().mockResolvedValue(bookingRow()) },
+    });
+
+    await expect(
+      service.updateStatus('b1', 'admin-1', UserRole.ADMIN, {
+        status: BookingStatus.CANCELLED,
+        cancelReason: 'Admin ləğvi',
+      }),
+    ).rejects.toThrow('İdarəçi sifarişə müdaxilə edə bilməz');
+  });
 });
 
 describe('BookingsService.create', () => {
@@ -192,6 +205,24 @@ describe('BookingsService.skipProvider', () => {
     await expect(
       service.skipProvider('b1', 'stranger', UserRole.CUSTOMER),
     ).rejects.toThrow('Bu sifarişi idarə etmək icazəniz yoxdur');
+  });
+
+  it('idarəçiyə skip icazəsi vermir', async () => {
+    const service = makeService({
+      booking: {
+        findUnique: vi.fn().mockResolvedValue(
+          bookingRow({
+            status: BookingStatus.CONFIRMED,
+            type: BookingType.INSTANT,
+            acceptedAt: new Date(),
+          }),
+        ),
+      },
+    });
+
+    await expect(
+      service.skipProvider('b1', 'admin-1', UserRole.ADMIN),
+    ).rejects.toThrow('İdarəçi sifarişə müdaxilə edə bilməz');
   });
 
   it('dispatch yoxdursa xəta verir', async () => {

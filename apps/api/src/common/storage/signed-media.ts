@@ -5,7 +5,20 @@ import { UPLOAD_FOLDERS } from './storage.types';
 export const MEDIA_SIG_PARAM = 'sig';
 export const MEDIA_EXP_PARAM = 'exp';
 
-const DEFAULT_TTL_SECONDS = 60 * 60; // 1 saat
+const DEFAULT_TTL_SECONDS = 60 * 60; // 1 saat — xidmət/avatar (ictimai listing)
+const SENSITIVE_TTL_SECONDS = 15 * 60;
+
+/** KYC / sifariş / mesaj — qısa TTL */
+export function mediaTtlSecondsForKey(key: string): number {
+  if (
+    key.startsWith(`${UPLOAD_FOLDERS.KYC}/`) ||
+    key.startsWith(`${UPLOAD_FOLDERS.BOOKINGS}/`) ||
+    key.startsWith(`${UPLOAD_FOLDERS.MESSAGES}/`)
+  ) {
+    return SENSITIVE_TTL_SECONDS;
+  }
+  return DEFAULT_TTL_SECONDS;
+}
 
 /** Canonical URL — imza/query-siz (DB-də saxlamaq üçün) */
 export function stripMediaSignature(url: string): string {
@@ -58,7 +71,7 @@ function safeEqualHex(a: string, b: string): boolean {
 export function signPrivateMediaUrl(
   url: string,
   secret: string,
-  ttlSeconds = DEFAULT_TTL_SECONDS,
+  ttlSeconds?: number,
 ): string {
   const canonical = stripMediaSignature(url);
   if (!canonical || !secret) return canonical;
@@ -79,7 +92,8 @@ export function signPrivateMediaUrl(
     return canonical;
   }
 
-  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const ttl = ttlSeconds ?? mediaTtlSecondsForKey(key);
+  const exp = Math.floor(Date.now() / 1000) + ttl;
   const payload = `${key}:${exp}`;
   const sig = hmacHex(secret, payload);
 

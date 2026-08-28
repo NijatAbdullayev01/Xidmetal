@@ -26,8 +26,8 @@ export function BookingOrderNumber({
 
   return (
     <div className={cn('flex min-w-0 flex-wrap items-center gap-2 text-sm', className)}>
-      <span className="text-muted-foreground">Sifariş nömrəsi:</span>
-      <span className="font-mono">{value}</span>
+      <span className="text-foreground">Sifariş nömrəsi:</span>
+      <span className="font-mono text-muted-foreground">{value}</span>
       <button
         type="button"
         onClick={() => void copy()}

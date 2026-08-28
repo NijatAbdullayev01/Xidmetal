@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { estimateEtaSeconds, type GeoPoint } from '@xidmetal/shared';
+import { resolveOsrmBaseUrl } from './osrm-url';
 
 export type EtaSource = 'google' | 'osrm' | 'mapbox' | 'haversine';
 
@@ -20,8 +21,6 @@ interface DirectionsCacheEntry {
   expiresAt: number;
 }
 
-const DEFAULT_OSRM_BASE = 'https://router.project-osrm.org';
-
 function parseGoogleDurationSeconds(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return Math.max(0, Math.round(value));
@@ -35,8 +34,8 @@ function parseGoogleDurationSeconds(value: unknown): number | null {
 
 /**
  * Bolt üslubu yol ETA:
- * 1) Google Routes API (New) — `GOOGLE_MAPS_API_KEY` (köhnə `.env`-də `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` fallback)
- * 2) OSRM — `OSRM_BASE_URL` (default public)
+ * 1) Google Routes API (New) — yalnız `GOOGLE_MAPS_API_KEY` (prod-da NEXT_PUBLIC fallback yox)
+ * 2) OSRM — `OSRM_BASE_URL` (host allowlist)
  * 3) Mapbox — `MAPBOX_ACCESS_TOKEN`
  * 4) Haversine × yol əmsalı
  */
@@ -117,16 +116,17 @@ export class EtaService {
   private resolveGoogleMapsApiKey(): string | null {
     const server = this.config.get<string>('GOOGLE_MAPS_API_KEY')?.trim();
     if (server) return server;
-    // Dev/lokal: eyni GCP açarı (Maps JS) — Routes API aktiv olanda işləyir
-    const pub = this.config.get<string>('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY')?.trim();
-    return pub || null;
+    const nodeEnv = this.config.get<string>('NODE_ENV', 'development');
+    // Prod-da brauzer açarı ilə ödənişli Routes çağırışı yoxdur
+    if (nodeEnv === 'production') return null;
+    return this.config.get<string>('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY')?.trim() || null;
   }
 
-  private osrmBaseUrl(): string {
-    return (
-      this.config.get<string>('OSRM_BASE_URL')?.trim().replace(/\/$/, '') ||
-      DEFAULT_OSRM_BASE
-    );
+  private osrmBaseUrl(): string | null {
+    return resolveOsrmBaseUrl({
+      configured: this.config.get<string>('OSRM_BASE_URL'),
+      allowedHosts: this.config.get<string>('OSRM_ALLOWED_HOSTS'),
+    });
   }
 
   private cacheKey(from: GeoPoint, to: GeoPoint): string {
@@ -249,9 +249,12 @@ export class EtaService {
     distanceMeters: number;
     routePolyline: string | null;
   } | null> {
+    const base = this.osrmBaseUrl();
+    if (!base) return null;
+
     const coords = `${from.lng},${from.lat};${to.lng},${to.lat}`;
     const url =
-      `${this.osrmBaseUrl()}/route/v1/driving/${coords}` +
+      `${base}/route/v1/driving/${coords}` +
       '?overview=full&geometries=polyline';
 
     const controller = new AbortController();
@@ -260,6 +263,7 @@ export class EtaService {
       const res = await fetch(url, {
         signal: controller.signal,
         headers: { Accept: 'application/json' },
+        redirect: 'error',
       });
       if (!res.ok) return null;
       const data: unknown = await res.json();

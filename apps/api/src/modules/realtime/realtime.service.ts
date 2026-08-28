@@ -53,4 +53,9 @@ export class RealtimeService {
     }
     this.server.to(room).emit(event, payload);
   }
+
+  disconnectUser(userId: string): void {
+    if (!this.server) return;
+    this.server.in(userRoom(userId)).disconnectSockets(true);
+  }
 }

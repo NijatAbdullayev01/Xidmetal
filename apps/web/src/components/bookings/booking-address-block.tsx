@@ -26,7 +26,7 @@ export function BookingAddressBlock({
   return (
     <div className={cn(className)}>
       <div className="flex items-start gap-2">
-        <span className="shrink-0 text-foreground">Yazılı ünvan:</span>
+        <span className="shrink-0 text-foreground">Ünvan:</span>
         <span className="min-w-0 flex-1 break-words text-muted-foreground">
           {addressText ?? 'Ünvan qeyd olunmayıb'}
         </span>

@@ -40,7 +40,7 @@ export class CreateBookingDto {
   notes?: string;
 
   @ApiPropertyOptional({
-    description: 'Xidmətin göstəriləcəyi yazılı ünvan (yerində xidmət üçün məcburi)',
+    description: 'Xidmətin göstəriləcəyi ünvan (yerində xidmət üçün məcburi)',
   })
   @IsOptional()
   @IsString()

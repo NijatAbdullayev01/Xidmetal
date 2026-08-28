@@ -87,7 +87,7 @@ export class BookingsController {
 
   @Patch(':id/status')
   @UseGuards(RolesGuard, EmailVerifiedGuard)
-  @Roles(UserRole.CUSTOMER, UserRole.PROVIDER, UserRole.ADMIN)
+  @Roles(UserRole.CUSTOMER, UserRole.PROVIDER)
   @RequireEmailVerified()
   @ApiOperation({ summary: 'Sifariş statusunu yenilə' })
   updateStatus(
@@ -132,7 +132,7 @@ export class BookingsController {
 
   @Post(':id/skip-provider')
   @UseGuards(RolesGuard, EmailVerifiedGuard)
-  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  @Roles(UserRole.CUSTOMER)
   @RequireEmailVerified()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({

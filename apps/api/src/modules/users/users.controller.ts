@@ -23,6 +23,8 @@ import {
   ConfirmEmailChangeDto,
   DeleteAccountDto,
   SubmitKycDocumentDto,
+  RequestPhoneChangeDto,
+  ConfirmPhoneChangeDto,
 } from './dto';
 import { JwtAuthGuard, RolesGuard, EmailVerifiedGuard } from '../../common/guards';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -68,8 +70,14 @@ export class UsersController {
 
   @Patch('me/password')
   @ApiOperation({ summary: 'Şifrəni dəyiş' })
-  changePassword(@CurrentUser('id') userId: string, @Body() dto: ChangePasswordDto) {
-    return this.usersService.changePassword(userId, dto);
+  async changePassword(
+    @CurrentUser('id') userId: string,
+    @Body() dto: ChangePasswordDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.usersService.changePassword(userId, dto);
+    clearAuthCookies(res, this.config);
+    return result;
   }
 
   @Post('me/email/request-change')
@@ -85,11 +93,34 @@ export class UsersController {
   @Post('me/email/confirm-change')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Təsdiq kodu ilə e-poçtu dəyiş' })
-  confirmEmailChange(
+  async confirmEmailChange(
     @CurrentUser('id') userId: string,
     @Body() dto: ConfirmEmailChangeDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.usersService.confirmEmailChange(userId, dto);
+    const result = await this.usersService.confirmEmailChange(userId, dto);
+    clearAuthCookies(res, this.config);
+    return result;
+  }
+
+  @Post('me/phone/request-change')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @ApiOperation({ summary: 'Yeni telefon üçün təsdiq kodu göndər (cari e-poçta)' })
+  requestPhoneChange(
+    @CurrentUser('id') userId: string,
+    @Body() dto: RequestPhoneChangeDto,
+  ) {
+    return this.usersService.requestPhoneChange(userId, dto);
+  }
+
+  @Post('me/phone/confirm-change')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiOperation({ summary: 'Təsdiq kodu ilə telefonu dəyiş' })
+  confirmPhoneChange(
+    @CurrentUser('id') userId: string,
+    @Body() dto: ConfirmPhoneChangeDto,
+  ) {
+    return this.usersService.confirmPhoneChange(userId, dto);
   }
 
   @Get('me/kyc')

@@ -20,6 +20,7 @@ import {
   type BookingSubscribePayload,
   type LocationPushPayload,
 } from '@xidmetal/shared';
+import { SessionRevocationService } from '../../common/auth/session-revocation.service';
 import { WsAuthService } from './ws-auth.service';
 import { RealtimeService } from './realtime.service';
 import { TrackingService } from '../tracking/tracking.service';
@@ -45,10 +46,14 @@ export class RealtimeGateway
     private tracking: TrackingService,
     private presence: ProviderPresenceService,
     private metrics: MetricsService,
+    private sessions: SessionRevocationService,
   ) {}
 
   afterInit(server: Server): void {
     this.realtime.setServer(server);
+    this.sessions.registerDisconnectHandler((userId) => {
+      this.realtime.disconnectUser(userId);
+    });
     this.logger.log('Socket.IO gateway hazır');
   }
 

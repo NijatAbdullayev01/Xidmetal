@@ -28,7 +28,7 @@ import type {
   AdminAuditLogSummary,
   AdminSetKycStatusInput,
 } from '@xidmetal/shared';
-import { BookingStatus, CLIENT_APP, CLIENT_APP_HEADER } from '@xidmetal/shared';
+import { CLIENT_APP, CLIENT_APP_HEADER } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
 
 /**
@@ -314,19 +314,4 @@ export const api = {
       });
     },
   },
-
-  updateBookingStatus: (
-    token: string,
-    id: string,
-    status: BookingStatus,
-    options?: { cancelReason?: string },
-  ) =>
-    apiClient<BookingSummary>(`/bookings/${id}/status`, {
-      method: 'PATCH',
-      token,
-      body: JSON.stringify({
-        status,
-        ...(options?.cancelReason ? { cancelReason: options.cancelReason } : {}),
-      }),
-    }),
 };

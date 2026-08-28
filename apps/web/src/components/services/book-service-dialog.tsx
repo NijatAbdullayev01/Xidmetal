@@ -61,8 +61,8 @@ function createBookServiceFormSchema(requireAddress: boolean) {
         ? z
             .string()
             .trim()
-            .min(1, 'Yazılı ünvan daxil edin')
-            .max(500, 'Yazılı ünvan maksimum 500 simvol ola bilər')
+            .min(1, 'Ünvan daxil edin')
+            .max(500, 'Ünvan maksimum 500 simvol ola bilər')
         : z.string().max(500).optional(),
       addressBlock: z.string().trim().max(30, 'Blok maksimum 30 simvol ola bilər').optional(),
       addressFloor: z.string().trim().max(20, 'Mərtəbə maksimum 20 simvol ola bilər').optional(),
@@ -80,7 +80,7 @@ function createBookServiceFormSchema(requireAddress: boolean) {
         if (composed.length > 500) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: 'Yazılı ünvan və detallar birlikdə maksimum 500 simvol ola bilər',
+            message: 'Ünvan və detallar birlikdə maksimum 500 simvol ola bilər',
             path: ['address'],
           });
         }
@@ -453,7 +453,7 @@ export function BookServiceDialog({ service, open, onClose }: BookServiceDialogP
 
           {requireAddress && (
             <div className="space-y-2">
-              <Label htmlFor={`booking-address-${service.id}`}>Yazılı ünvan</Label>
+              <Label htmlFor={`booking-address-${service.id}`}>Ünvan</Label>
               <Input
                 id={`booking-address-${service.id}`}
                 placeholder={

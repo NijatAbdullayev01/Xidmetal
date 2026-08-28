@@ -18,15 +18,18 @@ import { Label } from '@/components/ui/label';
 import { api, ApiError } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { useAuthStore } from '@/store/auth.store';
+import { useLogout } from '@/hooks/use-logout';
+import { useRouter } from 'next/navigation';
 
 export function AdminSettingsPage() {
   const token = useAuthToken();
   const queryClient = useQueryClient();
   const updateUser = useAuthStore((s) => s.updateUser);
+  const logout = useLogout();
+  const router = useRouter();
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
-  const [passwordMsg, setPasswordMsg] = useState<string | null>(null);
   const [profileErr, setProfileErr] = useState<string | null>(null);
   const [passwordErr, setPasswordErr] = useState<string | null>(null);
 
@@ -72,11 +75,11 @@ export function AdminSettingsPage() {
     mutationFn: (data: ChangePasswordInput) => api.users.changePassword(token!, data),
     onSuccess: () => {
       setPasswordErr(null);
-      setPasswordMsg('Şifrə dəyişdirildi');
       passwordForm.reset();
+      logout();
+      router.replace('/login');
     },
     onError: (err: unknown) => {
-      setPasswordMsg(null);
       setPasswordErr(err instanceof ApiError ? err.message : 'Şifrə dəyişmədi');
     },
   });
@@ -120,7 +123,9 @@ export function AdminSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Şifrə</CardTitle>
-          <CardDescription>Hesab şifrəsini dəyişin</CardDescription>
+          <CardDescription>
+            Tövsiyə: ən azı 10 simvol və xüsusi işarə. Dəyişəndən sonra yenidən daxil olun.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -172,7 +177,6 @@ export function AdminSettingsPage() {
               />
             </div>
             {passwordErr && <p className="text-sm text-destructive">{passwordErr}</p>}
-            {passwordMsg && <p className="text-sm text-success">{passwordMsg}</p>}
             <Button type="submit" disabled={savePassword.isPending} className="min-h-[44px]">
               {savePassword.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
