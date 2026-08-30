@@ -1,6 +1,5 @@
 import { SettingsForm } from '@/components/settings/settings-form';
 import { ProviderKycCard } from '@/components/settings/provider-kyc-card';
-import { PushNotificationsCard } from '@/components/notifications/push-notifications-card';
 
 export default function ProviderSettingsPage() {
   return (
@@ -11,7 +10,6 @@ export default function ProviderSettingsPage() {
           Profil məlumatlarınızı, şəxsiyyət sənədlərini və şifrənizi idarə edin.
         </p>
       </div>
-      <PushNotificationsCard />
       <ProviderKycCard />
       <SettingsForm />
     </div>

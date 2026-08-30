@@ -70,7 +70,7 @@ services:
     environment:
       NODE_ENV: production
       API_PORT: 4000
-      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgresql://xidmetal:${POSTGRES_PASSWORD:-xidmetal_dev}@postgres:5432/xidmetal?schema=public&connection_limit=15&pool_timeout=10}
+      DATABASE_URL: ${DATABASE_URL_DOCKER:?DATABASE_URL_DOCKER .env-də təyin edin}
       REDIS_URL: ${REDIS_URL_DOCKER:-redis://:${REDIS_PASSWORD}@redis:6379}
       RUN_MIGRATIONS_ON_BOOT: ${RUN_MIGRATIONS_ON_BOOT:-true}
       STORAGE_LOCAL_DIR: /app/uploads

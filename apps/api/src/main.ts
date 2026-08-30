@@ -57,6 +57,12 @@ async function bootstrap() {
   if (nodeEnv === 'production' && !configService.get<string>('SENTRY_DSN')?.trim()) {
     logger.warn('SENTRY_DSN təyin olunmayıb — xəta izləmə deaktivdir', 'Bootstrap');
   }
+  if (nodeEnv === 'production' && !configService.get<string>('TURNSTILE_SECRET_KEY')?.trim()) {
+    logger.warn(
+      'TURNSTILE_SECRET_KEY yoxdur — captcha deaktivdir. Real widget: ops/cloudflare/provision-turnstile.sh',
+      'Bootstrap',
+    );
+  }
 
   // api-proxy X-Forwarded-For-u host nginx X-Real-IP (Cloudflare) ilə əvəz edir → 1 hop.
   // İki qat XFF append olsa TRUST_PROXY=2.

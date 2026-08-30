@@ -33,6 +33,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PushNotificationsCard } from '@/components/notifications/push-notifications-card';
 import { api, ApiError, uploadImage } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
@@ -1026,6 +1027,8 @@ export function SettingsForm() {
           </div>
         </CardContent>
       </Card>
+
+      <PushNotificationsCard />
 
       <Card className="border-destructive/40">
         <CardHeader>

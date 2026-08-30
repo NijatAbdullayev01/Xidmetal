@@ -46,7 +46,8 @@ function redisPasswordLooksWeak(url: string): boolean {
 }
 
 /**
- * Production boot fail-fast — zəif/əskik ops konfiq ilə “işləyən” deqradasiya yox.
+ * Production boot fail-fast — zəif secret/parol və dummy Turnstile ilə “işləyən”
+ * deqradasiya yox. Boş Turnstile captcha skip-dir (Bootstrap warning).
  * Development-da heç nə etmir.
  */
 export function assertProductionRuntimeConfig(env: ProductionGuardEnv): void {
@@ -75,9 +76,8 @@ export function assertProductionRuntimeConfig(env: ProductionGuardEnv): void {
       'SMTP_HOST (localhost/127.0.0.1 production-da e-poçt göndərmir — real SMTP provider)',
     );
   }
-  if (!env.turnstileSecret?.trim()) {
-    missing.push('TURNSTILE_SECRET_KEY (auth/contact captcha)');
-  } else if (isTurnstileDummySecret(env.turnstileSecret)) {
+  // Boş = captcha skip (CaptchaService). Dummy/test açar «var kimi» görünür, amma qorumur.
+  if (isTurnstileDummySecret(env.turnstileSecret)) {
     missing.push(
       'TURNSTILE_SECRET_KEY (Cloudflare dummy/test açarı production-da qadağandır)',
     );

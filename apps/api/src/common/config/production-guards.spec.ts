@@ -37,16 +37,25 @@ describe('assertProductionRuntimeConfig', () => {
     expect(() => assertProductionRuntimeConfig(valid)).not.toThrow();
   });
 
-  it('əskik SMTP/Turnstile/Redis/Metrics fail edir', () => {
+  it('əskik SMTP/Redis/Metrics fail edir', () => {
     expect(() =>
       assertProductionRuntimeConfig({
         ...valid,
         smtpHost: '',
-        turnstileSecret: null,
         redisUrl: '  ',
         metricsToken: undefined,
       }),
-    ).toThrow(/SMTP_HOST|TURNSTILE|REDIS_URL|METRICS_TOKEN/);
+    ).toThrow(/SMTP_HOST|REDIS_URL|METRICS_TOKEN/);
+  });
+
+  it('boş Turnstile production-da keçir (captcha skip)', () => {
+    expect(() =>
+      assertProductionRuntimeConfig({
+        ...valid,
+        turnstileSecret: '',
+        turnstileSiteKey: '',
+      }),
+    ).not.toThrow();
   });
 
   it('loopback SMTP_HOST production-da qadağandır', () => {

@@ -28,8 +28,8 @@
     "docker:dev": "docker compose -f docker-compose.dev.yml up -d",
     "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
     "docker:infra": "docker compose -f docker-compose.dev.yml up -d",
-    "docker:prod": "docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d --build --scale api=${API_REPLICAS:-3}",
-    "docker:prod:cloudflare": "docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.cloudflare.yml --env-file .env up -d --build --scale api=${API_REPLICAS:-3}",
+    "docker:prod": "bash scripts/docker-prod-up.sh",
+    "docker:prod:cloudflare": "bash scripts/docker-prod-up.sh cloudflare",
     "docker:prod:down": "docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.cloudflare.yml --env-file .env down",
     "clean": "turbo clean && rm -rf node_modules"
   },

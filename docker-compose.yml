@@ -10,7 +10,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: xidmetal
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-xidmetal_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD .env-də təyin edin}
       POSTGRES_DB: xidmetal
     ports:
       - '127.0.0.1:5434:5432'
