@@ -15,7 +15,7 @@ Admin UI marketplace daxilində olmamalıdır — yalnız `apps/admin`.
 ## Məhsul qərarı — rollar
 
 - Bir hesab = bir rol: `CUSTOMER` **və ya** `PROVIDER` (ADMIN seed ilə).
-- Eyni hesabla müştəridən xidmət verənə keçid, dual-role və ya rol upgrade **yoxdur** və **əlavə edilməsin** — qəsdən qərardır, boşluq deyil.
+- Eyni hesabla xidmət alandan xidmət verənə keçid, dual-role və ya rol upgrade **yoxdur** və **əlavə edilməsin** — qəsdən qərardır, boşluq deyil.
 - Xidmət verən olmaq = ayrı `PROVIDER` qeydiyyatı. UI: `BecomeProviderLink`.
 
 ## Brend
@@ -27,7 +27,7 @@ Admin UI marketplace daxilində olmamalıdır — yalnız `apps/admin`.
 ## Terminologiya (UI)
 
 - Kodda `PROVIDER` qalır; **user-facing** mətndə heç vaxt «Provider» yazma → **Xidmət verən** (cəm: xidmət verənlər)
-- `CUSTOMER` → **Müştəri**
+- Kodda `CUSTOMER` qalır; **user-facing** mətndə heç vaxt «Müştəri» yazma → **Xidmət alan** (cəm: xidmət alanlar)
 - Ətraflı: `terminology-az.mdc`
 
 ## Kod standartları

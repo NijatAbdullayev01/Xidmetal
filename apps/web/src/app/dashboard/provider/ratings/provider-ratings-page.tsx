@@ -32,7 +32,7 @@ export function ProviderRatingsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Reytinq</h1>
         <p className="mt-1 text-muted-foreground">
-          Müştərilərin sizə verdiyi qiymətləndirmələr və rəylər.
+          Xidmət alanların sizə verdiyi qiymətləndirmələr və rəylər.
         </p>
       </div>
 
@@ -62,7 +62,7 @@ export function ProviderRatingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Müştəri rəyləri</CardTitle>
+          <CardTitle>Xidmət alan rəyləri</CardTitle>
           <CardDescription>
             Moderasiyada olan və təsdiqlənmiş rəylər burada göstərilir
           </CardDescription>
@@ -76,7 +76,7 @@ export function ProviderRatingsPage() {
 
           {!isLoading && reviews?.items.length === 0 && (
             <p className="py-12 text-center text-muted-foreground">
-              Hələ heç bir rəy yoxdur. Xidmətlərinizi tamamladıqca müştərilər rəy yaza biləcək.
+              Hələ heç bir rəy yoxdur. Xidmətlərinizi tamamladıqca xidmət alanlar rəy yaza biləcək.
             </p>
           )}
 

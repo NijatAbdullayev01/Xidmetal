@@ -35,7 +35,7 @@ describe('booking-access', () => {
     );
   });
 
-  it('INSTANT PENDING müştəri iştirakçıdır', () => {
+  it('INSTANT PENDING xidmət alan iştirakçıdır', () => {
     expect(isBookingParticipant('c1', UserRole.CUSTOMER, instantPending)).toBe(true);
   });
 

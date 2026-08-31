@@ -13,6 +13,7 @@ import { PrismaService } from '../../common/database/prisma.service';
 import { StorageService } from '../../common/storage/storage.service';
 import { MailService } from '../../common/mail/mail.service';
 import {
+  BOOKING_MAIL_ENABLED,
   buildBookingMailContent,
   bookingStatusToMailEvent,
   shouldSendCustomerStatusMail,
@@ -47,6 +48,7 @@ import { GeoService } from '../geo/geo.service';
 import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
 import { MetricsService } from '../../common/metrics/metrics.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
+import { ServiceCapacityService } from '../../common/booking/service-capacity.service';
 import {
   assertIdempotencyPayloadCompatible,
   hashIdempotencyPayload,
@@ -60,6 +62,7 @@ import {
 
 const bookingSummaryInclude = {
   service: { select: { id: true, title: true } },
+  team: { select: { id: true, name: true } },
   customer: {
     select: {
       id: true,
@@ -91,6 +94,7 @@ export class BookingsService {
     private mailService: MailService,
     private metrics: MetricsService,
     private idempotency: IdempotencyService,
+    private capacity: ServiceCapacityService,
     @Optional() private channels?: NotificationChannelsService,
     @Optional() private realtime?: RealtimeService,
     @Optional()
@@ -455,12 +459,17 @@ export class BookingsService {
 
       const orderNumber = await allocateBookingOrderNumber(tx);
 
+      const teamId = isInstant
+        ? null
+        : await this.capacity.assignFreeTeam(dto.serviceId, scheduledAt, tx);
+
       const created = await tx.booking.create({
         data: {
           orderNumber,
           serviceId: dto.serviceId,
           customerId,
           providerId: service.providerId,
+          teamId,
           scheduledAt,
           totalPrice: service.price,
           notes,
@@ -580,7 +589,7 @@ export class BookingsService {
 
     const messageContent = dto.message.trim();
     if (!messageContent) {
-      throw new BadRequestException('Müştəriyə mesaj yazmaq mütləqdir');
+      throw new BadRequestException('Xidmət alana mesaj yazmaq mütləqdir');
     }
 
     const booking = await this.prisma.booking.findUnique({
@@ -605,7 +614,7 @@ export class BookingsService {
       throw new BadRequestException('Yalnız gözləyən sifarişlər yenidən planlaşdırıla bilər');
     }
     if (booking.proposedScheduledAt) {
-      throw new BadRequestException('Müştərinin cavabı gözlənilir. Yeni təklif göndərmək olmaz');
+      throw new BadRequestException('Xidmət alanın cavabı gözlənilir. Yeni təklif göndərmək olmaz');
     }
 
     const formattedDate = this.formatScheduledAt(scheduledAt);
@@ -704,12 +713,20 @@ export class BookingsService {
         { excludeBookingId: booking.id, tx },
       );
 
+      const teamId = await this.capacity.assignFreeTeam(
+        booking.serviceId,
+        booking.proposedScheduledAt!,
+        tx,
+        booking.id,
+      );
+
       const result = await tx.booking.update({
         where: { id },
         data: {
           scheduledAt: booking.proposedScheduledAt!,
           proposedScheduledAt: null,
           status: BookingStatus.CONFIRMED,
+          teamId,
           ...(booking.acceptedAt ? {} : { acceptedAt: new Date() }),
         },
         include: bookingSummaryInclude,
@@ -720,7 +737,7 @@ export class BookingsService {
           userId: booking.providerId,
           type: NotificationType.BOOKING_CONFIRMED,
           title: 'Yeni tarix təsdiqləndi',
-          body: `Müştəri «${booking.service.title}» sifarişi üçün təklif etdiyiniz ${formattedDate} tarixini təsdiqlədi.`,
+          body: `Xidmət alan «${booking.service.title}» sifarişi üçün təklif etdiyiniz ${formattedDate} tarixini təsdiqlədi.`,
           data: { bookingId: booking.id },
         },
       });
@@ -765,7 +782,7 @@ export class BookingsService {
           userId: booking.providerId,
           type: NotificationType.BOOKING_RESCHEDULE_REJECTED,
           title: 'Yeni tarix rədd edildi',
-          body: `Müştəri «${booking.service.title}» sifarişi üçün təklif etdiyiniz ${formattedDate} tarixini rədd etdi.`,
+          body: `Xidmət alan «${booking.service.title}» sifarişi üçün təklif etdiyiniz ${formattedDate} tarixini rədd etdi.`,
           data: { bookingId: booking.id },
         },
       });
@@ -984,7 +1001,7 @@ export class BookingsService {
             : null
           : booking.customerId;
         if (recipientId) {
-          const actorLabel = isCustomer ? 'müştəri' : 'xidmət verən';
+          const actorLabel = isCustomer ? 'xidmət alan' : 'xidmət verən';
           const reasonSuffix = dto.cancelReason?.trim()
             ? ` Səbəb: ${dto.cancelReason.trim()}`
             : '';
@@ -1096,7 +1113,7 @@ export class BookingsService {
       const actorLabel = meta.isAdmin
         ? 'idarəçi'
         : meta.isCustomer
-          ? 'müştəri'
+          ? 'xidmət alan'
           : 'xidmət verən';
       void this.safeSendBookingMail({
         to: recipientEmail,
@@ -1209,6 +1226,7 @@ export class BookingsService {
     orderNumber?: string;
     bookingId?: string;
   }) {
+    if (!BOOKING_MAIL_ENABLED) return;
     try {
       const content = buildBookingMailContent(input);
       if (!content) return;
@@ -1254,7 +1272,7 @@ export class BookingsService {
     return { lat, lng };
   }
 
-  /** Ünvan mətnindən təyinat koordinatı (müştəri GPS göndərməyəndə). */
+  /** Ünvan mətnindən təyinat koordinatı (xidmət alan GPS göndərməyəndə). */
   private async resolveDestFromAddress(
     address: string,
   ): Promise<{ lat: number; lng: number } | null> {
@@ -1273,7 +1291,7 @@ export class BookingsService {
 
   /**
    * INSTANT sifariş üçün xidmət ərazisini təyin edir.
-   * Prioritet: müştəri seçimi → seed xidmət location → ünvan mətnindən match.
+   * Prioritet: xidmət alan seçimi → seed xidmət location → ünvan mətnindən match.
    */
   private resolveInstantServiceLocation(input: {
     isInstant: boolean;
@@ -1311,6 +1329,8 @@ export class BookingsService {
       orderNumber: string;
       serviceId: string;
       service: { title: string };
+      teamId?: string | null;
+      team?: { id: string; name: string } | null;
       customerId: string;
       customer: { firstName: string; lastName: string };
       providerId: string;
@@ -1406,6 +1426,8 @@ export class BookingsService {
       dispatchOfferId: dispatchOffer?.id ?? null,
       dispatchDistanceM: dispatchOffer?.distanceM ?? null,
       dispatchExpiresAt: dispatchOffer?.expiresAt.toISOString() ?? null,
+      teamId: booking.teamId ?? null,
+      teamName: booking.team?.name ?? null,
     };
   }
 }

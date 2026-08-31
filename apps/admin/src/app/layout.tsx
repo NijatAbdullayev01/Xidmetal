@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     template: '%s | İdarə etmə paneli',
   },
   description: 'Xidmətal platforma idarə paneli',
-  robots: { index: false, follow: false },
+  robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

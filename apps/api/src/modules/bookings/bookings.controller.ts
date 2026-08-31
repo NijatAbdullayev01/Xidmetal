@@ -116,7 +116,7 @@ export class BookingsController {
   @UseGuards(RolesGuard, EmailVerifiedGuard)
   @Roles(UserRole.CUSTOMER)
   @RequireEmailVerified()
-  @ApiOperation({ summary: 'Yeni tarix təklifini təsdiqlə (müştəri)' })
+  @ApiOperation({ summary: 'Yeni tarix təklifini təsdiqlə (xidmət alan)' })
   confirmReschedule(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.bookingsService.confirmReschedule(id, userId);
   }
@@ -125,7 +125,7 @@ export class BookingsController {
   @UseGuards(RolesGuard, EmailVerifiedGuard)
   @Roles(UserRole.CUSTOMER)
   @RequireEmailVerified()
-  @ApiOperation({ summary: 'Yeni tarix təklifini rədd et (müştəri)' })
+  @ApiOperation({ summary: 'Yeni tarix təklifini rədd et (xidmət alan)' })
   rejectReschedule(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.bookingsService.rejectReschedule(id, userId);
   }

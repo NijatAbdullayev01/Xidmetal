@@ -105,7 +105,7 @@ describe('buildMailText', () => {
 });
 
 describe('buildCustomerBookingReviewUrl', () => {
-  it('müştəri sifariş səhifəsinə rəy parametrli link qurur', () => {
+  it('xidmət alan sifariş səhifəsinə rəy parametrli link qurur', () => {
     expect(
       buildCustomerBookingReviewUrl('https://xidmetal.com/', 'bk-1'),
     ).toBe('https://xidmetal.com/dashboard/customer/bookings/bk-1?review=1');

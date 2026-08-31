@@ -1,6 +1,13 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { FolderSearch } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
+import { NOINDEX } from '@/lib/seo';
+
+export const metadata: Metadata = {
+  title: 'Kateqoriya tapılmadı',
+  robots: NOINDEX,
+};
 
 export default function CategoryNotFound() {
   return (

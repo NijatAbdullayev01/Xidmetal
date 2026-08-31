@@ -111,7 +111,7 @@ export function AdminAnalyticsPage() {
 
   const businessCards: MetricCard[] = [
     {
-      label: 'Yeni müştəri',
+      label: 'Yeni xidmət alan',
       value: data?.business.newCustomers ?? '—',
       icon: UserPlus,
     },

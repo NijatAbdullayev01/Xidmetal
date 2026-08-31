@@ -19,6 +19,8 @@ write_proxy_locations() {
     add_header Content-Type text/plain;
   }
 
+  include /etc/nginx/google-site-verification.conf;
+
   location /socket.io/ {
     proxy_http_version 1.1;
     proxy_set_header Host \$host;
@@ -88,6 +90,7 @@ server {
     return 200 'ok';
     add_header Content-Type text/plain;
   }
+  include /etc/nginx/google-site-verification.conf;
   location / {
     return 301 https://${WEB_HOST}\$request_uri;
   }
@@ -96,6 +99,7 @@ server {
   listen 443 ssl;
   http2 on;
   server_name ${WWW_HOST};
+  include /etc/nginx/google-site-verification.conf;
   location / {
     return 301 https://${WEB_HOST}\$request_uri;
   }

@@ -9,8 +9,9 @@ export const BRAND = {
 export const APP = {
   name: 'Xidmətal',
   description: 'Xidmət verənlərlə xidmət alanları bir araya gətirən platforma',
+  email: 'info@xidmetal.com',
   defaultLocale: 'az',
-  supportedLocales: ['az', 'en', 'ru'] as const,
+  supportedLocales: ['az'] as const,
 } as const;
 
 export const API = {
@@ -64,7 +65,7 @@ export const DISPATCH = {
   /** Namizəd limiti (eyni xidmət növü + şəhər) */
   MAX_CANDIDATES: 500,
   /**
-   * Müştəri qəbul olunmuş təcili sifarişdə neçə dəfə
+   * Xidmət alan qəbul olunmuş təcili sifarişdə neçə dəfə
    * «başqa xidmət verən axtar» edə bilər.
    */
   MAX_CUSTOMER_PROVIDER_SKIPS: 5,
@@ -84,4 +85,15 @@ export const PAYMENTS = {
 export const NOTIFICATION_CHANNELS = {
   /** IdempotencyRecord default TTL (saat) */
   IDEMPOTENCY_TTL_HOURS: 24,
+} as const;
+
+/**
+ * Şirkət xidməti üzrə komanda (paralel tutum vahidi).
+ * Fərdi hesabda tutum həmişə 1-dir.
+ */
+export const SERVICE_TEAMS = {
+  NAME_MIN_LENGTH: 2,
+  NAME_MAX_LENGTH: 80,
+  MAX_PER_SERVICE: 20,
+  DEFAULT_NAME: 'Komanda 1',
 } as const;

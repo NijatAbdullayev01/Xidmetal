@@ -103,6 +103,10 @@ export class AdminService {
       servicesPendingReview,
       bookingsTotal,
       bookingsPending,
+      bookingsCompleted,
+      bookingsValueAll,
+      bookingsValueDone,
+      bookingsValueVoid,
       reviewsPending,
       reportsPending,
       categoriesActive,
@@ -119,6 +123,16 @@ export class AdminService {
       this.prisma.service.count({ where: { status: ServiceStatus.PENDING_REVIEW } }),
       this.prisma.booking.count(),
       this.prisma.booking.count({ where: { status: BookingStatus.PENDING } }),
+      this.prisma.booking.count({ where: { status: BookingStatus.COMPLETED } }),
+      this.prisma.booking.aggregate({ _sum: { totalPrice: true } }),
+      this.prisma.booking.aggregate({
+        where: { status: BookingStatus.COMPLETED },
+        _sum: { totalPrice: true },
+      }),
+      this.prisma.booking.aggregate({
+        where: { status: { in: [BookingStatus.CANCELLED, BookingStatus.REJECTED] } },
+        _sum: { totalPrice: true },
+      }),
       this.prisma.review.count({ where: { status: ReviewStatus.PENDING } }),
       this.prisma.report.count({ where: { status: ReportStatus.PENDING } }),
       this.prisma.category.count({ where: { isActive: true } }),
@@ -135,6 +149,10 @@ export class AdminService {
       servicesPendingReview,
       bookingsTotal,
       bookingsPending,
+      bookingsCompleted,
+      bookingsValueTotal: bookingsValueAll._sum.totalPrice?.toNumber() ?? 0,
+      bookingsValueCompleted: bookingsValueDone._sum.totalPrice?.toNumber() ?? 0,
+      bookingsValueCancelled: bookingsValueVoid._sum.totalPrice?.toNumber() ?? 0,
       reviewsPending,
       reportsPending,
       categoriesActive,
@@ -431,7 +449,7 @@ export class AdminService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          category: { select: { id: true, name: true } },
+          category: { select: { id: true, name: true, slug: true } },
           provider: {
             select: {
               id: true,
@@ -457,6 +475,8 @@ export class AdminService {
         priceUnit: s.priceUnit,
         categoryId: s.categoryId,
         categoryName: s.category.name,
+        categorySlug: s.category.slug,
+        slug: s.slug,
         providerId: s.providerId,
         providerName: formatProviderDisplayName(s.provider),
         providerAvatarUrl: await this.storageService.toReadableMediaUrl(s.provider.avatarUrl),
@@ -546,7 +566,7 @@ export class AdminService {
     });
 
     const title = 'Xidmətiniz təsdiqləndi';
-    const body = `«${updated.title}» xidmətiniz yoxlamadan keçdi və müştərilərə görünür.`;
+    const body = `«${updated.title}» xidmətiniz yoxlamadan keçdi və xidmət alanlara görünür.`;
     const href = '/dashboard/provider/services';
     const notification = await this.prisma.notification.create({
       data: {
@@ -646,7 +666,7 @@ export class AdminService {
 
   private serviceAdminInclude() {
     return {
-      category: { select: { id: true, name: true } },
+      category: { select: { id: true, name: true, slug: true } },
       provider: {
         select: {
           id: true,
@@ -669,6 +689,7 @@ export class AdminService {
     priceUnit: string;
     categoryId: string;
     providerId: string;
+    slug?: string;
     status: ServiceStatus;
     reviewNote: string | null;
     submittedAt: Date | null;
@@ -682,7 +703,7 @@ export class AdminService {
     vehicleHeight: number | null;
     cargoRouteScope: string | null;
     createdAt: Date;
-    category: { id: string; name: string };
+    category: { id: string; name: string; slug?: string };
     provider: {
       firstName: string;
       lastName: string;
@@ -706,6 +727,8 @@ export class AdminService {
       priceUnit: updated.priceUnit,
       categoryId: updated.categoryId,
       categoryName: updated.category.name,
+      categorySlug: updated.category.slug,
+      slug: updated.slug,
       providerId: updated.providerId,
       providerName: formatProviderDisplayName(updated.provider),
       providerAvatarUrl: await this.storageService.toReadableMediaUrl(

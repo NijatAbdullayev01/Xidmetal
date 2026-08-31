@@ -360,7 +360,7 @@ export function UrgentOrderDialog({
       if (!token) throw new Error('Autentifikasiya tələb olunur');
 
       if (user?.role !== UserRole.CUSTOMER) {
-        throw new Error('Təcili sifariş yalnız müştəri hesabı ilə mümkündür');
+        throw new Error('Təcili sifariş yalnız xidmət alan hesabı ilə mümkündür');
       }
       if (!user.isVerified) {
         throw new Error('Sifariş vermək üçün e-poçtunuzu təsdiqləyin');

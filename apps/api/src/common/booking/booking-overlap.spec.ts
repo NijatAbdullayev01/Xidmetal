@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bookingWindowEndMs, rangesOverlap } from './booking-overlap';
+import { bookingWindowEndMs, countOverlappingWindows, rangesOverlap } from './booking-overlap';
 
 describe('rangesOverlap', () => {
   it('eyni başlanğıc → kəsişir', () => {
@@ -20,6 +20,18 @@ describe('rangesOverlap', () => {
 
   it('bir interval digərini tam əhatə edir → kəsişir', () => {
     expect(rangesOverlap(100, 400, 200, 300)).toBe(true);
+  });
+});
+
+describe('countOverlappingWindows', () => {
+  it('örtüşən pəncərələri sayır', () => {
+    expect(
+      countOverlappingWindows(100, 200, [
+        { startMs: 50, endMs: 120 },
+        { startMs: 200, endMs: 300 },
+        { startMs: 150, endMs: 180 },
+      ]),
+    ).toBe(2);
   });
 });
 

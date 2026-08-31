@@ -1,17 +1,24 @@
-import { Suspense } from 'react';
+import { cache, Suspense } from 'react';
 import type { Metadata } from 'next';
 import type { CategorySummary, PaginatedResponse, ServiceSummary } from '@xidmetal/shared';
 import { ServicesPageSkeleton } from '@/components/ui/page-skeletons';
+import { JsonLd } from '@/components/seo/json-ld';
 import { api } from '@/lib/api';
+import { NOINDEX_FOLLOW, pageMetadata, pageTitle } from '@/lib/seo';
+import {
+  buildBreadcrumbJsonLd,
+  buildCollectionPageJsonLd,
+  buildServicesItemListJsonLd,
+} from '@/lib/seo-schema';
+import { getSiteUrl } from '@/lib/site-url';
 import { ServicesContent } from './services-content';
 
-export const metadata: Metadata = {
-  title: 'Xidmətlər',
-  description:
-    'Təmizlik, təmir, gözəllik, təhsil və daha çox — Xidmətal-da minlərlə etibarlı xidməti kəşf edin, müqayisə edin və sifariş verin.',
-};
+export const revalidate = 60;
 
 const PAGE_SIZE = 24;
+
+const BASE_DESCRIPTION =
+  'Təmizlik, təmir, gözəllik, təhsil və daha çox — Xidmətal-da etibarlı xidmət verənləri kəşf edin, müqayisə edin və sifariş verin.';
 
 type SearchParams = Promise<{
   q?: string;
@@ -19,14 +26,18 @@ type SearchParams = Promise<{
   categoryId?: string;
 }>;
 
-async function loadServicesData(input: {
+function parsePage(raw: string | undefined): number {
+  return Math.max(1, Number.parseInt(raw ?? '1', 10) || 1);
+}
+
+const loadServicesData = cache(async (input: {
   q: string;
   page: number;
   categoryId: string | null;
 }): Promise<{
   categories: CategorySummary[];
   servicesPage: PaginatedResponse<ServiceSummary>;
-}> {
+}> => {
   try {
     const params: Record<string, string> = {
       limit: String(PAGE_SIZE),
@@ -53,34 +64,47 @@ async function loadServicesData(input: {
       },
     };
   }
-}
+});
 
-async function ServicesPageBody({
-  q,
-  page,
-  categoryId,
+export async function generateMetadata({
+  searchParams,
 }: {
-  q: string;
-  page: number;
-  categoryId: string | null;
-}) {
-  const { categories, servicesPage } = await loadServicesData({
-    q,
-    page,
-    categoryId,
-  });
+  searchParams: SearchParams;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  const q = params.q?.trim() ?? '';
+  const categoryId = params.categoryId?.trim() || null;
+  const page = parsePage(params.page);
 
-  return (
-    <ServicesContent
-      categories={categories}
-      services={servicesPage.items}
-      total={servicesPage.total}
-      page={servicesPage.page}
-      totalPages={servicesPage.totalPages}
-      query={q}
-      categoryId={categoryId}
-    />
-  );
+  if (q) {
+    return pageMetadata({
+      title: pageTitle(`Axtarış: ${q}`, page),
+      description: `«${q}» üzrə xidmət nəticələri — Xidmətal.`,
+      canonical: `/services?q=${encodeURIComponent(q)}${page > 1 ? `&page=${page}` : ''}`,
+      robots: NOINDEX_FOLLOW,
+    });
+  }
+
+  if (categoryId) {
+    return pageMetadata({
+      title: 'Xidmətlər',
+      description: BASE_DESCRIPTION,
+      canonical: '/services',
+      robots: NOINDEX_FOLLOW,
+    });
+  }
+
+  const canonical = page > 1 ? `/services?page=${page}` : '/services';
+  const { servicesPage } = await loadServicesData({ q: '', page, categoryId: null });
+  const outOfRange =
+    page > 1 && (servicesPage.totalPages === 0 || page > servicesPage.totalPages);
+
+  return pageMetadata({
+    title: pageTitle('Xidmətlər', page),
+    description: BASE_DESCRIPTION,
+    canonical,
+    robots: outOfRange ? NOINDEX_FOLLOW : undefined,
+  });
 }
 
 export default async function ServicesPage({
@@ -91,12 +115,45 @@ export default async function ServicesPage({
   const params = await searchParams;
   const q = params.q?.trim() ?? '';
   const categoryId = params.categoryId?.trim() || null;
-  const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1);
-  const suspenseKey = `${q}|${categoryId ?? ''}|${page}`;
+  const page = parsePage(params.page);
+
+  const { categories, servicesPage } = await loadServicesData({
+    q,
+    page,
+    categoryId,
+  });
 
   return (
-    <Suspense key={suspenseKey} fallback={<ServicesPageSkeleton />}>
-      <ServicesPageBody q={q} page={page} categoryId={categoryId} />
+    <Suspense fallback={<ServicesPageSkeleton />}>
+      <>
+        <JsonLd
+          data={[
+            buildBreadcrumbJsonLd(getSiteUrl(), [
+              { name: 'Ana səhifə', path: '/' },
+              { name: 'Xidmətlər', path: '/services' },
+            ]),
+            buildCollectionPageJsonLd(getSiteUrl(), {
+              name: 'Xidmətlər',
+              path: '/services',
+              description: BASE_DESCRIPTION,
+              itemList: buildServicesItemListJsonLd(
+                getSiteUrl(),
+                servicesPage.items,
+                servicesPage.total,
+              ),
+            }),
+          ]}
+        />
+        <ServicesContent
+          categories={categories}
+          services={servicesPage.items}
+          total={servicesPage.total}
+          page={servicesPage.page}
+          totalPages={servicesPage.totalPages}
+          query={q}
+          categoryId={categoryId}
+        />
+      </>
     </Suspense>
   );
 }

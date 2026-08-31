@@ -1,5 +1,5 @@
 ---
-description: Rol terminologiyası — UI-də Provider yox, Xidmət verən
+description: Rol terminologiyası — UI-də Provider/Müştəri yox; Xidmət verən / Xidmət alan
 alwaysApply: true
 ---
 
@@ -10,20 +10,23 @@ alwaysApply: true
 | Kod / enum | UI (Azərbaycan) |
 |---|---|
 | `PROVIDER` / provider | **Xidmət verən** (cəm: **xidmət verənlər**) |
-| `CUSTOMER` / customer | **Müştəri** |
+| `CUSTOMER` / customer | **Xidmət alan** (cəm: **xidmət alanlar**) |
 
 ## Qadağan (user-facing)
 
 ```
 ❌ Provider, Providers, provider təsdiqi, Provider tapılmadı
 ✅ Xidmət verən, Xidmət verənlər, Xidmət verən təsdiqi, Xidmət verən tapılmadı
+
+❌ Müştəri, Müştərilər, müştəri təsdiqi, Müştəri tapılmadı
+✅ Xidmət alan, Xidmət alanlar, xidmət alan təsdiqi, Xidmət alan tapılmadı
 ```
 
 ## İstisna (kodda saxlanılır)
 
-- Identifikatorlar: `providerId`, `UserRole.PROVIDER`, `providerProfile`, route `/dashboard/provider`
+- Identifikatorlar: `providerId`, `customerId`, `UserRole.PROVIDER`, `UserRole.CUSTOMER`, `providerProfile`, route `/dashboard/provider`, `/dashboard/customer`
 - React context: `ThemeProvider`, `QueryProvider`
 - Ödəniş/SMS adapter: `PaymentProvider`
 - Daxili şərh və test adları (istəyə görə AZ da ola bilər)
 
-Yeni UI yazarkən heç vaxt «Provider» sözünü istifadəçi mətninə yapışdırma.
+Yeni UI yazarkən heç vaxt «Provider» və ya «Müştəri» sözünü istifadəçi mətninə yapışdırma.

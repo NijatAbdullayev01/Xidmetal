@@ -39,6 +39,6 @@ export function redactBookingPiiForOffer(input: OfferBookingPii): {
     originLat: null,
     originLng: null,
     notes: null,
-    customerName: input.customerFirstName.trim() || 'Müştəri',
+    customerName: input.customerFirstName.trim() || 'Xidmət alan',
   };
 }

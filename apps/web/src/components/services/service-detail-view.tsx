@@ -1,8 +1,6 @@
 'use client';
 
-import Link from 'next/link';
 import {
-  ArrowLeft,
   Briefcase,
   MapPin,
   Route,
@@ -11,24 +9,36 @@ import {
   Home,
   Wifi,
 } from 'lucide-react';
-import type { ServiceSummary } from '@xidmetal/shared';
+import Link from 'next/link';
+import type { ReviewSummary, ServiceSummary } from '@xidmetal/shared';
 import {
   formatVehicleDimensions,
   formatCargoRouteScope,
   formatServiceVenue,
+  providerPublicPath,
   ServiceVenue,
 } from '@xidmetal/shared';
 import { formatPrice } from '@/lib/utils';
 import { getPriceUnitLabel } from '@/lib/provider-labels';
 import { ServiceImageGallery } from '@/components/services/service-image-gallery';
 import { ServiceOrderButton } from '@/components/services/service-order-button';
+import { ServiceCard } from '@/components/services/service-card';
+import { ServiceIndexLinks } from '@/components/services/service-index-links';
 import { ProviderReviewsTrigger } from '@/components/reviews/provider-reviews-trigger';
+import { ReviewListItem } from '@/components/reviews/review-list-item';
+import { Breadcrumbs } from '@/components/layout/breadcrumbs';
 
 interface ServiceDetailViewProps {
   service: ServiceSummary;
+  reviews?: ReviewSummary[];
+  related?: ServiceSummary[];
 }
 
-export function ServiceDetailView({ service }: ServiceDetailViewProps) {
+export function ServiceDetailView({
+  service,
+  reviews = [],
+  related = [],
+}: ServiceDetailViewProps) {
   const images = service.images ?? [];
   const hasImages = images.length > 0;
   const vehicleDimensions = formatVehicleDimensions(
@@ -45,23 +55,24 @@ export function ServiceDetailView({ service }: ServiceDetailViewProps) {
 
   return (
     <article className="space-y-8">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href="/services"
-          className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          Xidmətlər
-        </Link>
-        {service.categoryName ? (
-          <span className="text-sm text-muted-foreground">{service.categoryName}</span>
-        ) : null}
-      </div>
+      <Breadcrumbs
+        items={[
+          { href: '/', label: 'Ana səhifə' },
+          { href: '/categories', label: 'Kateqoriyalar' },
+          {
+            href: service.categorySlug
+              ? `/categories/${service.categorySlug}`
+              : '/categories',
+            label: service.categoryName || 'Kateqoriya',
+          },
+          { label: service.title },
+        ]}
+      />
 
       <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:gap-10">
         <div className="space-y-6">
           {hasImages ? (
-            <ServiceImageGallery images={images} />
+            <ServiceImageGallery images={images} title={service.title} />
           ) : (
             <div className="flex aspect-[16/10] items-center justify-center rounded-2xl bg-muted ring-1 ring-border/70">
               <p className="text-sm text-muted-foreground">Şəkil yoxdur</p>
@@ -126,7 +137,12 @@ export function ServiceDetailView({ service }: ServiceDetailViewProps) {
           </div>
 
           <div className="rounded-2xl border border-border/70 bg-card p-4">
-            <p className="text-sm font-semibold text-foreground">{service.providerName}</p>
+            <Link
+              href={providerPublicPath(service.providerId)}
+              className="text-sm font-semibold text-foreground underline-offset-2 hover:underline"
+            >
+              {service.providerName}
+            </Link>
             {service.reviewCount > 0 ? (
               <div className="mt-2">
                 <ProviderReviewsTrigger
@@ -134,6 +150,8 @@ export function ServiceDetailView({ service }: ServiceDetailViewProps) {
                   providerName={service.providerName}
                   averageRating={service.averageRating}
                   reviewCount={service.reviewCount}
+                  serviceId={service.id}
+                  serviceTitle={service.title}
                 />
               </div>
             ) : (
@@ -147,6 +165,38 @@ export function ServiceDetailView({ service }: ServiceDetailViewProps) {
           />
         </aside>
       </div>
+
+      {reviews.length > 0 ? (
+        <section aria-labelledby="service-reviews-heading" className="border-t border-border/60 pt-8">
+          <h2 id="service-reviews-heading" className="text-lg font-semibold tracking-tight">
+            Rəylər
+          </h2>
+          <ul className="mt-2 divide-y divide-border">
+            {reviews.map((review) => (
+              <ReviewListItem key={review.id} review={review} />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {related.length > 0 ? (
+        <section aria-labelledby="related-services-heading" className="border-t border-border/60 pt-8">
+          <h2 id="related-services-heading" className="text-lg font-semibold tracking-tight">
+            Oxşar xidmətlər
+          </h2>
+          <div className="mt-4 grid gap-6 sm:grid-cols-2">
+            {related.map((item) => (
+              <ServiceCard
+                key={item.id}
+                service={item}
+                categorySlug={item.categorySlug}
+                showCategoryHeader={false}
+              />
+            ))}
+          </div>
+          <ServiceIndexLinks services={related} />
+        </section>
+      ) : null}
     </article>
   );
 }

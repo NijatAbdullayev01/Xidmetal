@@ -19,12 +19,18 @@ import {
 } from 'lucide-react';
 import { APP } from '@xidmetal/shared';
 import { buttonStyles } from '@/components/ui/button';
+import { PageBreadcrumbs } from '@/components/layout/breadcrumbs';
+import { JsonLd } from '@/components/seo/json-ld';
+import { buildBreadcrumbJsonLd, buildHowToJsonLd } from '@/lib/seo-schema';
+import { pageMetadata } from '@/lib/seo';
+import { getSiteUrl } from '@/lib/site-url';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Necə işləyir?',
   description:
     'Xidmətal-da xidmət tapmaq, müqayisə etmək, sifariş vermək və izləmək prosesi — addım-addım, sadə və aydın izah.',
-};
+  canonical: '/how-it-works',
+});
 
 const customerSteps: {
   step: number;
@@ -172,13 +178,39 @@ const providerQuickSteps: {
   {
     icon: Star,
     title: 'Reytinq qazanın',
-    text: 'Keyfiyyətli xidmətlə daha çox müştəri cəlb edin.',
+    text: 'Keyfiyyətli xidmətlə daha çox xidmət alan cəlb edin.',
   },
 ];
 
 export default function HowItWorksPage() {
+  const siteUrl = getSiteUrl();
+
   return (
     <>
+      <JsonLd
+        data={[
+          buildBreadcrumbJsonLd(siteUrl, [
+            { name: 'Ana səhifə', path: '/' },
+            { name: 'Necə işləyir?', path: '/how-it-works' },
+          ]),
+          buildHowToJsonLd(siteUrl, {
+            name: 'Xidmətal-da necə sifariş verilir',
+            description:
+              'Xidmət tapmaq, müqayisə etmək, sifariş vermək və izləmək — addım-addım.',
+            path: '/how-it-works',
+            steps: customerSteps.map((step) => ({
+              name: step.title,
+              text: step.description,
+            })),
+          }),
+        ]}
+      />
+      <PageBreadcrumbs
+        items={[
+          { href: '/', label: 'Ana səhifə' },
+          { label: 'Necə işləyir?' },
+        ]}
+      />
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-b from-brand/15 via-brand/5 to-background">
         <div className="mx-auto max-w-7xl px-4 pt-16 pb-12 sm:px-6 lg:px-8 lg:pt-24">

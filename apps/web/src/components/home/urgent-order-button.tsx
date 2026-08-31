@@ -83,7 +83,7 @@ export function UrgentOrderButton({ categories, className }: UrgentOrderButtonPr
         disabled={!hydrated || blockedRole}
         title={
           blockedRole
-            ? 'Təcili sifariş yalnız müştəri hesabı ilə mümkündür'
+            ? 'Təcili sifariş yalnız xidmət alan hesabı ilə mümkündür'
             : undefined
         }
         className={cn(

@@ -9,6 +9,7 @@ import { PrismaService } from '../../common/database/prisma.service';
 import { StorageService } from '../../common/storage/storage.service';
 import { assertProviderVerified } from '../../common/provider/assert-provider-verified';
 import { CreateServiceDto, UpdateServiceDto, ServiceQueryDto } from './dto';
+import { randomUUID } from 'node:crypto';
 import {
   formatProviderDisplayName,
   UserRole,
@@ -22,6 +23,9 @@ import {
   ACTIVE_BOOKING_STATUSES,
   isAzerbaijanLocation,
   locationLabelsForCity,
+  SERVICE_TEAMS,
+  buildServiceSlug,
+  isUuid,
 } from '@xidmetal/shared';
 import { ReviewStatus, ServiceStatus } from '@prisma/client';
 import {
@@ -66,7 +70,7 @@ export class ServicesService {
         include: {
           category: { select: { id: true, name: true, slug: true } },
           images: SERVICE_IMAGES_INCLUDE,
-          _count: { select: { bookings: true } },
+          _count: { select: { bookings: true, teams: { where: { isActive: true } } } },
         },
       }),
       this.prisma.service.count({ where }),
@@ -86,6 +90,7 @@ export class ServicesService {
           provider: undefined,
           bookingCount: service._count.bookings,
           activeBookingCount: activeBookingCounts.get(service.id) ?? 0,
+          teamCount: service._count.teams,
           averageRating: stats?.averageRating ?? 0,
           reviewCount: stats?.reviewCount ?? 0,
         });
@@ -184,8 +189,8 @@ export class ServicesService {
   }
 
   async findById(id: string, requesterId?: string, requesterRole?: string) {
-    const service = await this.prisma.service.findUnique({
-      where: { id },
+    const service = await this.prisma.service.findFirst({
+      where: isUuid(id) ? { OR: [{ id }, { slug: id }] } : { slug: id },
       include: {
         category: true,
         provider: {
@@ -268,9 +273,14 @@ export class ServicesService {
       cargoRouteScope,
     });
 
+    const id = randomUUID();
+    const slug = buildServiceSlug(dto.title, id);
+
     const service = await this.prisma.service.create({
       data: {
         ...serviceFields,
+        id,
+        slug,
         serviceVenue: requiresServiceVenue(category.slug) ? dto.serviceVenue : null,
         ...vehicleFields,
         providerId,
@@ -283,6 +293,14 @@ export class ServicesService {
             })),
           },
         }),
+        teams: {
+          create: {
+            name: SERVICE_TEAMS.DEFAULT_NAME,
+            sortOrder: 0,
+            isDefault: true,
+            isActive: true,
+          },
+        },
       },
       include: {
         category: { select: { id: true, name: true, slug: true } },
@@ -892,6 +910,7 @@ export class ServicesService {
     priceUnit: string;
     categoryId: string;
     providerId: string;
+    slug?: string | null;
     status: string;
     reviewNote?: string | null;
     submittedAt?: Date | null;
@@ -905,8 +924,10 @@ export class ServicesService {
     vehicleHeight?: number | null;
     cargoRouteScope?: string | null;
     createdAt: Date;
+    updatedAt?: Date;
     bookingCount?: number;
     activeBookingCount?: number;
+    teamCount?: number;
     averageRating?: number;
     reviewCount?: number;
     category?: { id: string; name: string; slug?: string };
@@ -938,6 +959,8 @@ export class ServicesService {
       priceUnit: service.priceUnit,
       categoryId: service.categoryId,
       categoryName: service.category?.name ?? '',
+      categorySlug: service.category?.slug ?? undefined,
+      slug: service.slug ?? undefined,
       providerId: service.providerId,
       providerName: service.provider
         ? formatProviderDisplayName(service.provider)
@@ -962,10 +985,13 @@ export class ServicesService {
       vehicleHeight: service.vehicleHeight ?? undefined,
       cargoRouteScope: service.cargoRouteScope ?? undefined,
       createdAt: service.createdAt.toISOString(),
+      updatedAt: (service.updatedAt ?? service.createdAt).toISOString(),
+      providerAccountType: service.provider?.providerProfile?.accountType ?? undefined,
       ...(service.bookingCount !== undefined && { bookingCount: service.bookingCount }),
       ...(service.activeBookingCount !== undefined && {
         activeBookingCount: service.activeBookingCount,
       }),
+      ...(service.teamCount !== undefined && { teamCount: service.teamCount }),
       ...(service.images !== undefined && {
         images: await Promise.all(
           service.images.map(async (image) => ({

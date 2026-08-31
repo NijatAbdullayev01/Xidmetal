@@ -459,12 +459,12 @@ export class MessagesService {
       providerId = dto.providerId;
     } else if (role === UserRole.PROVIDER) {
       if (!dto.customerId) {
-        throw new BadRequestException('Müştəri seçilməlidir');
+        throw new BadRequestException('Xidmət alan seçilməlidir');
       }
       customerId = dto.customerId;
       providerId = userId;
     } else {
-      throw new BadRequestException('Söhbət yaratmaq üçün müştəri və ya xidmət verən göstərin');
+      throw new BadRequestException('Söhbət yaratmaq üçün xidmət alan və ya xidmət verən göstərin');
     }
 
     if (customerId === providerId) {

@@ -41,7 +41,7 @@ export class ServicesController {
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  @ApiOperation({ summary: 'Xidmət detalları' })
+  @ApiOperation({ summary: 'Xidmət detalları (id və ya slug)' })
   findOne(
     @Param('id') id: string,
     @CurrentUser('id') userId: string | undefined,

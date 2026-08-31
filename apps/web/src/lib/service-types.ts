@@ -1,4 +1,4 @@
-import { TRANSPORT_SERVICE_TYPES } from '@xidmetal/shared';
+import { TRANSPORT_SERVICE_TYPES, serviceTypeSlug } from '@xidmetal/shared';
 
 /** Kateqoriya slug → xidmət növləri */
 export const CATEGORY_SERVICE_TYPES: Record<string, readonly string[]> = {
@@ -79,4 +79,12 @@ export function getServiceTypesForCategory(slug: string): readonly string[] | un
 
 export function hasPredefinedServiceTypes(slug: string): boolean {
   return slug in CATEGORY_SERVICE_TYPES;
+}
+
+/** Yalnız kataloq növü — unikal elan başlığından doorway səhifə yaranmasın. */
+export function isCanonicalServiceType(categorySlug: string, title: string): boolean {
+  const types = getServiceTypesForCategory(categorySlug);
+  if (!types || types.length === 0) return false;
+  const key = serviceTypeSlug(title);
+  return types.some((type) => serviceTypeSlug(type) === key);
 }

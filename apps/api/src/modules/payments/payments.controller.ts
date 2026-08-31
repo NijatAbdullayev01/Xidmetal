@@ -42,7 +42,7 @@ export class PaymentsController {
   @RequireEmailVerified()
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({
-    summary: 'Payment intent yarat (yalnız PAYMENTS_ENABLED=true; müştəri)',
+    summary: 'Payment intent yarat (yalnız PAYMENTS_ENABLED=true; xidmət alan)',
   })
   @ApiHeader({
     name: 'Idempotency-Key',
@@ -79,7 +79,7 @@ export class PaymentsController {
   @Roles(UserRole.CUSTOMER)
   @UseGuards(EmailVerifiedGuard)
   @RequireEmailVerified()
-  @ApiOperation({ summary: 'Hold / authorize (müştəri)' })
+  @ApiOperation({ summary: 'Hold / authorize (xidmət alan)' })
   @ApiHeader({ name: 'Idempotency-Key', required: false })
   authorize(
     @CurrentUser('id') userId: string,
@@ -102,7 +102,7 @@ export class PaymentsController {
   @Roles(UserRole.CUSTOMER)
   @UseGuards(EmailVerifiedGuard)
   @RequireEmailVerified()
-  @ApiOperation({ summary: 'Capture (müştəri)' })
+  @ApiOperation({ summary: 'Capture (xidmət alan)' })
   @ApiHeader({ name: 'Idempotency-Key', required: false })
   capture(
     @CurrentUser('id') userId: string,

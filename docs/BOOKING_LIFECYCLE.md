@@ -9,7 +9,7 @@ Bu sənəd sifarişin **rezervdən rəyə** qədər keçdiyi tam axını və sta
 ## 1. Uçtan-uca axın
 
 ```
-Müştəri                    Sistem / Dispatch            Provider
+Xidmət alan                    Sistem / Dispatch            Provider
   │                                                        │
   ├─ sifariş yarat (INSTANT/SCHEDULED) ─► PENDING          │
   │                                                        │
@@ -40,7 +40,7 @@ Müştəri                    Sistem / Dispatch            Provider
 | `ARRIVED` | Provider ünvana çatdı |
 | `IN_PROGRESS` | İş gedir |
 | `COMPLETED` | İş bitdi |
-| `CANCELLED` | Ləğv edildi (müştəri/provider/admin) |
+| `CANCELLED` | Ləğv edildi (xidmət alan/provider/admin) |
 | `REJECTED` | Provider rədd etdi |
 
 `BookingType`: `SCHEDULED` (default) | `INSTANT` (avto-dispatch).
@@ -52,9 +52,9 @@ Müştəri                    Sistem / Dispatch            Provider
 Mənbə: `packages/shared/src/booking-lifecycle.ts` (`isBookingTransitionAllowed`).
 
 ```
-PENDING    → CONFIRMED (provider) | REJECTED (provider) | CANCELLED (müştəri)
-CONFIRMED  → EN_ROUTE (provider)  | CANCELLED (müştəri/provider)
-EN_ROUTE   → ARRIVED (provider)   | CANCELLED (müştəri/provider)
+PENDING    → CONFIRMED (provider) | REJECTED (provider) | CANCELLED (xidmət alan)
+CONFIRMED  → EN_ROUTE (provider)  | CANCELLED (xidmət alan/provider)
+EN_ROUTE   → ARRIVED (provider)   | CANCELLED (xidmət alan/provider)
 ARRIVED    → IN_PROGRESS (provider) | CANCELLED
 IN_PROGRESS→ COMPLETED (provider)
 COMPLETED  → (son — dəyişməz)
@@ -104,10 +104,10 @@ Hər keçiddə müvafiq `Booking` sahəsi doldurulur:
    `DISPATCH_DECLINE_REOFFER_COOLDOWN_SEC` (default 2 dəq) sonra yenidən təklif
    (axtarış pəncərəsi açıq qaldıqca və sifariş qəbul olunmayana qədər təkrarlanır).
    Rediscovery yeni ONLINE tutur.
-6b. Müştəri CONFIRMED-də (iş başlamazdan əvvəl) «Başqa xidmət verən axtar»:
+6b. Xidmət alan CONFIRMED-də (iş başlamazdan əvvəl) «Başqa xidmət verən axtar»:
    qəbul etmiş icraçı SKIPPED, sifariş yenidən PENDING, axtarış pəncərəsi yenilənir,
    digər onlayn namizədlərə yenidən təklif. Limit: `DISPATCH.MAX_CUSTOMER_PROVIDER_SKIPS`.
-7. Axtarış pəncərəsi bitib + hələ PENDING → auto-CANCELLED + müştəri bildirişi
+7. Axtarış pəncərəsi bitib + hələ PENDING → auto-CANCELLED + xidmət alan bildirişi
 ```
 
 **SCHEDULED toxunulmur:** advisory lock + `assertSlotIsFree` yalnız SCHEDULED create/reschedule-də.
@@ -121,7 +121,7 @@ Hər keçiddə müvafiq `Booking` sahəsi doldurulur:
 Hər status dəyişikliyi:
 1. DB update (transaction daxilində timestamp + status).
 2. In-app notification + push/WS.
-3. Müştəriyə best-effort e-poçt yalnız **təsdiq** (`CONFIRMED` — SCHEDULED status + INSTANT offer accept) və **tamamlanma** (`COMPLETED`) zamanı.
+3. Xidmət alana best-effort e-poçt yalnız **təsdiq** (`CONFIRMED` — SCHEDULED status + INSTANT offer accept) və **tamamlanma** (`COMPLETED`) zamanı.
 4. Ləğv (`CANCELLED`) — qarşı tərəfə best-effort e-poçt (mövcud axın).
 5. Ödəniş — məhsul qərarı / Phase 5.
 
@@ -132,14 +132,14 @@ Hər status dəyişikliyi:
 | Nə vaxt ləğv | Nəticə |
 |--------------|--------|
 | PENDING/CONFIRMED/EN_ROUTE/ARRIVED | `cancelReason` + `cancelledBy` məcburi |
-| IN_PROGRESS | Provider/müştəri ləğv edə bilməz |
+| IN_PROGRESS | Provider/xidmət alan ləğv edə bilməz |
 
 ---
 
 ## 8. Rəy (review) qapısı
 
 - Rəy yalnız `COMPLETED` sifarişə yazıla bilər.
-- Yalnız həmin sifarişin **müştərisi** rəy yaza bilər.
+- Yalnız həmin sifarişin **xidmət alanı** rəy yaza bilər.
 - Bir sifarişə bir rəy (`Review.bookingId @unique`).
 
 ---
@@ -156,17 +156,17 @@ Sifarişə bağlı söhbət (`POST /messages/conversations` + `bookingId`) yaln�
 
 Mənbə: `packages/shared` `isBookingMessagingEnabled`. UI «Mesaj yaz» düyməsi `PENDING`-də görünür, amma deaktivdir; `COMPLETED`-də gizlidir.
 
-Tarix təklifi (`reschedule`) PENDING-də sistem mesajı yaza bilər; müştəri söhbəti «Mesaj yaz» ilə aça bilməz.
+Tarix təklifi (`reschedule`) PENDING-də sistem mesajı yaza bilər; xidmət alan söhbəti «Mesaj yaz» ilə aça bilməz.
 
 ## 8c. Qiymət görünürlüyü
 
-Sifariş qiyməti **xidmət verən tərəfdə göstərilmir**. Müştəridə yalnız xidmət verən qəbul etdikdən sonra görünür (`isBookingPriceVisibleToCustomer`).
+Sifariş qiyməti **xidmət verən tərəfdə göstərilmir**. Xidmət alanda yalnız xidmət verən qəbul etdikdən sonra görünür (`isBookingPriceVisibleToCustomer`).
 
 | Tərəf / status | Qiymət |
 |----------------|--------|
 | Xidmət verən (bütün statuslar, o cümlədən dispatch təklifi) | ✗ |
-| Müştəri `PENDING` / `REJECTED` / qəbuldan əvvəl `CANCELLED` | ✗ |
-| Müştəri `CONFIRMED`+ (və ya `acceptedAt` dolu) | ✓ |
+| Xidmət alan `PENDING` / `REJECTED` / qəbuldan əvvəl `CANCELLED` | ✗ |
+| Xidmət alan `CONFIRMED`+ (və ya `acceptedAt` dolu) | ✓ |
 
 ---
 

@@ -5,7 +5,7 @@ import { canJoinBookingRoom, canPushLocation } from './realtime-auth';
 describe('canJoinBookingRoom', () => {
   const booking = { customerId: 'c1', providerId: 'p1' };
 
-  it('müştəri və provider qoşula bilər', () => {
+  it('xidmət alan və provider qoşula bilər', () => {
     expect(canJoinBookingRoom({ id: 'c1', role: UserRole.CUSTOMER }, booking)).toBe(true);
     expect(canJoinBookingRoom({ id: 'p1', role: UserRole.PROVIDER }, booking)).toBe(true);
   });

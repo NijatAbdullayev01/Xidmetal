@@ -152,10 +152,16 @@ export function bookingStatusToMailEvent(
   }
 }
 
-/** Müştəriyə status e-poçtu yalnız xidmət verən təsdiqində və tamamlanmada. */
+/**
+ * Sifariş e-poçtları (yeni sifariş, təsdiq, tamamlanma, ləğv).
+ * Müvəqqəti bağlıdır — yenidən açmaq üçün `true` edin.
+ */
+export const BOOKING_MAIL_ENABLED = false;
+
+/** Xidmət alana status e-poçtu yalnız xidmət verən təsdiqində və tamamlanmada. */
 export function shouldSendCustomerStatusMail(status: BookingStatus): boolean {
+  if (!BOOKING_MAIL_ENABLED) return false;
   return (
-    status === BookingStatus.CONFIRMED ||
-    status === BookingStatus.COMPLETED
+    status === BookingStatus.CONFIRMED || status === BookingStatus.COMPLETED
   );
 }

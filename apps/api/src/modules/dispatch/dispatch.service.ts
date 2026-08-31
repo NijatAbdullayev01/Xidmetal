@@ -35,7 +35,10 @@ import {
 import { Prisma, ServiceStatus } from '@prisma/client';
 import { PrismaService } from '../../common/database/prisma.service';
 import { MailService } from '../../common/mail/mail.service';
-import { buildBookingMailContent } from '../../common/mail/booking-mail';
+import {
+  BOOKING_MAIL_ENABLED,
+  buildBookingMailContent,
+} from '../../common/mail/booking-mail';
 import { RealtimeService } from '../realtime/realtime.service';
 import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
 import { redactBookingPiiForOffer } from '../bookings/booking-pii';
@@ -46,6 +49,7 @@ import {
   type SearchWindowJobData,
 } from './dispatch-queue.service';
 import { MetricsService } from '../../common/metrics/metrics.service';
+import { ServiceCapacityService } from '../../common/booking/service-capacity.service';
 import { assertDispatchAdminList } from './dispatch-access';
 
 const offerInclude = {
@@ -90,6 +94,7 @@ export class DispatchService implements OnModuleInit {
     private config: ConfigService,
     private metrics: MetricsService,
     private mailService: MailService,
+    private capacity: ServiceCapacityService,
     @Optional() private realtime?: RealtimeService,
     @Optional() private channels?: NotificationChannelsService,
   ) {}
@@ -358,6 +363,13 @@ export class DispatchService implements OnModuleInit {
         );
       }
 
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${providerId}))`;
+      const teamId = await this.capacity.assignFreeTeam(
+        matchingService.id,
+        booking.scheduledAt,
+        tx,
+      );
+
       // Race-safe: yalnız PENDING offer + PENDING booking
       const offerUpdate = await tx.dispatchOffer.updateMany({
         where: {
@@ -386,6 +398,7 @@ export class DispatchService implements OnModuleInit {
           serviceId: matchingService.id,
           totalPrice: matchingService.price,
           acceptedAt: now,
+          teamId,
         },
       });
 
@@ -412,10 +425,7 @@ export class DispatchService implements OnModuleInit {
         },
       });
 
-      await tx.providerProfile.updateMany({
-        where: { userId: providerId },
-        data: { availability: ProviderAvailability.BUSY },
-      });
+      await this.capacity.syncAvailability(providerId, tx);
 
       await tx.notification.create({
         data: {
@@ -578,7 +588,7 @@ export class DispatchService implements OnModuleInit {
   }
 
   /**
-   * Müştəri/admin PENDING ani sifarişi ləğv edəndə — növbəni dayandırır,
+   * Xidmət alan/admin PENDING ani sifarişi ləğv edəndə — növbəni dayandırır,
    * açıq təklifləri geri çəkir. Ləğv bildirişi göndərilmir (heç kim qəbul etməyib).
    */
   async abortForBooking(bookingId: string): Promise<void> {
@@ -622,7 +632,7 @@ export class DispatchService implements OnModuleInit {
   }
 
   /**
-   * Müştəri qəbul olunmuş təcili icraçını buraxır və yenidən axtarış başladır.
+   * Xidmət alan qəbul olunmuş təcili icraçını buraxır və yenidən axtarış başladır.
    */
   async skipAcceptedProvider(bookingId: string, customerId: string): Promise<void> {
     const now = new Date();
@@ -694,6 +704,7 @@ export class DispatchService implements OnModuleInit {
           acceptedAt: null,
           dispatchWindowStartedAt: now,
           dispatchSkipCount: { increment: 1 },
+          teamId: null,
         },
       });
       if (reverted.count !== 1) {
@@ -704,8 +715,8 @@ export class DispatchService implements OnModuleInit {
         data: {
           userId: booking.providerId,
           type: NotificationType.BOOKING_CANCELLED,
-          title: 'Müştəri başqa xidmət verən axtarır',
-          body: `«${booking.service.title}» sifarişi üçün müştəri sizin qiymətinizi qəbul etmədi.`,
+          title: 'Xidmət alan başqa xidmət verən axtarır',
+          body: `«${booking.service.title}» sifarişi üçün xidmət alan sizin qiymətinizi qəbul etmədi.`,
           data: { bookingId, skippedProvider: true },
         },
       });
@@ -720,8 +731,8 @@ export class DispatchService implements OnModuleInit {
 
     this.channels?.deliverAfterInApp({
       userId: result.skippedProviderId,
-      title: 'Müştəri başqa xidmət verən axtarır',
-      body: `«${result.serviceTitle}» sifarişi üçün müştəri sizin qiymətinizi qəbul etmədi.`,
+      title: 'Xidmət alan başqa xidmət verən axtarır',
+      body: `«${result.serviceTitle}» sifarişi üçün xidmət alan sizin qiymətinizi qəbul etmədi.`,
       type: NotificationType.BOOKING_CANCELLED,
       data: { bookingId, skippedProvider: true },
       serviceTitle: result.serviceTitle,
@@ -812,17 +823,18 @@ export class DispatchService implements OnModuleInit {
   }
 
   /**
-   * Provider BUSY → ONLINE (sifariş bitəndə / ləğv).
+   * Provider BUSY → ONLINE (sifariş bitəndə / ləğv), tutum qalıbsa.
    */
   async releaseProviderIfBusy(providerId: string): Promise<void> {
-    const result = await this.prisma.providerProfile.updateMany({
-      where: {
-        userId: providerId,
-        availability: ProviderAvailability.BUSY,
-      },
-      data: { availability: ProviderAvailability.ONLINE },
+    const before = await this.prisma.providerProfile.findUnique({
+      where: { userId: providerId },
+      select: { availability: true },
     });
-    if (result.count > 0) {
+    const next = await this.capacity.syncAvailability(providerId);
+    if (
+      before?.availability === ProviderAvailability.BUSY &&
+      next === ProviderAvailability.ONLINE
+    ) {
       this.notifyProviderOnline(providerId);
     }
   }
@@ -984,6 +996,7 @@ export class DispatchService implements OnModuleInit {
       locationLabels,
       destLat: booking.destLat,
       destLng: booking.destLng,
+      scheduledAt: booking.scheduledAt,
       minPrice: prefs?.minPrice,
       maxPrice: prefs?.maxPrice,
       minRating: prefs?.minRating,
@@ -1029,7 +1042,7 @@ export class DispatchService implements OnModuleInit {
   }
 
   /**
-   * Eyni xidmət növü (kateqoriya + başlıq) + şəhər + ONLINE — radius məhdudiyyəti yox.
+   * Eyni xidmət növü (kateqoriya + başlıq) + şəhər + ONLINE + boş komanda.
    */
   private async findServiceTypeCandidates(input: {
     categoryId: string;
@@ -1037,6 +1050,7 @@ export class DispatchService implements OnModuleInit {
     locationLabels: readonly string[];
     destLat: number | null;
     destLng: number | null;
+    scheduledAt: Date;
     minPrice?: number;
     maxPrice?: number;
     minRating?: number;
@@ -1067,6 +1081,7 @@ export class DispatchService implements OnModuleInit {
       },
       take: DISPATCH.MAX_CANDIDATES,
       select: {
+        id: true,
         providerId: true,
         provider: {
           select: {
@@ -1082,8 +1097,17 @@ export class DispatchService implements OnModuleInit {
       },
     });
 
+    const withCapacity = await this.capacity.filterProviderIdsWithCapacity(
+      services.map((service) => ({
+        providerId: service.providerId,
+        serviceId: service.id,
+      })),
+      input.scheduledAt,
+    );
+
     const byProvider = new Map<string, DispatchCandidate>();
     for (const service of services) {
+      if (!withCapacity.has(service.providerId)) continue;
       if (byProvider.has(service.providerId)) continue;
       const profile = service.provider.providerProfile;
       const rating = profile?.rating ?? 0;
@@ -1228,7 +1252,7 @@ export class DispatchService implements OnModuleInit {
   }
 
   /**
-   * Namizəd tükəndi / mümkün deyil — auto-cancel + müştəriyə bildiriş.
+   * Namizəd tükəndi / mümkün deyil — auto-cancel + xidmət alana bildiriş.
    */
   private async failDispatch(
     bookingId: string,
@@ -1300,6 +1324,7 @@ export class DispatchService implements OnModuleInit {
     orderNumber?: string;
     bookingId?: string;
   }) {
+    if (!BOOKING_MAIL_ENABLED) return;
     try {
       const content = buildBookingMailContent(input);
       if (!content) return;

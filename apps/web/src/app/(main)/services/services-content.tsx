@@ -3,11 +3,14 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, ChevronLeft, ChevronRight, LayoutGrid, SearchX } from 'lucide-react';
+import { ArrowRight, LayoutGrid, SearchX } from 'lucide-react';
 import type { CategorySummary, ServiceSummary } from '@xidmetal/shared';
 import { BecomeProviderLink } from '@/components/auth/become-provider-link';
+import { Breadcrumbs } from '@/components/layout/breadcrumbs';
+import { PaginationNav } from '@/components/layout/pagination-nav';
 import { buttonStyles } from '@/components/ui/button';
 import { ServiceCard } from '@/components/services/service-card';
+import { ServiceIndexLinks } from '@/components/services/service-index-links';
 import { NearbyProvidersSection } from '@/components/services/nearby-providers-section';
 import { ServiceSearch } from '@/components/search/service-search';
 import { getCategoryIcon } from '@/lib/category-icons';
@@ -74,7 +77,13 @@ export function ServicesContent({
     <>
       <section className="border-b border-border/60 bg-gradient-to-b from-brand/10 to-background pt-8 pb-6 sm:pt-12 sm:pb-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl">
+          <Breadcrumbs
+            items={[
+              { href: '/', label: 'Ana səhifə' },
+              { label: hasQuery ? 'Axtarış' : 'Xidmətlər' },
+            ]}
+          />
+          <div className="mx-auto mt-4 max-w-2xl">
             <h1 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
               {hasQuery ? 'Axtarış nəticələri' : 'Xidmətlər'}
             </h1>
@@ -108,9 +117,8 @@ export function ServicesContent({
             <div className="-mx-4 sm:-mx-6 lg:-mx-8">
               <div className="scrollbar-none snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth scroll-px-4 sm:scroll-px-6 lg:scroll-px-8">
                 <div className="flex w-max gap-3 px-4 py-1 sm:gap-4 sm:px-6 sm:py-3 lg:px-8">
-                  <button
-                    type="button"
-                    onClick={() => setCategory(null)}
+                  <Link
+                    href="/services"
                     className={cn(
                       categoryCardClass,
                       !activeCategory && 'border-brand/60 ring-2 ring-brand/25',
@@ -148,17 +156,17 @@ export function ServicesContent({
                       className="relative mt-3 hidden h-4 w-4 text-brand-dark opacity-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:opacity-100 sm:block"
                       aria-hidden
                     />
-                  </button>
+                  </Link>
 
                   {categories.map((category) => {
                     const Icon = getCategoryIcon(category.slug);
                     const isActive = activeCategory === category.id;
 
                     return (
-                      <button
+                      <Link
                         key={category.id}
-                        type="button"
-                        onClick={() => setCategory(isActive ? null : category.id)}
+                        href={`/categories/${category.slug}`}
+                        prefetch
                         className={cn(
                           categoryCardClass,
                           isActive && 'border-brand/60 ring-2 ring-brand/25',
@@ -196,7 +204,7 @@ export function ServicesContent({
                           className="relative mt-3 hidden h-4 w-4 text-brand-dark opacity-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:opacity-100 sm:block"
                           aria-hidden
                         />
-                      </button>
+                      </Link>
                     );
                   })}
                 </div>
@@ -298,48 +306,19 @@ export function ServicesContent({
                 ))}
               </div>
 
-              {totalPages > 1 ? (
-                <nav
-                  className="mt-10 flex flex-col items-center justify-between gap-4 sm:flex-row"
-                  aria-label="Səhifələmə"
-                >
-                  <p className="text-sm text-muted-foreground">
-                    Səhifə {page} / {totalPages}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={buildServicesHref({
-                        q: query || undefined,
-                        categoryId: activeCategory,
-                        page: page - 1,
-                      })}
-                      aria-disabled={page <= 1}
-                      className={cn(
-                        buttonStyles('outline', 'md'),
-                        page <= 1 && 'pointer-events-none opacity-40',
-                      )}
-                    >
-                      <ChevronLeft className="h-4 w-4" aria-hidden />
-                      Əvvəlki
-                    </Link>
-                    <Link
-                      href={buildServicesHref({
-                        q: query || undefined,
-                        categoryId: activeCategory,
-                        page: page + 1,
-                      })}
-                      aria-disabled={page >= totalPages}
-                      className={cn(
-                        buttonStyles('outline', 'md'),
-                        page >= totalPages && 'pointer-events-none opacity-40',
-                      )}
-                    >
-                      Növbəti
-                      <ChevronRight className="h-4 w-4" aria-hidden />
-                    </Link>
-                  </div>
-                </nav>
-              ) : null}
+              <PaginationNav
+                page={page}
+                totalPages={totalPages}
+                hrefForPage={(nextPage) =>
+                  buildServicesHref({
+                    q: query || undefined,
+                    categoryId: activeCategory,
+                    page: nextPage,
+                  })
+                }
+              />
+
+              <ServiceIndexLinks services={services} />
             </>
           )}
         </div>
@@ -356,7 +335,7 @@ export function ServicesContent({
               Öz xidmətinizi təklif edin
             </h2>
             <p className="relative mx-auto mt-4 max-w-xl text-brand-foreground/80">
-              Xidmət verən kimi qeydiyyatdan keçin və minlərlə potensial müştəriyə çatın.
+              Xidmət verən kimi qeydiyyatdan keçin və yeni xidmət alanlara çatın.
             </p>
             <BecomeProviderLink className="relative mt-8 inline-flex items-center gap-2 rounded-xl bg-brand-foreground px-8 py-3.5 font-semibold text-brand transition-colors hover:bg-brand-foreground/90">
               Xidmət verən ol

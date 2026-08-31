@@ -29,7 +29,7 @@ export type CancelBookingDialogMode = 'cancel' | 'reject';
 
 interface CancelBookingDialogProps {
   open: boolean;
-  /** cancel = ləğv (müştəri/xidmət verən); reject = imtina (xidmət verən PENDING) */
+  /** cancel = ləğv (xidmət alan/xidmət verən); reject = imtina (xidmət verən PENDING) */
   mode?: CancelBookingDialogMode;
   serviceTitle?: string;
   pending?: boolean;
@@ -147,7 +147,7 @@ export function CancelBookingDialog({
       <div className="space-y-5 px-5 py-5 sm:px-6">
         <p className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">
           {isReject
-            ? 'İmtina etdikdən sonra sifariş rədd ediləcək. Müştəriyə bildiriş göndəriləcək.'
+            ? 'İmtina etdikdən sonra sifariş rədd ediləcək. Xidmət alana bildiriş göndəriləcək.'
             : 'Ləğv etdikdən sonra sifariş aktiv siyahıdan çıxarılacaq. Əks tərəfə bildiriş göndəriləcək.'}
         </p>
 

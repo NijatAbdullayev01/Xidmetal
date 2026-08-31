@@ -298,7 +298,7 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
           )}
           {!errors.phone && (
             <p className="text-xs text-muted-foreground">
-              Nömrə dəstəyin sizinlə əlaqə saxlaması üçündür.
+              Sifariş və dəstək üçün sizinlə əlaqə saxlamaq üçündür.
             </p>
           )}
         </div>

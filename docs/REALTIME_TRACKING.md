@@ -52,7 +52,7 @@ Etibarsız token → bağlantı rədd edilir. HTTP `JwtStrategy` ilə eyni secre
 
 | Otaq | Kim daxil olur | Məqsəd |
 |------|----------------|--------|
-| `booking:{id}` | Həmin sifarişin müştəri + provideri (+ admin) | Lokasiya + status |
+| `booking:{id}` | Həmin sifarişin xidmət alan + provideri (+ admin) | Lokasiya + status |
 | `user:{id}` | Konkret istifadəçi | Şəxsi bildiriş |
 | `provider:{id}` | Konkret provider | Dispatch təklifi (Faza 4) |
 
@@ -67,8 +67,8 @@ Etibarsız token → bağlantı rədd edilir. HTTP `JwtStrategy` ilə eyni secre
 | Event | Göndərən | Payload | İzah |
 |-------|----------|---------|------|
 | `location:push` | Provider | `{ bookingId, lat, lng, heading, speed }` | Canlı mövqe (throttled ~3s) |
-| `booking:subscribe` | Müştəri/Provider | `{ bookingId }` | Otağa qoşul (auth yoxlanır) |
-| `booking:unsubscribe` | Müştəri/Provider | `{ bookingId }` | Otaqdan çıx |
+| `booking:subscribe` | Xidmət alan/Provider | `{ bookingId }` | Otağa qoşul (auth yoxlanır) |
+| `booking:unsubscribe` | Xidmət alan/Provider | `{ bookingId }` | Otaqdan çıx |
 
 ### Server → Client
 
@@ -96,7 +96,7 @@ Provider PWA                Gateway              Customer PWA
 - **Provider:** `navigator.geolocation.watchPosition` → ~3s throttle → `location:push` (yalnız trackable status).
 - **Server hot path:** validate + Redis throttle → **WS `location:update` dərhal** (haversine ETA).
 - **Server background:** ProviderProfile/PostGIS sync ~15s; `LocationPing` ~15s; Mapbox ETA dəqiqləşdirmə (opsional).
-- **Müştəri:** canlı mövqe paneli və Google Maps linki yoxdur; ünvan mətni sifariş kartında qalır.
+- **Xidmət alan:** canlı mövqe paneli və Google Maps linki yoxdur; ünvan mətni sifariş kartında qalır.
 
 > Battery/data: throttle interval və `enableHighAccuracy` balanslıdır. Background GPS brauzer/OS limitlərinə tabedir (tab açıq olanda etibarlı).
 > Miqyas: bax [CAPACITY.md](./CAPACITY.md).

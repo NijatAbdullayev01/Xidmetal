@@ -29,9 +29,9 @@ describe('bookingStatusToMailEvent', () => {
 });
 
 describe('shouldSendCustomerStatusMail', () => {
-  it('yalnız təsdiq və tamamlanma üçün true qaytarır', () => {
-    expect(shouldSendCustomerStatusMail(BookingStatus.CONFIRMED)).toBe(true);
-    expect(shouldSendCustomerStatusMail(BookingStatus.COMPLETED)).toBe(true);
+  it('sifariş e-poçtları müvəqqəti bağlıdır', () => {
+    expect(shouldSendCustomerStatusMail(BookingStatus.CONFIRMED)).toBe(false);
+    expect(shouldSendCustomerStatusMail(BookingStatus.COMPLETED)).toBe(false);
     expect(shouldSendCustomerStatusMail(BookingStatus.REJECTED)).toBe(false);
     expect(shouldSendCustomerStatusMail(BookingStatus.EN_ROUTE)).toBe(false);
     expect(shouldSendCustomerStatusMail(BookingStatus.ARRIVED)).toBe(false);

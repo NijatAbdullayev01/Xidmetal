@@ -92,19 +92,6 @@ export class MailService {
     );
   }
 
-  async sendPhoneChangeCode(
-    email: string,
-    code: string,
-    newPhone: string,
-  ): Promise<MailSendResult> {
-    return this.sendCodeMail(
-      email,
-      'Xidmətal — Telefon təsdiq kodu',
-      `Telefon nömrənizi ${newPhone} olaraq dəyişmək üçün təsdiq kodunuz`,
-      code,
-    );
-  }
-
   async sendSignupVerificationCode(email: string, code: string): Promise<MailSendResult> {
     return this.sendCodeMail(
       email,

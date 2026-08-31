@@ -10,14 +10,12 @@ import {
   requestEmailChangeSchema,
   confirmEmailChangeSchema,
   requestPhoneChangeSchema,
-  confirmPhoneChangeSchema,
   deleteAccountSchema,
   type UpdateProfileInput,
   type ChangePasswordInput,
   type RequestEmailChangeInput,
   type ConfirmEmailChangeInput,
   type RequestPhoneChangeInput,
-  type ConfirmPhoneChangeInput,
   type DeleteAccountInput,
   toDisplayMediaUrl,
 } from '@xidmetal/shared';
@@ -106,7 +104,7 @@ export function SettingsForm() {
   const [emailChangeStep, setEmailChangeStep] = useState<'idle' | 'editing' | 'verify'>('idle');
   const [emailChangeSuccess, setEmailChangeSuccess] = useState<string | null>(null);
   const [emailChangeServerError, setEmailChangeServerError] = useState<string | null>(null);
-  const [phoneChangeStep, setPhoneChangeStep] = useState<'idle' | 'editing' | 'verify'>('idle');
+  const [phoneChangeStep, setPhoneChangeStep] = useState<'idle' | 'editing'>('idle');
   const [phoneChangeSuccess, setPhoneChangeSuccess] = useState<string | null>(null);
   const [phoneChangeServerError, setPhoneChangeServerError] = useState<string | null>(null);
 
@@ -171,11 +169,6 @@ export function SettingsForm() {
   const phoneRequestForm = useForm<RequestPhoneChangeInput>({
     resolver: zodResolver(requestPhoneChangeSchema),
     defaultValues: { newPhone: '' },
-  });
-
-  const phoneConfirmForm = useForm<ConfirmPhoneChangeInput>({
-    resolver: zodResolver(confirmPhoneChangeSchema),
-    defaultValues: { newPhone: '', code: '' },
   });
 
   useEffect(() => {
@@ -303,34 +296,13 @@ export function SettingsForm() {
     },
   });
 
-  const requestPhoneChangeMutation = useMutation({
+  const changePhoneMutation = useMutation({
     mutationFn: (data: RequestPhoneChangeInput) =>
-      api.users.requestPhoneChange(token!, data),
-    onSuccess: (_, variables) => {
-      phoneConfirmForm.setValue('newPhone', variables.newPhone);
-      phoneConfirmForm.setValue('code', '');
-      setPhoneChangeStep('verify');
-      setPhoneChangeServerError(null);
-      setPhoneChangeSuccess('Təsdiq kodu cari e-poçt ünvanınıza göndərildi');
-      autoDismiss(setPhoneChangeSuccess, 5000);
-    },
-    onError: (error) => {
-      if (error instanceof ApiError) {
-        setPhoneChangeServerError(error.message);
-      } else {
-        setPhoneChangeServerError('Kod göndərilərkən xəta baş verdi');
-      }
-    },
-  });
-
-  const confirmPhoneChangeMutation = useMutation({
-    mutationFn: (data: ConfirmPhoneChangeInput) =>
-      api.users.confirmPhoneChange(token!, data),
+      api.users.changePhone(token!, data),
     onSuccess: (updatedUser) => {
       updateUser(updatedUser);
       queryClient.setQueryData(['users', 'me'], updatedUser);
       phoneRequestForm.reset();
-      phoneConfirmForm.reset();
       setPhoneChangeStep('idle');
       setPhoneChangeSuccess('Telefon nömrəsi yeniləndi');
       setPhoneChangeServerError(null);
@@ -356,7 +328,6 @@ export function SettingsForm() {
   const handleCancelPhoneChange = () => {
     setPhoneChangeStep('idle');
     phoneRequestForm.reset();
-    phoneConfirmForm.reset();
     setPhoneChangeServerError(null);
     setPhoneChangeSuccess(null);
   };
@@ -540,7 +511,7 @@ export function SettingsForm() {
             <div>
               <h3 className="text-base font-semibold">Mobil nömrə</h3>
               <p className="text-sm text-muted-foreground">
-                Nömrə dəyişəndə təsdiq kodu cari e-poçtunuza göndərilir.
+                Sifariş və dəstək üçün sizinlə əlaqə saxlamaq üçün məcburidir.
               </p>
             </div>
 
@@ -563,7 +534,7 @@ export function SettingsForm() {
                     phoneRequestForm.reset({ newPhone: '' });
                   }}
                 >
-                  Nömrəni dəyiş
+                  {source.phone ? 'Nömrəni dəyiş' : 'Nömrə əlavə et'}
                 </Button>
               )}
             </div>
@@ -571,7 +542,7 @@ export function SettingsForm() {
             {phoneChangeStep === 'editing' && (
               <form
                 onSubmit={phoneRequestForm.handleSubmit((values) =>
-                  requestPhoneChangeMutation.mutate(values),
+                  changePhoneMutation.mutate(values),
                 )}
                 className="space-y-3"
                 noValidate
@@ -629,98 +600,27 @@ export function SettingsForm() {
                   <Button
                     type="submit"
                     className="min-h-[44px]"
-                    disabled={requestPhoneChangeMutation.isPending}
+                    disabled={changePhoneMutation.isPending}
                   >
-                    {requestPhoneChangeMutation.isPending ? (
+                    {changePhoneMutation.isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Göndərilir...
+                        Saxlanılır...
                       </>
                     ) : (
-                      'Təsdiq kodu göndər'
+                      'Saxla'
                     )}
                   </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-[44px]"
-                    onClick={handleCancelPhoneChange}
-                  >
-                    Ləğv et
-                  </Button>
-                </div>
-              </form>
-            )}
-
-            {phoneChangeStep === 'verify' && (
-              <form
-                onSubmit={phoneConfirmForm.handleSubmit((values) =>
-                  confirmPhoneChangeMutation.mutate(values),
-                )}
-                className="space-y-3"
-                noValidate
-              >
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">
-                    {phoneConfirmForm.watch('newPhone')}
-                  </span>{' '}
-                  üçün e-poçtunuza göndərilən 8 rəqəmli kodu daxil edin.
-                </p>
-                <div className="space-y-2">
-                  <Label htmlFor="phoneVerificationCode">Təsdiq kodu</Label>
-                  <Input
-                    id="phoneVerificationCode"
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    placeholder="12345678"
-                    maxLength={8}
-                    className="max-w-xs tracking-widest"
-                    {...phoneConfirmForm.register('code')}
-                  />
-                  {phoneConfirmForm.formState.errors.code && (
-                    <p className="text-sm text-destructive">
-                      {phoneConfirmForm.formState.errors.code.message}
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Button
-                    type="submit"
-                    className="min-h-[44px]"
-                    disabled={confirmPhoneChangeMutation.isPending}
-                  >
-                    {confirmPhoneChangeMutation.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Təsdiq edilir...
-                      </>
-                    ) : (
-                      'Nömrəni təsdiq et'
-                    )}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-[44px]"
-                    disabled={requestPhoneChangeMutation.isPending}
-                    onClick={() => {
-                      const newPhone = phoneConfirmForm.getValues('newPhone');
-                      if (newPhone) {
-                        requestPhoneChangeMutation.mutate({ newPhone });
-                      }
-                    }}
-                  >
-                    Kodu yenidən göndər
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="min-h-[44px]"
-                    onClick={handleCancelPhoneChange}
-                  >
-                    Ləğv et
-                  </Button>
+                  {source.phone ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-[44px]"
+                      onClick={handleCancelPhoneChange}
+                    >
+                      Ləğv et
+                    </Button>
+                  ) : null}
                 </div>
               </form>
             )}

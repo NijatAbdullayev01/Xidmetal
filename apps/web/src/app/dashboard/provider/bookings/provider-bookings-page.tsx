@@ -67,7 +67,7 @@ function RescheduleForm({
       if (!token) throw new Error('Autentifikasiya tələb olunur');
       const trimmedMessage = message.trim();
       if (!trimmedMessage) {
-        throw new Error('Müştəriyə mesaj yazmaq mütləqdir');
+        throw new Error('Xidmət alana mesaj yazmaq mütləqdir');
       }
       const scheduledAt = combineDateAndTime(date, time);
       if (new Date(scheduledAt) <= new Date()) {
@@ -119,7 +119,7 @@ function RescheduleForm({
         </div>
       </div>
       <div className="mt-3 space-y-2">
-        <Label htmlFor={`reschedule-message-${bookingId}`}>Müştəriyə mesaj</Label>
+        <Label htmlFor={`reschedule-message-${bookingId}`}>Xidmət alana mesaj</Label>
         <Textarea
           id={`reschedule-message-${bookingId}`}
           rows={2}
@@ -573,9 +573,15 @@ export function ProviderBookingsPage() {
                     />
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-foreground">Müştəri:</span>
+                    <span className="text-foreground">Xidmət alan:</span>
                     <span className="text-muted-foreground">{booking.customerName}</span>
                   </div>
+                  {booking.teamName ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-foreground">Komanda:</span>
+                      <span className="text-muted-foreground">{booking.teamName}</span>
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-foreground">Tarix və saat:</span>
                       <span className="text-muted-foreground">
@@ -587,7 +593,7 @@ export function ProviderBookingsPage() {
                       <span className="text-foreground">Təklif olunan tarix və saat:</span>
                       <span>
                         {formatDateTime(booking.proposedScheduledAt)}{' '}
-                        (müştəri təsdiqi gözlənilir)
+                        (xidmət alan təsdiqi gözlənilir)
                       </span>
                     </div>
                   )}

@@ -16,6 +16,9 @@ import type {
   CreateReviewInput,
   CreateServiceInput,
   UpdateServiceInput,
+  CreateServiceTeamInput,
+  UpdateServiceTeamInput,
+  ServiceTeamSummary,
   UpdateProfileInput,
   ChangePasswordInput,
   ContactFormInput,
@@ -23,7 +26,6 @@ import type {
   RequestEmailChangeInput,
   ConfirmEmailChangeInput,
   RequestPhoneChangeInput,
-  ConfirmPhoneChangeInput,
   SubmitKycDocumentInput,
   KycDocumentSummary,
   ConversationSummary,
@@ -54,6 +56,7 @@ import type {
   DeviceTokenSummary,
   RegisterDeviceTokenInput,
   UnregisterDeviceTokenInput,
+  PublicProviderProfile,
 } from '@xidmetal/shared';
 import { BookingStatus, CLIENT_APP, CLIENT_APP_HEADER } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
@@ -290,15 +293,9 @@ export const api = {
         token,
         body: JSON.stringify(data),
       }),
-    requestPhoneChange: (token: string, data: RequestPhoneChangeInput) =>
-      apiClient<{ message: string }>('/users/me/phone/request-change', {
-        method: 'POST',
-        token,
-        body: JSON.stringify(data),
-      }),
-    confirmPhoneChange: (token: string, data: ConfirmPhoneChangeInput) =>
-      apiClient<UserProfile>('/users/me/phone/confirm-change', {
-        method: 'POST',
+    changePhone: (token: string, data: RequestPhoneChangeInput) =>
+      apiClient<UserProfile>('/users/me/phone', {
+        method: 'PATCH',
         token,
         body: JSON.stringify(data),
       }),
@@ -359,6 +356,11 @@ export const api = {
   service: (id: string, token?: string) =>
     apiClient<ServiceSummary>(`/services/${id}`, { token }),
 
+  publicProvider: (id: string) =>
+    apiClient<PublicProviderProfile>(`/providers/${id}`, {
+      next: { revalidate: PUBLIC_REVALIDATE_SECONDS },
+    }),
+
   createService: (token: string, data: CreateServiceInput) =>
     apiClient<ServiceSummary>('/services', {
       method: 'POST',
@@ -381,6 +383,34 @@ export const api = {
 
   deleteService: (token: string, id: string) =>
     apiClient<{ message: string }>(`/services/${id}`, {
+      method: 'DELETE',
+      token,
+    }),
+
+  listServiceTeams: (token: string, serviceId: string) =>
+    apiClient<ServiceTeamSummary[]>(`/services/${serviceId}/teams`, { token }),
+
+  createServiceTeam: (token: string, serviceId: string, data: CreateServiceTeamInput) =>
+    apiClient<ServiceTeamSummary>(`/services/${serviceId}/teams`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify(data),
+    }),
+
+  updateServiceTeam: (
+    token: string,
+    serviceId: string,
+    teamId: string,
+    data: UpdateServiceTeamInput,
+  ) =>
+    apiClient<ServiceTeamSummary>(`/services/${serviceId}/teams/${teamId}`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify(data),
+    }),
+
+  deleteServiceTeam: (token: string, serviceId: string, teamId: string) =>
+    apiClient<void>(`/services/${serviceId}/teams/${teamId}`, {
       method: 'DELETE',
       token,
     }),
@@ -523,7 +553,7 @@ export const api = {
     return apiClient<PaginatedResponse<ReviewSummary>>(`/reviews/received${query}`, { token });
   },
 
-  /** İctimai — xidmət verənin müştəri rəyləri (auth tələb olunmur) */
+  /** İctimai — xidmət verənin xidmət alan rəyləri (auth tələb olunmur) */
   reviewsByProvider: (providerId: string, params?: Record<string, string>) => {
     const query = params ? `?${new URLSearchParams(params)}` : '';
     return apiClient<ProviderReviewsPage>(`/reviews/provider/${providerId}${query}`);

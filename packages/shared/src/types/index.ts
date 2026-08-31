@@ -52,7 +52,6 @@ export interface UserProfile {
   role: UserRole;
   isVerified: boolean;
   createdAt: string;
-  phoneVerifiedAt?: string | null;
   providerProfile?: ProviderProfile;
 }
 
@@ -71,6 +70,10 @@ export interface ServiceSummary {
   priceUnit: string;
   categoryId: string;
   categoryName: string;
+  /** Public kateqoriya səhifəsi — breadcrumb / canonical */
+  categorySlug?: string;
+  /** Public xidmət URL-i (`/services/{slug}`) */
+  slug?: string;
   providerId: string;
   providerName: string;
   providerAvatarUrl?: string;
@@ -98,10 +101,26 @@ export interface ServiceSummary {
   /** Yükdaşıma: şəhərdaxili / şəhərlərarası */
   cargoRouteScope?: string;
   createdAt: string;
+  /** Sitemap lastmod / freshness */
+  updatedAt?: string;
+  /** JSON-LD: şirkət → Organization, fərdi → Person */
+  providerAccountType?: ProviderAccountType | string;
   bookingCount?: number;
   activeBookingCount?: number;
+  /** Aktiv komanda sayı (şirkət kabineti) */
+  teamCount?: number;
   /** Xidmətə bağlı şəkillər (sıralı) */
   images?: ServiceImageSummary[];
+}
+
+export interface ServiceTeamSummary {
+  id: string;
+  serviceId: string;
+  name: string;
+  sortOrder: number;
+  isDefault: boolean;
+  isActive: boolean;
+  createdAt: string;
 }
 
 export interface BookingSummary {
@@ -144,7 +163,7 @@ export interface BookingSummary {
   createdAt: string;
   /** INSTANT axtarış pəncərəsinin başlanğıcı (skip sonrası yenilənir) */
   dispatchWindowStartedAt?: string | null;
-  /** Müştəri «başqa xidmət verən axtar» sayı */
+  /** Xidmət alan «başqa xidmət verən axtar» sayı */
   dispatchSkipCount?: number;
   /**
    * Xidmət verənin aktiv ani-sifariş təklifi (yalnız list/find cavabında,
@@ -153,6 +172,9 @@ export interface BookingSummary {
   dispatchOfferId?: string | null;
   dispatchDistanceM?: number | null;
   dispatchExpiresAt?: string | null;
+  /** Təyin olunmuş komanda (xidmət verən kabineti) */
+  teamId?: string | null;
+  teamName?: string | null;
 }
 
 export interface CategorySummary {
@@ -162,6 +184,21 @@ export interface CategorySummary {
   description?: string;
   icon?: string;
   serviceCount: number;
+}
+
+/** İctimai xidmət verən profili — e-poçt/telefon yoxdur */
+export interface PublicProviderProfile {
+  id: string;
+  displayName: string;
+  accountType: ProviderAccountType | string;
+  companyName?: string | null;
+  bio?: string;
+  experience?: number;
+  location?: string;
+  rating: number;
+  reviewCount: number;
+  avatarUrl?: string;
+  createdAt: string;
 }
 
 export interface ReviewSummary {
@@ -220,6 +257,14 @@ export interface AdminDashboardStats {
   servicesPendingReview: number;
   bookingsTotal: number;
   bookingsPending: number;
+  /** Tamamlanmış sifariş sayı */
+  bookingsCompleted: number;
+  /** Bütün sifarişlərin `totalPrice` cəmi (AZN) */
+  bookingsValueTotal: number;
+  /** Tamamlanmış sifarişlərin `totalPrice` cəmi (AZN) */
+  bookingsValueCompleted: number;
+  /** Ləğv və rədd olunmuş sifarişlərin `totalPrice` cəmi (AZN) */
+  bookingsValueCancelled: number;
   reviewsPending: number;
   reportsPending: number;
   categoriesActive: number;

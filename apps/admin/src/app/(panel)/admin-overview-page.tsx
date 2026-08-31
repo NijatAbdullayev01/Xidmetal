@@ -12,6 +12,9 @@ import {
   FolderTree,
   ArrowRight,
   UserCog,
+  Banknote,
+  CircleCheck,
+  Ban,
   type LucideIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +22,14 @@ import { buttonStyles } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { useAuthToken } from '@/hooks/use-auth-token';
 import { ADMIN_LIST_POLL_MS } from '@/lib/admin-queries';
+
+function formatAzn(amount: number): string {
+  const formatted = new Intl.NumberFormat('az-AZ', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(amount);
+  return `${formatted} AZN`;
+}
 
 interface StatCard {
   label: string;
@@ -49,11 +60,11 @@ function StatsGrid({
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm text-muted-foreground">{card.label}</p>
-                  <p className="text-2xl font-bold tabular-nums">
+                  <p className="text-2xl font-bold tabular-nums break-words">
                     {isLoading ? '…' : card.value}
                   </p>
                   {card.hint && (
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{card.hint}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{card.hint}</p>
                   )}
                 </div>
               </CardContent>
@@ -115,7 +126,7 @@ export function AdminOverviewPage() {
   /** Platforma icmalı — hər kart bir entity, qarışıq «cəmi» yox */
   const overviewCards: StatCard[] = [
     {
-      label: 'Müştərilər',
+      label: 'Xidmət alanlar',
       value: stats?.usersCustomers ?? '—',
       icon: Users,
       href: '/users',
@@ -139,6 +150,10 @@ export function AdminOverviewPage() {
     {
       label: 'Sifarişlər',
       value: stats?.bookingsTotal ?? '—',
+      hint:
+        stats != null
+          ? `${stats.bookingsCompleted} tamamlanmış`
+          : undefined,
       icon: ClipboardList,
       href: '/bookings',
     },
@@ -147,6 +162,36 @@ export function AdminOverviewPage() {
       value: stats?.categoriesActive ?? '—',
       icon: FolderTree,
       href: '/categories',
+    },
+  ];
+
+  const bookingValueCards: StatCard[] = [
+    {
+      label: 'Ümumi sifariş dəyəri',
+      value: stats != null ? formatAzn(stats.bookingsValueTotal) : '—',
+      hint:
+        stats != null
+          ? `${stats.bookingsTotal} sifariş — platformada qeydə alınan bütün məbləğ`
+          : undefined,
+      icon: Banknote,
+      href: '/bookings',
+    },
+    {
+      label: 'Tamamlanmış dəyər',
+      value: stats != null ? formatAzn(stats.bookingsValueCompleted) : '—',
+      hint:
+        stats != null
+          ? `${stats.bookingsCompleted} tamamlanmış sifariş`
+          : undefined,
+      icon: CircleCheck,
+      href: '/bookings',
+    },
+    {
+      label: 'Ləğv / rədd dəyəri',
+      value: stats != null ? formatAzn(stats.bookingsValueCancelled) : '—',
+      hint: 'Ləğv edilmiş və rədd olunmuş sifarişlər',
+      icon: Ban,
+      href: '/bookings',
     },
   ];
 
@@ -175,6 +220,17 @@ export function AdminOverviewPage() {
           <p className="text-xs text-muted-foreground">Hesablar, xidmətlər və sifarişlər</p>
         </div>
         <StatsGrid cards={overviewCards} isLoading={isLoading} />
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold tracking-tight">Sifariş dəyəri</h2>
+          <p className="text-xs text-muted-foreground">
+            Platformada qeydə alınan sifariş məbləğləri (AZN). Ödəniş platformadan keçmir —
+            bu, sifarişlərin elan olunan dəyəridir.
+          </p>
+        </div>
+        <StatsGrid cards={bookingValueCards} isLoading={isLoading} />
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -213,7 +269,7 @@ export function AdminOverviewPage() {
               verilənlər bazası vasitəsilə əlavə olunur.
             </p>
             <p>
-              Müştərini deaktiv etmək aktiv sessiyaları ləğv edir. Xidmət verən
+              Xidmət alanı deaktiv etmək aktiv sessiyaları ləğv edir. Xidmət verən
               təsdiqi etibar nişanıdır; rəylər təsdiqlənənə qədər ictimai siyahıda
               görünmür.
             </p>

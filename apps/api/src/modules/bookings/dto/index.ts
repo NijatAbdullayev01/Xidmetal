@@ -33,7 +33,7 @@ export class CreateBookingDto {
   @IsDateString()
   scheduledAt?: string;
 
-  @ApiPropertyOptional({ description: 'Müştəri qeydi (opsional)' })
+  @ApiPropertyOptional({ description: 'Xidmət alan qeydi (opsional)' })
   @IsOptional()
   @IsString()
   @MaxLength(1000)
@@ -158,7 +158,7 @@ export class RescheduleBookingDto {
   @IsDateString()
   scheduledAt!: string;
 
-  @ApiProperty({ description: 'Müştəriyə göndəriləcək mesaj' })
+  @ApiProperty({ description: 'Xidmət alana göndəriləcək mesaj' })
   @IsString()
   @MaxLength(1000)
   message!: string;

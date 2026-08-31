@@ -100,7 +100,7 @@ export function providersExcludedFromRedispatch(
       continue;
     }
 
-    // CANCELLED / EXPIRED — yeni təklif göndərilə bilər (məs. müştəri skip)
+    // CANCELLED / EXPIRED — yeni təklif göndərilə bilər (məs. xidmət alan skip)
   }
 
   return exclude;

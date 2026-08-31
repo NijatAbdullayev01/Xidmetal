@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
   Mail,
-  Phone,
   MapPin,
   Clock,
   MessageCircle,
@@ -12,12 +11,18 @@ import {
 } from 'lucide-react';
 import { APP } from '@xidmetal/shared';
 import { ContactForm } from '@/components/contact/contact-form';
+import { PageBreadcrumbs } from '@/components/layout/breadcrumbs';
+import { JsonLd } from '@/components/seo/json-ld';
+import { buildBreadcrumbJsonLd, buildContactPageJsonLd } from '@/lib/seo-schema';
+import { pageMetadata } from '@/lib/seo';
+import { getSiteUrl } from '@/lib/site-url';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Əlaqə',
   description:
     'Xidmətal komandası ilə əlaqə saxlayın. Sual, təklif və ya dəstək üçün bizə yazın.',
-};
+  canonical: '/contact',
+});
 
 const contactInfo: {
   icon: LucideIcon;
@@ -28,14 +33,8 @@ const contactInfo: {
   {
     icon: Mail,
     title: 'E-poçt',
-    value: 'info@xidmetal.com',
-    href: 'mailto:info@xidmetal.com',
-  },
-  {
-    icon: Phone,
-    title: 'Telefon',
-    value: '+994 12 345 67 89',
-    href: 'tel:+994123456789',
+    value: APP.email,
+    href: `mailto:${APP.email}`,
   },
   {
     icon: MapPin,
@@ -72,8 +71,25 @@ const supportTopics: {
 ];
 
 export default function ContactPage() {
+  const siteUrl = getSiteUrl();
+
   return (
     <>
+      <JsonLd
+        data={[
+          buildBreadcrumbJsonLd(siteUrl, [
+            { name: 'Ana səhifə', path: '/' },
+            { name: 'Əlaqə', path: '/contact' },
+          ]),
+          buildContactPageJsonLd(siteUrl),
+        ]}
+      />
+      <PageBreadcrumbs
+        items={[
+          { href: '/', label: 'Ana səhifə' },
+          { label: 'Əlaqə' },
+        ]}
+      />
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-b from-brand/15 via-brand/5 to-background">
         <div className="mx-auto max-w-7xl px-4 pt-16 pb-12 sm:px-6 lg:px-8 lg:pt-24">
@@ -145,7 +161,7 @@ export default function ContactPage() {
                 <h3 className="font-semibold text-brand-foreground">Cavab müddəti</h3>
                 <p className="mt-2 text-sm leading-relaxed text-brand-foreground/80">
                   Mesajlarınıza adətən 1–2 iş günü ərzində cavab veririk. Təcili hallar
-                  üçün telefon xəttindən istifadə edə bilərsiniz.
+                  üçün e-poçt və ya əlaqə formasından istifadə edin.
                 </p>
               </div>
             </div>

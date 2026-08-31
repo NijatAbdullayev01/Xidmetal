@@ -106,7 +106,7 @@ export function AdminServicesPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Xidmətlər</h1>
         <p className="mt-1 text-muted-foreground">
-          Yeni elanlar yoxlamaya düşür. Təsdiqləsəniz müştərilərə görünür; düzəlişə
+          Yeni elanlar yoxlamaya düşür. Təsdiqləsəniz xidmət alanlara görünür; düzəlişə
           göndərsəniz xidmət verən qeydi görüb yeniləyir.
         </p>
       </div>

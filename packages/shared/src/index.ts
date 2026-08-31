@@ -17,3 +17,5 @@ export * from './types';
 export * from './media-url';
 export * from './security';
 export * from './provider-display-name';
+export * from './slug';
+export * from './seo-paths';

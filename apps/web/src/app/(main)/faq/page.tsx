@@ -2,53 +2,39 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, HelpCircle } from 'lucide-react';
 import { APP } from '@xidmetal/shared';
+import { JsonLd } from '@/components/seo/json-ld';
+import { PageBreadcrumbs } from '@/components/layout/breadcrumbs';
+import { FAQ_ITEMS } from '@/lib/faq-items';
+import { buildBreadcrumbJsonLd, buildFaqPageJsonLd } from '@/lib/seo-schema';
+import { pageMetadata } from '@/lib/seo';
+import { getSiteUrl } from '@/lib/site-url';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Tez-tez verilən suallar',
   description: `${APP.name} platforması haqqında ən çox soruşulan suallar və cavablar.`,
-};
-
-const faqs: { question: string; answer: string }[] = [
-  {
-    question: 'Sifariş vermək üçün qeydiyyat lazımdır?',
-    answer:
-      'Bəli, sifariş göndərmək üçün pulsuz hesab yaratmaq lazımdır. Bu, sifarişinizi izləməyinizə və xidmət verənlə əlaqə saxlamanıza imkan verir.',
-  },
-  {
-    question: 'Sifariş göndərdikdən sonra nə baş verir?',
-    answer:
-      'Sifarişiniz xidmət verənə çatır və «Gözləyir» statusunda görünür. Xidmət verən təsdiqlədikdən sonra status «Təsdiqləndi» və sonra «İcrada» olur. Prosesi kabinetinizdən izləyə bilərsiniz.',
-  },
-  {
-    question: 'Qiymət necə müəyyən edilir?',
-    answer:
-      'Hər xidmətin qiyməti xidmət verən tərəfindən təyin olunur. Sabit, saatlıq və ya günlük qiymət tipi xidmət səhifəsində göstərilir. Sifariş vermədən əvvəl qiyməti görə bilərsiniz.',
-  },
-  {
-    question: 'Sifarişi ləğv edə bilərəm?',
-    answer:
-      'Bəli, müəyyən mərhələlərdə sifarişi ləğv etmək mümkündür. Ləğv şərtləri sifariş statusundan asılıdır — kabinetinizdən idarə edə bilərsiniz.',
-  },
-  {
-    question: 'Xidmət verən olmaq istəyirəm, haradan başlamalıyam?',
-    answer:
-      '«Xidmət verən ol» düyməsinə klikləyərək pulsuz qeydiyyatdan keçin. Ətraflı addım-addım təlimat üçün Xidmət verən bələdçisi səhifəsinə baxın.',
-  },
-  {
-    question: 'Platforma komissiya və ya ödəniş alır?',
-    answer:
-      'Xeyr. Hal-hazırda Xidmətal xidmət verənlərdən və müştərilərdən platforma haqqı / komissiya tutmur. Kartla onlayn ödəniş də yoxdur — xidmət haqqı tərəflər arasında birbaşa (nağd və ya digər razılaşma) ödənilir.',
-  },
-  {
-    question: 'Rəy yazmaq məcburidirmi?',
-    answer:
-      'Xeyr, məcburi deyil. Lakin rəy yazmaq digər istifadəçilərə kömək edir və platformada keyfiyyətli xidmət verənlərin seçilməsini asanlaşdırır.',
-  },
-];
+  canonical: '/faq',
+});
 
 export default function FaqPage() {
+  const siteUrl = getSiteUrl();
+
   return (
     <>
+      <JsonLd
+        data={[
+          buildBreadcrumbJsonLd(siteUrl, [
+            { name: 'Ana səhifə', path: '/' },
+            { name: 'Tez-tez verilən suallar', path: '/faq' },
+          ]),
+          buildFaqPageJsonLd(),
+        ]}
+      />
+      <PageBreadcrumbs
+        items={[
+          { href: '/', label: 'Ana səhifə' },
+          { label: 'Tez-tez verilən suallar' },
+        ]}
+      />
       <section className="relative overflow-hidden bg-gradient-to-b from-brand/15 via-brand/5 to-background">
         <div className="mx-auto max-w-7xl px-4 pt-16 pb-12 sm:px-6 lg:px-8 lg:pt-24">
           <div className="mx-auto max-w-3xl text-center">
@@ -68,7 +54,7 @@ export default function FaqPage() {
       <section className="border-t border-border bg-muted/30 py-16 sm:py-20">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <div className="space-y-3">
-            {faqs.map((faq) => (
+            {FAQ_ITEMS.map((faq) => (
               <details
                 key={faq.question}
                 className="group rounded-xl border border-border bg-card shadow-sm [&_summary::-webkit-details-marker]:hidden"
@@ -84,6 +70,16 @@ export default function FaqPage() {
                 </summary>
                 <div className="border-t border-border px-5 py-4 text-sm leading-relaxed text-muted-foreground">
                   {faq.answer}
+                  {faq.href && faq.hrefLabel ? (
+                    <p className="mt-3">
+                      <Link
+                        href={faq.href}
+                        className="font-medium text-brand-dark underline-offset-2 hover:underline"
+                      >
+                        {faq.hrefLabel}
+                      </Link>
+                    </p>
+                  ) : null}
                 </div>
               </details>
             ))}

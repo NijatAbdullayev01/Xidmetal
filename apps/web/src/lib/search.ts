@@ -1,3 +1,4 @@
+import { servicePublicPath, serviceTypeSlug } from '@xidmetal/shared';
 import { CATEGORY_SERVICE_TYPES } from '@/lib/service-types';
 
 /** Kateqoriya axtarış indeksi üçün minimal tip */
@@ -206,8 +207,7 @@ export function scoreMatch(query: string, ...fields: Array<string | undefined>):
 }
 
 function buildTypeHref(categorySlug: string, type: string): string {
-  const params = new URLSearchParams({ type });
-  return `/categories/${categorySlug}?${params.toString()}`;
+  return `/categories/${categorySlug}/type/${serviceTypeSlug(type)}`;
 }
 
 export function buildServiceSearchHref(query: string): string {
@@ -282,6 +282,7 @@ export function mapServicesToSuggestions(
   query: string,
   services: ReadonlyArray<{
     id: string;
+    slug?: string;
     title: string;
     description: string;
     categoryName: string;
@@ -304,9 +305,7 @@ export function mapServicesToSuggestions(
         service.location,
       );
 
-      const href = slug
-        ? buildTypeHref(slug, service.title)
-        : buildServiceSearchHref(service.title);
+      const href = servicePublicPath(service);
 
       return {
         id: `service:${service.id}`,

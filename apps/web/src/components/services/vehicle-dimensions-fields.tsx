@@ -121,7 +121,7 @@ export function VehicleDimensionsFields({
           (errors?.length || errors?.width || errors?.height) && 'sr-only',
         )}
       >
-        Müştərilər yükün sizin maşınıza sığacağını bilmək üçün bu ölçülərə baxacaq.
+        Xidmət alanlar yükün sizin maşınıza sığacağını bilmək üçün bu ölçülərə baxacaq.
       </p>
     </div>
   );

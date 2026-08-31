@@ -7,7 +7,7 @@
 
 Xidmətal **monorepo** arxitekturası ilə qurulub. Bu yanaşma kod paylaşımını, tip təhlükəsizliyini və vahid development workflow-unu təmin edir.
 
-**Hazırkı məhsul tipi:** planlaşdırılmış (scheduled) randevu marketplace + **on-demand INSTANT dispatch** (Faza 4) — müştəri tarix/slot bron edir və ya «İndi çağır» ilə yaxın ONLINE provider-lərə təklif göndərir; chat/bildiriş REST polling + Socket.IO (tracking/status/dispatch). Platforma **ödənişsizdir** (cash-only; `PAYMENTS_ENABLED=false` — Faza 5 scaffolding).
+**Hazırkı məhsul tipi:** planlaşdırılmış (scheduled) randevu marketplace + **on-demand INSTANT dispatch** (Faza 4) — xidmət alan tarix/slot bron edir və ya «İndi çağır» ilə yaxın ONLINE provider-lərə təklif göndərir; chat/bildiriş REST polling + Socket.IO (tracking/status/dispatch). Platforma **ödənişsizdir** (cash-only; `PAYMENTS_ENABLED=false` — Faza 5 scaffolding).
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -65,7 +65,7 @@ Backend modulları (`apps/api/src/modules/`) — **cari status:**
 | `dispatch` | On-demand: yaxın provider, `DispatchOffer`, BullMQ timeout, sequential reassign | ✅ |
 | `payments` | Intent/hold/capture/refund scaffolding; `PAYMENTS_ENABLED=false` default (501) | ✅ flag OFF |
 | `reviews` | Rəy yaratma + rating aggregate (dərhal APPROVED; admin REJECT mümkündür) | ✅ |
-| `messages` | Müştəri↔provider söhbət (REST; TypingPresence DB) | ✅ |
+| `messages` | Xidmət alan↔provider söhbət (REST; TypingPresence DB) | ✅ |
 | `notifications` | In-app + best-effort push (FCM/noop) | ✅ |
 | `devices` | DeviceToken register/unregister (JWT) | ✅ |
 | `reports` | İstifadəçi şikayətləri + admin moderation | ✅ |
@@ -139,7 +139,7 @@ Kateqoriyalar seed ilə; `Service`-də venue, (yükdaşıma üçün) ölçü və
 
 **Geospatial (Faza 2):** Docker `postgis/postgis:16-3.5`; `ProviderAvailability` (`OFFLINE`/`ONLINE`/`BUSY`) domain field-dir — `User.lastSeenAt` presence heartbeat-indən ayrıdır. WS connect/disconnect provider ONLINE→OFFLINE (BUSY toxunulmur); heartbeat `lastSeenAt` saxlayır. Yaxınlıq: PostGIS `ST_DWithin`; extension yoxdursa haversine fallback. Geocoder: `GEOCODER_PROVIDER=mock|nominatim`.
 
-**Dispatch (Faza 4):** `INSTANT` sifariş → eyni xidmət növü (kateqoriya + başlıq) + şəhər + ONLINE xidmət verənlərə fan-out `DispatchOffer` (tək təklif timeout yox) → axtarış pəncərəsi (`DISPATCH_SEARCH_WINDOW_SEC`, default 10 dəq) bitəndə hələ qəbul yoxdursa auto-cancel + müştəri bildirişi. İmtina edən xidmət verənə `DISPATCH_DECLINE_REOFFER_COOLDOWN_SEC` (default 2 dəq) sonra yenidən təklif (pəncərə açıq qaldıqca). Rediscovery yeni ONLINE-ları tutur. Redis yoxdursa development-də in-process `setTimeout`.
+**Dispatch (Faza 4):** `INSTANT` sifariş → eyni xidmət növü (kateqoriya + başlıq) + şəhər + ONLINE xidmət verənlərə fan-out `DispatchOffer` (tək təklif timeout yox) → axtarış pəncərəsi (`DISPATCH_SEARCH_WINDOW_SEC`, default 10 dəq) bitəndə hələ qəbul yoxdursa auto-cancel + xidmət alan bildirişi. İmtina edən xidmət verənə `DISPATCH_DECLINE_REOFFER_COOLDOWN_SEC` (default 2 dəq) sonra yenidən təklif (pəncərə açıq qaldıqca). Rediscovery yeni ONLINE-ları tutur. Redis yoxdursa development-də in-process `setTimeout`.
 
 ### Rollar
 
@@ -149,7 +149,7 @@ Kateqoriyalar seed ilə; `Service`-də venue, (yükdaşıma üçün) ölçü və
 | `PROVIDER` | Xidmət/təqvim idarə et, sifariş qəbul/rədd et, mesajlaş |
 | `ADMIN` | Ayrı admin app (`apps/admin`); qeydiyyatla yaradıla bilməz (seed); marketplace login-da rədd |
 
-> **Məhsul qərarı:** bir hesab = bir rol. `CUSTOMER` → `PROVIDER` upgrade, dual-role və ya eyni hesabda rol dəyişimi **yoxdur** və planlaşdırılmır. Xidmət verən olmaq üçün ayrıca `PROVIDER` hesabı (ayrı e-poçt) lazımdır. UI: `BecomeProviderLink` mövcud müştəriyə bunu izah edir. Agent/kod bu axını “boşluq” kimi əlavə etməsin.
+> **Məhsul qərarı:** bir hesab = bir rol. `CUSTOMER` → `PROVIDER` upgrade, dual-role və ya eyni hesabda rol dəyişimi **yoxdur** və planlaşdırılmır. Xidmət verən olmaq üçün ayrıca `PROVIDER` hesabı (ayrı e-poçt) lazımdır. UI: `BecomeProviderLink` mövcud xidmət alana bunu izah edir. Agent/kod bu axını “boşluq” kimi əlavə etməsin.
 
 ### Booking status (cari)
 

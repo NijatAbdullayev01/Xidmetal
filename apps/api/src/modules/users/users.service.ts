@@ -21,6 +21,7 @@ import {
   ACTIVE_BOOKING_STATUSES,
   ProviderAccountType,
   ProviderAvailability,
+  formatProviderDisplayName,
   type KycDocumentSummary,
 } from '@xidmetal/shared';
 import { PrismaService } from '../../common/database/prisma.service';
@@ -37,7 +38,6 @@ import {
   DeleteAccountDto,
   SubmitKycDocumentDto,
   RequestPhoneChangeDto,
-  ConfirmPhoneChangeDto,
 } from './dto';
 
 const EMAIL_CODE_EXPIRY_MS = 15 * 60 * 1000;
@@ -64,13 +64,60 @@ export class UsersService {
         role: true,
         isVerified: true,
         createdAt: true,
-        phoneVerifiedAt: true,
         providerProfile: true,
       },
     });
 
     if (!user) throw new NotFoundException('İstifadəçi tapılmadı');
     return this.mapUserProfile(user);
+  }
+
+  async findPublicProvider(id: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id,
+        role: UserRole.PROVIDER,
+        isActive: true,
+        deletedAt: null,
+        providerProfile: { isVerified: true },
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+        createdAt: true,
+        providerProfile: {
+          select: {
+            bio: true,
+            experience: true,
+            location: true,
+            accountType: true,
+            companyName: true,
+            rating: true,
+            reviewCount: true,
+          },
+        },
+      },
+    });
+
+    if (!user?.providerProfile) {
+      throw new NotFoundException('Xidmət verən tapılmadı');
+    }
+
+    return {
+      id: user.id,
+      displayName: formatProviderDisplayName(user),
+      accountType: user.providerProfile.accountType,
+      companyName: user.providerProfile.companyName,
+      bio: user.providerProfile.bio ?? undefined,
+      experience: user.providerProfile.experience ?? undefined,
+      location: user.providerProfile.location ?? undefined,
+      rating: user.providerProfile.rating,
+      reviewCount: user.providerProfile.reviewCount,
+      avatarUrl: await this.storageService.toReadableMediaUrl(user.avatarUrl),
+      createdAt: user.createdAt.toISOString(),
+    };
   }
 
   async getProviderDashboardStats(userId: string) {
@@ -174,7 +221,7 @@ export class UsersService {
 
     if (dto.phone !== undefined) {
       throw new BadRequestException(
-        'Telefon nömrəsini dəyişmək üçün e-poçt təsdiq kodundan istifadə edin',
+        'Telefon nömrəsini Mobil nömrə bölməsindən dəyişin',
       );
     }
 
@@ -220,7 +267,6 @@ export class UsersService {
         role: true,
         isVerified: true,
         createdAt: true,
-        phoneVerifiedAt: true,
         providerProfile: true,
       },
     });
@@ -416,7 +462,7 @@ export class UsersService {
     return this.mapUserProfile(updatedUser);
   }
 
-  async requestPhoneChange(userId: string, dto: RequestPhoneChangeDto) {
+  async changePhone(userId: string, dto: RequestPhoneChangeDto) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('İstifadəçi tapılmadı');
 
@@ -433,77 +479,21 @@ export class UsersService {
       throw new ConflictException('Bu telefon nömrəsi artıq istifadə olunur');
     }
 
-    const code = generateNumericOtp();
-    const codeHash = await bcrypt.hash(code, 10);
-    const expiresAt = new Date(Date.now() + EMAIL_CODE_EXPIRY_MS);
-
-    await this.prisma.$transaction([
-      this.prisma.emailVerificationCode.deleteMany({
-        where: { userId, purpose: EmailVerificationPurpose.PHONE_VERIFY },
-      }),
-      this.prisma.emailVerificationCode.create({
-        data: {
-          userId,
-          email: newPhone,
-          codeHash,
-          purpose: EmailVerificationPurpose.PHONE_VERIFY,
-          expiresAt,
-        },
-      }),
-    ]);
-
-    const mail = await this.mailService.sendPhoneChangeCode(user.email, code, newPhone);
-
-    return {
-      message: mail.delivered
-        ? 'Təsdiq kodu cari e-poçt ünvanınıza göndərildi'
-        : 'SMTP qurulmayıb — təsdiq kodu server loguna yazıldı (DEV)',
-      ...(mail.previewCode ? { previewCode: mail.previewCode } : {}),
-    };
-  }
-
-  async confirmPhoneChange(userId: string, dto: ConfirmPhoneChangeDto) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException('İstifadəçi tapılmadı');
-
-    const newPhone = dto.newPhone.trim();
-    await assertValidEmailCode(this.prisma, {
-      userId,
-      email: newPhone,
-      purpose: EmailVerificationPurpose.PHONE_VERIFY,
-      code: dto.code,
-    });
-
-    const existing = await this.prisma.user.findFirst({
-      where: { phone: newPhone, NOT: { id: userId } },
-      select: { id: true },
-    });
-    if (existing) {
-      throw new ConflictException('Bu telefon nömrəsi artıq istifadə olunur');
-    }
-
-    const updatedUser = await this.prisma.$transaction(async (tx) => {
-      await tx.emailVerificationCode.deleteMany({
-        where: { userId, purpose: EmailVerificationPurpose.PHONE_VERIFY },
-      });
-
-      return tx.user.update({
-        where: { id: userId },
-        data: { phone: newPhone, phoneVerifiedAt: null },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
-          avatarUrl: true,
-          role: true,
-          isVerified: true,
-          createdAt: true,
-          phoneVerifiedAt: true,
-          providerProfile: true,
-        },
-      });
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: { phone: newPhone },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        avatarUrl: true,
+        role: true,
+        isVerified: true,
+        createdAt: true,
+        providerProfile: true,
+      },
     });
 
     return this.mapUserProfile(updatedUser);
@@ -652,7 +642,6 @@ export class UsersService {
     role: string;
     isVerified: boolean;
     createdAt: Date;
-    phoneVerifiedAt?: Date | null;
     providerProfile: {
       id: string;
       bio: string | null;
@@ -680,7 +669,6 @@ export class UsersService {
       role: user.role,
       isVerified: user.isVerified,
       createdAt: user.createdAt.toISOString(),
-      phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
       providerProfile: user.providerProfile
         ? {
             id: user.providerProfile.id,

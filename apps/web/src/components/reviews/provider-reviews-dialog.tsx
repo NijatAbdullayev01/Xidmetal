@@ -106,19 +106,19 @@ export function ProviderReviewsDialog({
       onClose={handleClose}
       title={
         serviceTitle
-          ? `${serviceTitle} — müştəri rəyləri`
-          : `${providerName} — müştəri rəyləri`
+          ? `${serviceTitle} — xidmət alan rəyləri`
+          : `${providerName} — xidmət alan rəyləri`
       }
       description={
         serviceId
-          ? 'Bu xidmət üçün müştəri rəyləri'
-          : 'Digər müştərilərin bu xidmət verənə yazdığı rəylər'
+          ? 'Bu xidmət üçün xidmət alan rəyləri'
+          : 'Digər xidmət alanların bu xidmət verənə yazdığı rəylər'
       }
       panelClassName="max-w-xl"
     >
       <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold tracking-tight">Müştəri rəyləri</h2>
+          <h2 className="text-lg font-semibold tracking-tight">Xidmət alan rəyləri</h2>
           <p className="mt-0.5 truncate text-sm text-muted-foreground">{subtitle}</p>
         </div>
         <button

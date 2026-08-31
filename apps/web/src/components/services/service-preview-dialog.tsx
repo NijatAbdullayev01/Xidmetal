@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Ruler, Route, Store, Home, X } from 'lucide-react';
 import type { ServiceSummary } from '@xidmetal/shared';
 import {
@@ -7,6 +8,7 @@ import {
   formatCargoRouteScope,
   formatServiceVenue,
   ServiceVenue,
+  servicePublicPath,
 } from '@xidmetal/shared';
 import { Modal } from '@/components/ui/modal';
 import { ServiceImageGallery } from '@/components/services/service-image-gallery';
@@ -63,7 +65,7 @@ export function ServicePreviewDialog({
       </div>
 
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 py-4">
-        {hasImages ? <ServiceImageGallery images={images} /> : null}
+        {hasImages ? <ServiceImageGallery images={images} title={service.title} /> : null}
 
         {hasVenueMeta ? (
           <section aria-labelledby="service-preview-venue">
@@ -143,6 +145,15 @@ export function ServicePreviewDialog({
             Bu xidmət üçün şəkil və ya təsvir yoxdur.
           </p>
         ) : null}
+      </div>
+
+      <div className="border-t border-border/60 px-5 py-3">
+        <Link
+          href={servicePublicPath(service)}
+          className="inline-flex min-h-11 items-center text-sm font-medium text-brand-dark underline-offset-2 hover:underline"
+        >
+          Tam səhifəyə bax
+        </Link>
       </div>
     </Modal>
   );

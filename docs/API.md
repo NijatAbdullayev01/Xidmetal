@@ -26,7 +26,7 @@ Swagger / xarici klientlər Bearer header dəstəklənir. Access default: `15m`.
 Yeni istifadəçi. `role`: `CUSTOMER` | `PROVIDER` (`ADMIN` qeydiyyatı qadağandır).
 **Məhsul qərarı:** rol qeydiyyatda seçilir və dəyişmir; `CUSTOMER` → `PROVIDER` upgrade endpoint-i yoxdur (ayrı hesab lazımdır).
 Qeydiyyatdan sonra e-poçt təsdiq kodu göndərilir (`isVerified: false`). Marketplace kabinetinə keçid üçün e-poçt təsdiqi məcburidir (`/verify-email`); təsdiqlənənə qədər dashboard açıla bilməz.
-Telefon nömrəsi qeydiyyatda məcburidir (SMS təsdiqi tələb olunmur).
+Telefon nömrəsi qeydiyyatda məcburidir (əlaqə üçün). Telefon təsdiqi yoxdur.
 Opsional `captchaToken` — `TURNSTILE_SECRET_KEY` setdirsə məcburidir.
 
 **Body:**
@@ -102,7 +102,7 @@ Kabinet statistikası: `activeServices`, `totalServices`, `pendingBookings`, `co
 
 ### PATCH /users/me 🔒
 
-Profil yeniləmə (ad, telefon, avatar; provider: `bio`, `location`, `experience`).
+Profil yeniləmə (ad, avatar; provider: `bio`, `location`, `experience`). Telefon: `PATCH /users/me/phone`.
 
 ### PATCH /users/me/password 🔒
 
@@ -120,9 +120,25 @@ Yeni e-poçt üçün kod (SMTP varsa mail; yoxdursa dev log).
 
 Kod ilə e-poçt təsdiqi.
 
+### PATCH /users/me/phone 🔒
+
+Telefon nömrəsini dəyiş (təsdiq yoxdur; əlaqə üçün məcburidir).
+
 ### DELETE /users/me 🔒
 
 Hesab soft-delete (şifrə + `SIL` təsdiqi).
+
+---
+
+## Providers (ictimai)
+
+### GET /providers/:id 🌐
+
+Təsdiqlənmiş, aktiv xidmət verənin ictimai profili.
+
+- UUID `id`. Tapılmayan / təsdiqlənməmiş / deaktiv hesab → `404`.
+- E-poçt və telefon **qaytarılmır**.
+- Sahələr: `displayName`, `accountType`, `companyName`, `bio`, `experience`, `location`, `rating`, `reviewCount`, `avatarUrl`, `createdAt`.
 
 ---
 
@@ -163,6 +179,22 @@ Yeni xidmət. Qiymət, kateqoriya, təsvir, şəkillər (**http(s) URL** — `PO
 ### PATCH /services/:id 🔒 PROVIDER/ADMIN
 
 ### DELETE /services/:id 🔒 PROVIDER/ADMIN
+
+### GET /services/:serviceId/teams 🔒 PROVIDER
+
+Xidmətin komandaları (tutum vahidləri). Mövcud xidmətlərə avtomatik 1 «Komanda 1» yazılır.
+
+### POST /services/:serviceId/teams 🔒 PROVIDER
+
+Yeni komanda. **Yalnız şirkət** hesabı. Maksimum 20. Body: `{ "name": "Xalça yuma — komanda 2" }`.
+
+### PATCH /services/:serviceId/teams/:teamId 🔒 PROVIDER
+
+Komandanı yenilə (ad / `isActive`). Əsas komandanı deaktiv etmək olmaz.
+
+### DELETE /services/:serviceId/teams/:teamId 🔒 PROVIDER
+
+Komandanı sil. Əsas komanda və aktiv sifarişi olan komanda silinmir.
 
 ---
 
@@ -246,11 +278,11 @@ Env: `DISPATCH_SEARCH_WINDOW_SEC` (default 600), `DISPATCH_REDISCOVERY_INTERVAL_
 
 Lifecycle timestamp-lər: `acceptedAt`, `enRouteAt`, `arrivedAt`, `startedAt`, `completedAt`, `cancelledAt`.
 
-Müştəriyə sifariş e-poçtu: `CONFIRMED` (xidmət verən təsdiqi və ya INSTANT offer accept) və `COMPLETED`. Digər statuslar in-app + push. Ləğv e-poçtu qarşı tərəfə gedir.
+Sifariş e-poçtları (yeni sifariş, təsdiq, tamamlanma, ləğv) müvəqqəti bağlıdır (`BOOKING_MAIL_ENABLED`). Status dəyişiklikləri in-app + push ilə gedir.
 
 ### PATCH /bookings/:id/reschedule 🔒 PROVIDER
 
-Yeni tarix təklifi + müştəriyə mesaj.
+Yeni tarix təklifi + xidmət alana mesaj.
 
 ### PATCH /bookings/:id/reschedule/confirm 🔒
 
@@ -450,7 +482,7 @@ Bütün endpoint-lər `@Roles(ADMIN)` tələb edir. Admin qeydiyyatla yaradıla 
 
 ### GET /admin/stats
 
-Platforma icmalı (istifadəçi, xidmət, sifariş, rəy, kateqoriya sayları).
+Platforma icmalı (istifadəçi, xidmət, sifariş, rəy, kateqoriya sayları; sifariş məbləğ cəmləri AZN).
 
 ### GET /admin/users
 

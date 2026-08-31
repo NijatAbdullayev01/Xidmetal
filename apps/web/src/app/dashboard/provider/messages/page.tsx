@@ -9,7 +9,7 @@ export default function ProviderMessagesPage() {
       <div className="shrink-0">
         <h1 className="text-2xl font-bold tracking-tight">Mesajlarım</h1>
         <p className="mt-1 text-muted-foreground">
-          Müştərilərlə yazışmalarınızı buradan idarə edin.
+          Xidmət alanlarla yazışmalarınızı buradan idarə edin.
         </p>
       </div>
       <Suspense

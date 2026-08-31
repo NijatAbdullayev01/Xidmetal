@@ -4,7 +4,7 @@ import { ProviderAccountType, UserRole } from '@xidmetal/shared';
 import { resolveProviderProfileCreate, resolveRegisterPersonNames } from './provider-account';
 
 describe('resolveProviderProfileCreate', () => {
-  it('müştəri üçün profil yaratmır', () => {
+  it('xidmət alan üçün profil yaratmır', () => {
     expect(
       resolveProviderProfileCreate({
         role: UserRole.CUSTOMER,

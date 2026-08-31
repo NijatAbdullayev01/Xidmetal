@@ -7,14 +7,14 @@ import { cn } from '@/lib/utils';
 const roles = [
   {
     value: UserRole.CUSTOMER,
-    label: 'Müştəri',
+    label: 'Xidmət alan',
     description: 'Xidmət sifariş etmək və xidmət verən tapmaq üçün',
     icon: User,
   },
   {
     value: UserRole.PROVIDER,
     label: 'Xidmət verən',
-    description: 'Xidmət təklif etmək və müştəri tapmaq üçün',
+    description: 'Xidmət təklif etmək və xidmət alan tapmaq üçün',
     icon: Briefcase,
   },
 ] as const;

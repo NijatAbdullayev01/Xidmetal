@@ -30,7 +30,7 @@ function formatCountdown(remainingMs: number): string {
 }
 
 /**
- * INSTANT sifariş PENDING ikən müştəriyə göstərilən gözləmə bloku.
+ * INSTANT sifariş PENDING ikən xidmət alana göstərilən gözləmə bloku.
  * Axtarış pəncərəsi: booking.createdAt + DISPATCH.SEARCH_WINDOW_SEC (default 10 dəq).
  */
 export function InstantWaitingCard({

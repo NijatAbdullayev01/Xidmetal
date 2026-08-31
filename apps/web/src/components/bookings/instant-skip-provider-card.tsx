@@ -84,7 +84,7 @@ interface InstantSkipProviderCardProps {
 }
 
 /**
- * Qəbul olunmuş təcili sifariş — müştəri qiyməti bəyənməsə başqa icraçı axtarır.
+ * Qəbul olunmuş təcili sifariş — xidmət alan qiyməti bəyənməsə başqa icraçı axtarır.
  */
 export function InstantSkipProviderCard({
   providerId,

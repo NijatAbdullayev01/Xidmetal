@@ -129,7 +129,7 @@ export function isBakuInternalDistrict(location: string): boolean {
 /**
  * Dropdown üçün: şəhər və rayonlar tək-tək.
  * Bakı daxili inzibati rayonlar (`Bakı, Nəsimi rayonu` və s.) daxil deyil —
- * xidmət ərazisi kimi `Bakı` seçilir; müştəri ünvanında rayon ayrıca dropdown-dadır.
+ * xidmət ərazisi kimi `Bakı` seçilir; xidmət alan ünvanında rayon ayrıca dropdown-dadır.
  */
 export const AZERBAIJAN_PICKER_LOCATIONS: readonly string[] = [
   ...AZERBAIJAN_LOCATIONS,
@@ -202,8 +202,32 @@ export function isAzerbaijanLocation(value: string): boolean {
   return LOCATION_SET.has(value.trim());
 }
 
+const BACK_VOWELS = 'aıou';
+const FRONT_VOWELS = 'eiöüə';
+
+/** «Bakı» → «Bakıda», «Gəncə» → «Gəncədə», «Bakı, Nəsimi rayonu» → «…rayonunda». */
+export function locationLocativeAz(location: string): string {
+  const trimmed = location.trim();
+  if (!trimmed) return trimmed;
+  if (/rayonu$/i.test(trimmed)) {
+    return trimmed.replace(/rayonu$/i, 'rayonunda');
+  }
+
+  const lower = trimmed.toLocaleLowerCase('az');
+  let lastVowel = '';
+  for (let i = lower.length - 1; i >= 0; i -= 1) {
+    const char = lower[i] ?? '';
+    if (BACK_VOWELS.includes(char) || FRONT_VOWELS.includes(char)) {
+      lastVowel = char;
+      break;
+    }
+  }
+  const suffix = FRONT_VOWELS.includes(lastVowel) ? 'də' : 'da';
+  return `${trimmed}${suffix}`;
+}
+
 /**
- * Müştəri sifariş ünvanı: kataloqda olmalıdır.
+ * Xidmət alan sifariş ünvanı: kataloqda olmalıdır.
  * Bakı tək başına kifayət etmir — daxili inzibati rayon da seçilməlidir.
  */
 export function isCompleteBookingLocation(value: string): boolean {

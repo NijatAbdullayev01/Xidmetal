@@ -56,9 +56,9 @@ export function AdminUsersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Müştərilər</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Xidmət alanlar</h1>
         <p className="mt-1 text-muted-foreground">
-          Müştəri hesablarını axtarın, filtrələyin və aktivlik statusunu idarə edin.
+          Xidmət alan hesablarını axtarın, filtrələyin və aktivlik statusunu idarə edin.
         </p>
       </div>
 
@@ -96,7 +96,7 @@ export function AdminUsersPage() {
             <p className="py-8 text-center text-sm text-muted-foreground">Yüklənir…</p>
           )}
           {!isLoading && data?.items.length === 0 && (
-            <p className="py-8 text-center text-sm text-muted-foreground">Müştəri tapılmadı</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">Xidmət alan tapılmadı</p>
           )}
 
           <ul className="divide-y divide-border">

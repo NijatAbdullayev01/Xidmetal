@@ -51,7 +51,7 @@ export enum DispatchOfferStatus {
   REJECTED = 'REJECTED',
   EXPIRED = 'EXPIRED',
   CANCELLED = 'CANCELLED',
-  /** Müştəri qiyməti bəyənməyib bu xidmət verəni buraxdı */
+  /** Xidmət alan qiyməti bəyənməyib bu xidmət verəni buraxdı */
   SKIPPED = 'SKIPPED',
 }
 
@@ -115,7 +115,7 @@ export enum NotificationType {
   BOOKING_EN_ROUTE = 'BOOKING_EN_ROUTE',
   BOOKING_ARRIVED = 'BOOKING_ARRIVED',
   BOOKING_RESCHEDULE_PROPOSED = 'BOOKING_RESCHEDULE_PROPOSED',
-  /** Müştəri providerin tarix təklifini rədd etdi — sifariş PENDING qalır */
+  /** Xidmət alan providerin tarix təklifini rədd etdi — sifariş PENDING qalır */
   BOOKING_RESCHEDULE_REJECTED = 'BOOKING_RESCHEDULE_REJECTED',
   REVIEW_RECEIVED = 'REVIEW_RECEIVED',
   MESSAGE_RECEIVED = 'MESSAGE_RECEIVED',

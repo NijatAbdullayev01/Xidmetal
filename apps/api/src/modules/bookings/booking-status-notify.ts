@@ -2,7 +2,7 @@
  * Sifariş status keçidlərində in-app bildiriş qaydaları (saf funksiyalar — unit test üçün).
  */
 
-/** CONFIRMED / REJECTED → müştəriyə: provider və ya admin aktoru */
+/** CONFIRMED / REJECTED → xidmət alana: provider və ya admin aktoru */
 export function shouldNotifyCustomerOnConfirmOrReject(
   isProvider: boolean,
   isAdmin: boolean,

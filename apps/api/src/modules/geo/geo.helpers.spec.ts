@@ -103,7 +103,7 @@ describe('catalog location (təcili sifariş)', () => {
     expect(bakuDistrictDisplayName('Bakı, Nəsimi rayonu')).toBe('Nəsimi rayonu');
   });
 
-  it('müştəri ünvanında Bakı tək başına yetərli deyil', () => {
+  it('xidmət alan ünvanında Bakı tək başına yetərli deyil', () => {
     expect(isCompleteBookingLocation('Bakı')).toBe(false);
     expect(isCompleteBookingLocation('Bakı, Nəsimi rayonu')).toBe(true);
     expect(isCompleteBookingLocation('Gəncə')).toBe(true);

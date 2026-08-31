@@ -18,13 +18,19 @@ import {
 } from 'lucide-react';
 import { BecomeProviderLink } from '@/components/auth/become-provider-link';
 import { buttonStyles } from '@/components/ui/button';
+import { PageBreadcrumbs } from '@/components/layout/breadcrumbs';
+import { JsonLd } from '@/components/seo/json-ld';
+import { buildBreadcrumbJsonLd, buildFaqPageJsonLd, buildHowToJsonLd } from '@/lib/seo-schema';
+import { pageMetadata } from '@/lib/seo';
+import { getSiteUrl } from '@/lib/site-url';
 import { ProviderGuideHeroCta } from './provider-guide-hero-cta';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Xidmət verən bələdçisi',
   description:
     'Xidmətal platformasında xidmət verən kimi necə qeydiyyatdan keçmək, xidmət yaratmaq, sifarişləri idarə etmək və reytinqinizi artırmaq barədə addım-addım bələdçi.',
-};
+  canonical: '/provider/guide',
+});
 
 const steps: {
   step: number;
@@ -38,7 +44,7 @@ const steps: {
     icon: UserPlus,
     title: 'Qeydiyyatdan keçin',
     description:
-      'Pulsuz hesab yaradın və profilinizi tamamlayın. Müştərilərin sizi tanıması üçün ad, əlaqə və qısa bio əlavə edin.',
+      'Pulsuz hesab yaradın və profilinizi tamamlayın. Xidmət alanların sizi tanıması üçün ad, əlaqə və qısa bio əlavə edin.',
     details: [
       '«Xidmət verən ol» düyməsinə klikləyin',
       'E-poçt və parol ilə hesab yaradın',
@@ -63,7 +69,7 @@ const steps: {
     icon: ClipboardCheck,
     title: 'Sifarişləri idarə edin',
     description:
-      'Müştərilərdən gələn sifarişləri kabinetinizdən izləyin. Təsdiqləyin, icra edin və tamamlayın.',
+      'Xidmət alanlardan gələn sifarişləri kabinetinizdən izləyin. Təsdiqləyin, icra edin və tamamlayın.',
     details: [
       'Gözləyən sifarişləri vaxtında cavablandırın',
       'Sifarişi qəbul etdikdən sonra «İcrada» statusuna keçirin',
@@ -75,9 +81,9 @@ const steps: {
     icon: Star,
     title: 'Reytinqinizi artırın',
     description:
-      'Keyfiyyətli xidmət və sürətli cavab müştəri rəylərini yaxşılaşdırır. Yüksək reytinq daha çox görünürlük deməkdir.',
+      'Keyfiyyətli xidmət və sürətli cavab xidmət alan rəylərini yaxşılaşdırır. Yüksək reytinq daha çox görünürlük deməkdir.',
     details: [
-      'Müştərilərlə aydın və hörmətli ünsiyyət saxlayın',
+      'Xidmət alanlarla aydın və hörmətli ünsiyyət saxlayın',
       'Vəd etdiyiniz vaxtda xidməti tamamlayın',
       'Rəylərə cavab verin və təcrübənizi təkmilləşdirin',
     ],
@@ -91,9 +97,9 @@ const benefits: {
 }[] = [
   {
     icon: TrendingUp,
-    title: 'Yeni müştərilər',
+    title: 'Yeni xidmət alanlar',
     description:
-      'Platformamız minlərlə xidmət axtaran istifadəçiyə çatır. Siz yalnız xidmətinizə fokuslanın — axtarışı biz edirik.',
+      'Platforma xidmət axtaran istifadəçilərə çatır. Siz yalnız xidmətinizə fokuslanın — axtarışı biz edirik.',
   },
   {
     icon: Shield,
@@ -124,13 +130,13 @@ const tips: {
     icon: ImageIcon,
     title: 'Profil və təsvirə diqqət',
     description:
-      'Aydın başlıq, konkret qiymət və real təcrübəni əks etdirən təsvir müştərinin etibarını artırır.',
+      'Aydın başlıq, konkret qiymət və real təcrübəni əks etdirən təsvir xidmət alanın etibarını artırır.',
   },
   {
     icon: MapPin,
     title: 'Düzgün yer məlumatı',
     description:
-      'Xidmət göstərdiyiniz ərazini dəqiq qeyd edin. Bu, yaxınlıqdakı müştərilərin sizi tapmasına kömək edir.',
+      'Xidmət göstərdiyiniz ərazini dəqiq qeyd edin. Bu, yaxınlıqdakı xidmət alanların sizi tapmasına kömək edir.',
   },
   {
     icon: Clock,
@@ -155,7 +161,7 @@ const faqs: { question: string; answer: string }[] = [
   {
     question: 'Platforma komissiya alır?',
     answer:
-      'Xeyr. Hal-hazırda Xidmətal xidmət verənlərdən heç bir ödəniş / komissiya almır. Müştəri ilə razılaşdırılan xidmət haqqı birbaşa sizin aranızda həll olunur.',
+      'Xeyr. Hal-hazırda Xidmətal xidmət verənlərdən heç bir ödəniş / komissiya almır. Xidmət alan ilə razılaşdırılan xidmət haqqı birbaşa sizin aranızda həll olunur.',
   },
   {
     question: 'Neçə xidmət yarada bilərəm?',
@@ -175,13 +181,40 @@ const faqs: { question: string; answer: string }[] = [
   {
     question: 'Reytinq necə hesablanır?',
     answer:
-      'Tamamlanan sifarişlərdən sonra müştərilər 1–5 ulduzla qiymətləndirmə edə bilər. Orta reytinq profilinizdə göstərilir.',
+      'Tamamlanan sifarişlərdən sonra xidmət alanlar 1–5 ulduzla qiymətləndirmə edə bilər. Orta reytinq profilinizdə göstərilir.',
   },
 ];
 
 export default function ProviderGuidePage() {
+  const siteUrl = getSiteUrl();
+
   return (
     <>
+      <JsonLd
+        data={[
+          buildBreadcrumbJsonLd(siteUrl, [
+            { name: 'Ana səhifə', path: '/' },
+            { name: 'Xidmət verən bələdçisi', path: '/provider/guide' },
+          ]),
+          buildHowToJsonLd(siteUrl, {
+            name: 'Xidmətal-da xidmət verən olmaq',
+            description:
+              'Qeydiyyat, xidmət yaratmaq, sifarişləri idarə etmək və reytinqi artırmaq — addım-addım.',
+            path: '/provider/guide',
+            steps: steps.map((step) => ({
+              name: step.title,
+              text: step.description,
+            })),
+          }),
+          buildFaqPageJsonLd(faqs),
+        ]}
+      />
+      <PageBreadcrumbs
+        items={[
+          { href: '/', label: 'Ana səhifə' },
+          { label: 'Xidmət verən bələdçisi' },
+        ]}
+      />
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-b from-brand/15 via-brand/5 to-background">
         <div className="mx-auto max-w-7xl px-4 pt-16 pb-12 sm:px-6 lg:px-8 lg:pt-24">
@@ -227,7 +260,7 @@ export default function ProviderGuidePage() {
             <h2 className="text-3xl font-bold tracking-tight">Necə başlamaq olar?</h2>
             <p className="mt-3 max-w-2xl mx-auto text-muted-foreground">
               Aşağıdakı 4 addımı izləyərək bir neçə dəqiqə ərzində ilk xidmətinizi
-              yaradıb müştəri qəbul edə bilərsiniz.
+              yaradıb xidmət alan qəbul edə bilərsiniz.
             </p>
           </div>
 
@@ -333,7 +366,7 @@ export default function ProviderGuidePage() {
                   },
                   {
                     title: 'Reytinqlər',
-                    text: 'Müştəri rəylərini oxuyun və xidmət keyfiyyətinizi təkmilləşdirin.',
+                    text: 'Xidmət alan rəylərini oxuyun və xidmət keyfiyyətinizi təkmilləşdirin.',
                   },
                 ].map((item) => (
                   <li key={item.title} className="flex gap-3">
@@ -470,7 +503,7 @@ export default function ProviderGuidePage() {
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-brand-foreground/80">
               Bir neçə dəqiqə ərzində qeydiyyatdan keçin, ilk xidmətinizi yaradın və
-              Xidmətal-da minlərlə potensial müştəriyə çatın.
+              Xidmətal-da potensial xidmət alanlara çatın.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <BecomeProviderLink className="inline-flex items-center gap-2 rounded-lg bg-brand-foreground px-6 py-3 font-medium text-brand transition-colors hover:bg-brand-foreground/90">

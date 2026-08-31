@@ -12,3 +12,13 @@ export function bookingWindowEndMs(scheduledAtMs: number, durationMinutes: numbe
   const duration = durationMinutes > 0 ? durationMinutes : 60;
   return scheduledAtMs + duration * 60_000;
 }
+
+export function countOverlappingWindows(
+  startMs: number,
+  endMs: number,
+  windows: Array<{ startMs: number; endMs: number }>,
+): number {
+  return windows.filter((window) =>
+    rangesOverlap(startMs, endMs, window.startMs, window.endMs),
+  ).length;
+}

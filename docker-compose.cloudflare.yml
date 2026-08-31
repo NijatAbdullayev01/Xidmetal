@@ -35,6 +35,7 @@ services:
       - ./ops/nginx/edge-http.conf.template:/templates/edge-http.conf.template:ro
       - ./ops/nginx/edge-ssl.conf.template:/templates/edge-ssl.conf.template:ro
       - ./ops/nginx/cloudflare-realip.conf:/etc/nginx/cloudflare-realip.conf:ro
+      - ./ops/nginx/google-site-verification.conf:/etc/nginx/google-site-verification.conf:ro
       - ./ops/certs:/etc/nginx/certs:ro
     entrypoint: ['/bin/sh', '/edge-entrypoint.sh']
     healthcheck:

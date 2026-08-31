@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { toDisplayMediaUrl, type ServiceImageSummary } from '@xidmetal/shared';
@@ -12,6 +13,7 @@ interface ServiceImageGalleryProps {
   className?: string;
   /** Şəkil sahəsinin max-height utility-ləri */
   imageClassName?: string;
+  title?: string;
 }
 
 export function ServiceImageGallery({
@@ -19,6 +21,7 @@ export function ServiceImageGallery({
   initialIndex = 0,
   className,
   imageClassName,
+  title,
 }: ServiceImageGalleryProps) {
   const count = images.length;
   const [activeIndex, setActiveIndex] = useState(() =>
@@ -61,15 +64,17 @@ export function ServiceImageGallery({
 
   return (
     <div className={cn('min-w-0 space-y-3', className)}>
-      <div className="relative overflow-hidden rounded-xl bg-muted ring-1 ring-border/60">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+      <div className="relative aspect-[16/10] overflow-hidden rounded-xl bg-muted ring-1 ring-border/60">
+        <Image
           src={toDisplayMediaUrl(active.url)}
-          alt={active.alt ?? `Xidmət şəkli ${activeIndex + 1}`}
-          className={cn(
-            'mx-auto max-h-[min(50dvh,420px)] w-full object-contain',
-            imageClassName,
-          )}
+          alt={
+            active.alt ||
+            (title ? `${title} — şəkil ${activeIndex + 1}` : `Xidmət şəkli ${activeIndex + 1}`)
+          }
+          fill
+          sizes="(max-width: 768px) 100vw, 640px"
+          className={cn('object-contain', imageClassName)}
+          priority={activeIndex === 0}
         />
 
         {count > 1 ? (
@@ -105,7 +110,7 @@ export function ServiceImageGallery({
                 type="button"
                 onClick={() => setActiveIndex(index)}
                 className={cn(
-                  'box-border h-10 w-10 overflow-hidden rounded-md border-2 transition-[border-color,opacity]',
+                  'relative box-border h-10 w-10 overflow-hidden rounded-md border-2 transition-[border-color,opacity]',
                   index === activeIndex
                     ? 'border-brand opacity-100'
                     : 'border-transparent opacity-70 ring-1 ring-inset ring-border/70 hover:opacity-100',
@@ -113,11 +118,12 @@ export function ServiceImageGallery({
                 aria-label={`Şəkil ${index + 1}`}
                 aria-current={index === activeIndex ? 'true' : undefined}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={toDisplayMediaUrl(image.url)}
                   alt=""
-                  className="h-full w-full object-cover"
+                  fill
+                  sizes="40px"
+                  className="object-cover"
                 />
               </button>
             </li>

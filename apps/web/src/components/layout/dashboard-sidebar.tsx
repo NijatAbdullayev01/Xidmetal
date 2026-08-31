@@ -70,7 +70,7 @@ const CUSTOMER_NAV: NavItem[] = [
 
 const ROLE_LABELS: Record<DashboardVariant, string> = {
   provider: 'Xidmət verən',
-  customer: 'Müştəri',
+  customer: 'Xidmət alan',
 };
 
 interface DashboardSidebarProps {

@@ -137,6 +137,7 @@ function buildSecurityHeaders() {
 }
 
 const nextConfig: NextConfig = {
+  trailingSlash: false,
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, '../../'),
   transpilePackages: ['@xidmetal/shared'],
@@ -160,6 +161,30 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      {
+        source: '/sitemap.xml',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=600, s-maxage=3600, stale-while-revalidate=86400',
+          },
+        ],
+      },
+      {
+        source: '/robots.txt',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=600, s-maxage=3600, stale-while-revalidate=86400',
+          },
+        ],
+      },
+      {
+        source: '/google3ca31a5fa705ff79.html',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
+        ],
+      },
       {
         source: '/:path*',
         headers: buildSecurityHeaders(),

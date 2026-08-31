@@ -79,7 +79,7 @@ export function AdminBookingsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Sifarişlər</h1>
         <p className="mt-1 text-muted-foreground">
-          Bütün sifarişləri izləyin. Statusu yalnız müştəri və xidmət verən dəyişə bilər.
+          Bütün sifarişləri izləyin. Statusu yalnız xidmət alan və xidmət verən dəyişə bilər.
         </p>
       </div>
 
@@ -137,7 +137,7 @@ export function AdminBookingsPage() {
                       <CardTitle className="text-base">{booking.serviceTitle}</CardTitle>
                       <div className="mt-1.5 space-y-1 text-sm">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-foreground">Müştəri:</span>
+                          <span className="text-foreground">Xidmət alan:</span>
                           <span className="text-muted-foreground">{booking.customerName}</span>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">

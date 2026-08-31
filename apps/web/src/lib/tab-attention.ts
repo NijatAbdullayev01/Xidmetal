@@ -23,7 +23,7 @@ function channel(
   return { id, count, at, singular, plural, latestTitle: latestTitle ?? null };
 }
 
-/** Müştəri / xidmət verən tab prefiksi — ən son bildirişin mövzusu əvvəl. */
+/** Xidmət alan / xidmət verən tab prefiksi — ən son bildirişin mövzusu əvvəl. */
 export function marketplaceTabPrefix(input: MarketplaceTabAttentionInput): string | null {
   return formatTabAttentionPrefix(
     tabLabelsFromChannels([

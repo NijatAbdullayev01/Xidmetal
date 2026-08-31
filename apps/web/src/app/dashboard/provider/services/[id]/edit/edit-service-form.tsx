@@ -17,9 +17,10 @@ import {
   requiresVehicleDetails,
   requiresCargoRouteScope,
   MAX_SERVICE_IMAGES,
+  ProviderAccountType,
 } from '@xidmetal/shared';
 import { z } from 'zod';
-import { ArrowLeft, Loader2, Save } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonStyles } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,6 +62,9 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
   const router = useRouter();
   const token = useAuthToken();
   const userId = useAuthStore((state) => state.user?.id);
+  const isCompany =
+    useAuthStore((state) => state.user?.providerProfile?.accountType) ===
+    ProviderAccountType.COMPANY;
   const hydrated = useAuthHydrated();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -358,6 +362,29 @@ export function EditServiceForm({ serviceId }: EditServiceFormProps) {
           Geri
         </Link>
       </div>
+
+      {isCompany ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-brand" />
+              Komandalar
+            </CardTitle>
+            <CardDescription>
+              Şirkətinizdə bu xidmət üçün bir neçə ekipaj varsa, hər biri üçün komanda yaradın —
+              eyni vaxtda bir neçə sifariş qəbul edilə bilər.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link
+              href={`/dashboard/provider/services/${serviceId}/teams`}
+              className={buttonStyles('outline')}
+            >
+              Komandaları idarə et
+            </Link>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {service.status === ServiceStatus.NEEDS_REVISION && service.reviewNote ? (
         <div

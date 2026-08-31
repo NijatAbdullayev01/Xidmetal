@@ -216,7 +216,6 @@ export class AuthService {
             firstName: true,
             lastName: true,
             phone: true,
-            phoneVerifiedAt: true,
             avatarUrl: true,
             role: true,
             isVerified: true,
@@ -379,7 +378,6 @@ export class AuthService {
         firstName: true,
         lastName: true,
         phone: true,
-        phoneVerifiedAt: true,
         avatarUrl: true,
         role: true,
         isVerified: true,
@@ -422,7 +420,6 @@ export class AuthService {
           firstName: true,
           lastName: true,
           phone: true,
-          phoneVerifiedAt: true,
           avatarUrl: true,
           role: true,
           isVerified: true,
@@ -563,7 +560,6 @@ export class AuthService {
     firstName: string;
     lastName: string;
     phone: string | null;
-    phoneVerifiedAt?: Date | null;
     avatarUrl: string | null;
     role: string;
     isVerified: boolean;
@@ -591,7 +587,6 @@ export class AuthService {
       firstName: user.firstName,
       lastName: user.lastName,
       phone: user.phone ?? undefined,
-      phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
       avatarUrl: await this.storageService.toReadableMediaUrl(user.avatarUrl),
       role: user.role,
       isVerified: user.isVerified,

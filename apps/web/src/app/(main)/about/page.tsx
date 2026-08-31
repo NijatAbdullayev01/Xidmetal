@@ -15,19 +15,38 @@ import {
 } from 'lucide-react';
 import { APP } from '@xidmetal/shared';
 import { BecomeProviderLink } from '@/components/auth/become-provider-link';
+import { PageBreadcrumbs } from '@/components/layout/breadcrumbs';
+import { JsonLd } from '@/components/seo/json-ld';
+import { api } from '@/lib/api';
+import { buildAboutPageJsonLd, buildBreadcrumbJsonLd } from '@/lib/seo-schema';
+import { pageMetadata } from '@/lib/seo';
+import { getSiteUrl } from '@/lib/site-url';
 
-export const metadata: Metadata = {
+export const revalidate = 60;
+
+export const metadata: Metadata = pageMetadata({
   title: 'Haqqımızda',
   description:
     'Xidmətal haqqında — missiyamız, dəyərlərimiz və xidmət verənlərlə xidmət alanları necə birləşdirdiyimiz barədə məlumat.',
-};
+  canonical: '/about',
+});
 
-const stats = [
-  { value: '1000+', label: 'Aktiv xidmət' },
-  { value: '500+', label: 'Xidmət verən' },
-  { value: '50+', label: 'Kateqoriya' },
-  { value: '4.8 ★', label: 'Orta reytinq' },
-];
+async function loadAboutStats(): Promise<{ value: string; label: string }[]> {
+  const [categories, servicesPage] = await Promise.all([
+    api.categories().catch(() => []),
+    api.services({ limit: '1' }).catch(() => null),
+  ]);
+
+  const stats: { value: string; label: string }[] = [];
+  const serviceTotal = servicesPage?.total ?? 0;
+  if (serviceTotal > 0) {
+    stats.push({ value: String(serviceTotal), label: 'Aktiv xidmət' });
+  }
+  if (categories.length > 0) {
+    stats.push({ value: String(categories.length), label: 'Kateqoriya' });
+  }
+  return stats;
+}
 
 const values: {
   icon: LucideIcon;
@@ -56,7 +75,7 @@ const values: {
     icon: Handshake,
     title: 'Bərabər tərəfdaşlıq',
     description:
-      'Xidmət verənləri yalnız siyahıda göstərmirik — onların biznesini böyütməyə, yeni müştərilərə çatmağa kömək edirik.',
+      'Xidmət verənləri yalnız siyahıda göstərmirik — onların biznesini böyütməyə, yeni xidmət alanlara çatmağa kömək edirik.',
   },
 ];
 
@@ -77,7 +96,7 @@ const forWhom: {
   },
   {
     title: 'Xidmət verənlər üçün',
-    audience: 'Bacarıqlarınızı monetizasiya edin və yeni müştərilərə çatın.',
+    audience: 'Bacarıqlarınızı monetizasiya edin və yeni xidmət alanlara çatın.',
     points: [
       'Pulsuz qeydiyyat və xidmət əlavəsi',
       'Sifarişləri bir kabinetdən idarəetmə',
@@ -112,9 +131,27 @@ const milestones: {
   },
 ];
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const siteUrl = getSiteUrl();
+  const stats = await loadAboutStats();
+
   return (
     <>
+      <JsonLd
+        data={[
+          buildBreadcrumbJsonLd(siteUrl, [
+            { name: 'Ana səhifə', path: '/' },
+            { name: 'Haqqımızda', path: '/about' },
+          ]),
+          buildAboutPageJsonLd(siteUrl),
+        ]}
+      />
+      <PageBreadcrumbs
+        items={[
+          { href: '/', label: 'Ana səhifə' },
+          { label: 'Haqqımızda' },
+        ]}
+      />
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-b from-brand/15 via-brand/5 to-background">
         <div className="mx-auto max-w-7xl px-4 pt-16 pb-12 sm:px-6 lg:px-8 lg:pt-24">
@@ -131,22 +168,23 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="border-y border-border bg-muted/30 py-12">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((item) => (
-              <div
-                key={item.label}
-                className="rounded-xl border border-border/70 bg-card px-6 py-5 text-center shadow-sm"
-              >
-                <p className="text-2xl font-bold text-brand-dark">{item.value}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{item.label}</p>
-              </div>
-            ))}
+      {stats.length > 0 ? (
+        <section className="border-y border-border bg-muted/30 py-12">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="grid gap-6 sm:grid-cols-2">
+              {stats.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-xl border border-border/70 bg-card px-6 py-5 text-center shadow-sm"
+                >
+                  <p className="text-2xl font-bold text-brand-dark">{item.value}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{item.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       {/* Mission & Vision */}
       <section className="py-16 sm:py-20">
@@ -187,15 +225,15 @@ export default function AboutPage() {
             <h2 className="text-3xl font-bold tracking-tight">Hekayəmiz</h2>
             <p className="mt-4 leading-relaxed text-muted-foreground">
               Xidmətal, gündəlik həyatda xidmət tapmağın çətin olduğu, xidmət verənlərin isə
-              müştəri tapmaqda çətinlik çəkdiyi bir reallıqdan doğulub. Təmizlik, təmir,
+              xidmət alan tapmaqda çətinlik çəkdiyi bir reallıqdan doğulub. Təmizlik, təmir,
               gözəllik, təhsil və daha onlarla kateqoriyada etibarlı xidmət verən tapmaq çox vaxt
               tanışlıq və ya təsadüfi axtarışlara bağlı idi.
             </p>
             <p className="mt-4 leading-relaxed text-muted-foreground">
               Biz bu boşluğu doldurmaq üçün platforma yaratdıq: bir tərəfdə ehtiyacı olan
-              müştəri, digər tərəfdə bacarıqlı xidmət verən — aralarında isə aydın qiymət,
-              reytinq və sifariş idarəetməsi. Bu gün Xidmətal minlərlə istifadəçiyə xidmət
-              göstərir və davamlı inkişaf edir.
+              xidmət alan, digər tərəfdə bacarıqlı xidmət verən — aralarında isə aydın qiymət,
+              reytinq və sifariş idarəetməsi. Platforma davamlı inkişaf edir və daha çox
+              istifadəçiyə etibarlı xidmət təcrübəsi təqdim etməyi hədəfləyir.
             </p>
           </div>
 
@@ -321,7 +359,7 @@ export default function AboutPage() {
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-brand-foreground/80">
               Xidmət axtarırsınızsa indi kəşf edin, xidmət təklif edirsinizsə pulsuz
-              qeydiyyatdan keçib ilk müştərilərinizə çatın.
+              qeydiyyatdan keçib ilk xidmət alanlarınıza çatın.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link

@@ -14,7 +14,7 @@ import { useAuthToken } from '@/hooks/use-auth-token';
 
 const AUDIENCE_OPTIONS = [
   { value: 'all', label: 'Bütün istifadəçilər' },
-  { value: 'customers', label: 'Yalnız müştərilər' },
+  { value: 'customers', label: 'Yalnız xidmət alanlar' },
   { value: 'providers', label: 'Yalnız xidmət verənlər' },
 ];
 

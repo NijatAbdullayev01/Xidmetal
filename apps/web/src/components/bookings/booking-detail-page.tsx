@@ -200,7 +200,12 @@ export function BookingDetailPage({
                 />
               )
             ) : (
-              booking.customerName
+              <>
+                {booking.customerName}
+                {booking.teamName ? (
+                  <span className="mt-1 block">Komanda: {booking.teamName}</span>
+                ) : null}
+              </>
             )}
           </div>
           <BookingOrderNumber value={booking.orderNumber} className="mt-2" />

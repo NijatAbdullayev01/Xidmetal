@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { Images, X } from 'lucide-react';
 import { toDisplayMediaUrl, type ServiceImageSummary } from '@xidmetal/shared';
 import { Modal } from '@/components/ui/modal';
@@ -33,11 +34,12 @@ export function ServiceImagesPreview({
 
   const coverInner = (
     <span className="relative block aspect-[16/10] w-full">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={toDisplayMediaUrl(cover.url)}
-        alt=""
-        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+        alt={cover.alt || (title ? `${title} — şəkil` : 'Xidmət şəkli')}
+        fill
+        sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 400px"
+        className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
       />
       {count > 1 ? (
         <span

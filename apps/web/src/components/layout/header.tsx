@@ -114,6 +114,30 @@ export function Header() {
           <Logo priority />
         </Link>
 
+        <nav
+          aria-label="Əsas"
+          className="flex min-w-0 flex-1 items-center justify-center gap-0.5 sm:gap-1"
+        >
+          <Link
+            href="/services"
+            className="rounded-md px-2 py-2 text-sm font-medium text-brand-foreground transition-colors hover:bg-brand-dark/20 sm:px-3"
+          >
+            Xidmətlər
+          </Link>
+          <Link
+            href="/categories"
+            className="rounded-md px-2 py-2 text-sm font-medium text-brand-foreground transition-colors hover:bg-brand-dark/20 sm:px-3"
+          >
+            Kateqoriyalar
+          </Link>
+          <Link
+            href="/how-it-works"
+            className="hidden rounded-md px-3 py-2 text-sm font-medium text-brand-foreground transition-colors hover:bg-brand-dark/20 lg:inline-flex"
+          >
+            Necə işləyir?
+          </Link>
+        </nav>
+
         <div className="hidden items-center gap-2 lg:flex">
           <ThemeToggle className="text-brand-foreground hover:bg-brand-dark/20 hover:text-brand-foreground" />
           {authSection}

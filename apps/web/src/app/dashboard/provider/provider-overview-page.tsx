@@ -194,7 +194,7 @@ export function ProviderOverviewPage() {
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>Son mesajlar</CardTitle>
-              <CardDescription>Müştərilərlə yazışmalar</CardDescription>
+              <CardDescription>Xidmət alanlarla yazışmalar</CardDescription>
             </div>
             <Link
               href="/dashboard/provider/messages"

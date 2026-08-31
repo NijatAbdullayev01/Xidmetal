@@ -15,7 +15,7 @@ export const SERVICE_VENUE_LABELS: Record<ServiceVenueValue, string> = {
 };
 
 export const SERVICE_VENUE_DESCRIPTIONS: Record<ServiceVenueValue, string> = {
-  [ServiceVenue.AT_LOCATION]: 'Müştərinin ünvanında xidmət göstərirəm',
+  [ServiceVenue.AT_LOCATION]: 'Xidmət alanın ünvanında xidmət göstərirəm',
   [ServiceVenue.AT_SALON]: 'Öz salonumda xidmət göstərirəm',
 };
 

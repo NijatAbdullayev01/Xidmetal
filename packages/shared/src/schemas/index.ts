@@ -22,7 +22,7 @@ import { SERVICE_VENUE_VALUES } from '../service-venues';
 import { CARGO_ROUTE_SCOPE_VALUES } from '../vehicle-cargo';
 import { isValidCoordinates } from '../geo';
 import { isAzerbaijanLocation } from '../locations';
-import { PAYMENTS } from '../constants';
+import { PAYMENTS, SERVICE_TEAMS } from '../constants';
 
 const vehicleDimensionSchema = z
   .number({ invalid_type_error: 'Maşın ölçüsü rəqəm olmalıdır' })
@@ -383,7 +383,7 @@ export const reverseGeocodeQuerySchema = z.object({
 
 export const rescheduleBookingSchema = z.object({
   scheduledAt: z.string().datetime(),
-  message: z.string().min(1, 'Müştəriyə mesaj yazmaq mütləqdir').max(1000),
+  message: z.string().min(1, 'Xidmət alana mesaj yazmaq mütləqdir').max(1000),
 });
 
 export const createReviewSchema = z.object({
@@ -500,11 +500,6 @@ export const confirmEmailChangeSchema = z.object({
 
 export const requestPhoneChangeSchema = z.object({
   newPhone: phoneSchema,
-});
-
-export const confirmPhoneChangeSchema = z.object({
-  newPhone: phoneSchema,
-  code: verificationCodeSchema,
 });
 
 export const createConversationSchema = z.object({
@@ -755,7 +750,6 @@ export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
 export type RequestEmailChangeInput = z.infer<typeof requestEmailChangeSchema>;
 export type ConfirmEmailChangeInput = z.infer<typeof confirmEmailChangeSchema>;
 export type RequestPhoneChangeInput = z.infer<typeof requestPhoneChangeSchema>;
-export type ConfirmPhoneChangeInput = z.infer<typeof confirmPhoneChangeSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 export type SubmitKycDocumentInput = z.infer<typeof submitKycDocumentSchema>;
@@ -853,3 +847,36 @@ export const adminAnalyticsQuerySchema = z.object({
 export type AnalyticsBeaconEventInput = z.infer<typeof analyticsBeaconEventSchema>;
 export type AnalyticsBeaconInput = z.infer<typeof analyticsBeaconSchema>;
 export type AdminAnalyticsQueryInput = z.infer<typeof adminAnalyticsQuerySchema>;
+
+export const createServiceTeamSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(
+      SERVICE_TEAMS.NAME_MIN_LENGTH,
+      `Komanda adı minimum ${SERVICE_TEAMS.NAME_MIN_LENGTH} simvol olmalıdır`,
+    )
+    .max(
+      SERVICE_TEAMS.NAME_MAX_LENGTH,
+      `Komanda adı maksimum ${SERVICE_TEAMS.NAME_MAX_LENGTH} simvol ola bilər`,
+    ),
+});
+
+export const updateServiceTeamSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(
+      SERVICE_TEAMS.NAME_MIN_LENGTH,
+      `Komanda adı minimum ${SERVICE_TEAMS.NAME_MIN_LENGTH} simvol olmalıdır`,
+    )
+    .max(
+      SERVICE_TEAMS.NAME_MAX_LENGTH,
+      `Komanda adı maksimum ${SERVICE_TEAMS.NAME_MAX_LENGTH} simvol ola bilər`,
+    )
+    .optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type CreateServiceTeamInput = z.infer<typeof createServiceTeamSchema>;
+export type UpdateServiceTeamInput = z.infer<typeof updateServiceTeamSchema>;

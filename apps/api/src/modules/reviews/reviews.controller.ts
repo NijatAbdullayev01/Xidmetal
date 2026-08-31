@@ -17,7 +17,7 @@ export class ReviewsController {
   @ApiOperation({
     summary: 'Xidmət verənin ictimai rəyləri',
     description:
-      'Təsdiqlənmiş müştəri rəyləri — qonaqlar və digər müştərilər baxa bilər. Adlar qismən anonimdir.',
+      'Təsdiqlənmiş xidmət alan rəyləri — qonaqlar və digər xidmət alanlar baxa bilər. Adlar qismən anonimdir.',
   })
   findByProvider(@Param('providerId') providerId: string, @Query() query: ReviewQueryDto) {
     return this.reviewsService.findPublicByProvider(providerId, query);

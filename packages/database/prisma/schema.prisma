@@ -33,7 +33,7 @@ model User {
   /** Soft-delete — hard delete əvəzinə; auth rədd edir */
   deletedAt     DateTime? @map("deleted_at")
   lastSeenAt    DateTime? @map("last_seen_at")
-  /** Telefon OTP təsdiqi — e-poçt verify-dən ayrı */
+  /** Köhnə telefon OTP — istifadə olunmur */
   phoneVerifiedAt DateTime? @map("phone_verified_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
@@ -220,6 +220,8 @@ model Service {
   revisionEditedAt     DateTime? @map("revision_edited_at")
   providerId  String        @map("provider_id")
   categoryId  String        @map("category_id")
+  /** Public URL (`/services/{slug}`) — title dəyişəndə sabit qalır */
+  slug        String        @unique
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
@@ -228,6 +230,7 @@ model Service {
   category Category @relation(fields: [categoryId], references: [id])
   bookings Booking[]
   images   ServiceImage[]
+  teams                 ServiceTeam[]
   workingHours          ServiceWorkingHours[]
   availabilityOverrides ServiceAvailabilityOverride[]
 
@@ -248,6 +251,29 @@ model ServiceImage {
   service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   @@map("service_images")
+}
+
+/**
+ * Xidmət üzrə tutum vahidi (komanda / ekipaj).
+ * Şirkət eyni xidmətdə paralel işlər üçün bir neçə komanda saxlaya bilər.
+ * Fərdi hesabda avtomatik 1 default komanda — əlavə yaratmaq olmaz.
+ */
+model ServiceTeam {
+  id        String   @id @default(uuid())
+  serviceId String   @map("service_id")
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  isDefault Boolean  @default(false) @map("is_default")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  service  Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@unique([serviceId, name])
+  @@index([serviceId, isActive])
+  @@map("service_teams")
 }
 
 // ─── Xidmət təqvimi ──────────────────────────────────────────────────────────
@@ -316,6 +342,8 @@ model Booking {
   serviceId           String        @map("service_id")
   customerId          String        @map("customer_id")
   providerId          String        @map("provider_id")
+  /** Şirkət komandası — paralel tutum; fərdi hesabda default komanda */
+  teamId              String?       @map("team_id")
   scheduledAt         DateTime      @map("scheduled_at")
   proposedScheduledAt DateTime?     @map("proposed_scheduled_at")
   status              BookingStatus @default(PENDING)
@@ -347,16 +375,17 @@ model Booking {
   completedAt  DateTime?    @map("completed_at")
   /** INSTANT axtarış pəncərəsi (yoxdursa createdAt). Skip sonrası yenilənir. */
   dispatchWindowStartedAt DateTime? @map("dispatch_window_started_at")
-  /** Müştəri qəbul olunmuş icraçını neçə dəfə buraxıb */
+  /** Xidmət alan qəbul olunmuş icraçını neçə dəfə buraxıb */
   dispatchSkipCount       Int       @default(0) @map("dispatch_skip_count")
   /** INSTANT filtrləri (minRating/minPrice/maxPrice/serviceCity) — skip sonrası saxlanır */
   dispatchPrefs           Json?     @map("dispatch_prefs")
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
-  service  Service  @relation(fields: [serviceId], references: [id])
-  customer User     @relation("CustomerBookings", fields: [customerId], references: [id])
-  provider User     @relation("ProviderBookings", fields: [providerId], references: [id])
+  service  Service     @relation(fields: [serviceId], references: [id])
+  customer User        @relation("CustomerBookings", fields: [customerId], references: [id])
+  provider User        @relation("ProviderBookings", fields: [providerId], references: [id])
+  team     ServiceTeam? @relation(fields: [teamId], references: [id], onDelete: SetNull)
   review        Review?
   conversation  Conversation?
   locationPings LocationPing[]
@@ -365,6 +394,7 @@ model Booking {
 
   @@index([customerId])
   @@index([providerId])
+  @@index([teamId])
   @@index([status])
   @@index([serviceId, scheduledAt])
   @@index([scheduledAt])
@@ -500,7 +530,7 @@ model Conversation {
   customerId String   @map("customer_id")
   providerId String   @map("provider_id")
   bookingId  String?  @unique @map("booking_id")
-  /// Müştəri söhbəti öz siyahısından silib (qarşı tərəfə təsir etmir)
+  /// Xidmət alan söhbəti öz siyahısından silib (qarşı tərəfə təsir etmir)
   customerDeletedAt DateTime? @map("customer_deleted_at")
   /// Xidmət verən söhbəti öz siyahısından silib (qarşı tərəfə təsir etmir)
   providerDeletedAt DateTime? @map("provider_deleted_at")

@@ -100,21 +100,6 @@ export class RequestPhoneChangeDto {
   newPhone!: string;
 }
 
-export class ConfirmPhoneChangeDto {
-  @ApiProperty({ example: '+994501234567' })
-  @IsString()
-  @Matches(/^(\+994|0)[0-9]{9}$/, {
-    message: 'Düzgün telefon nömrəsi daxil edin (+994XXXXXXXXX)',
-  })
-  newPhone!: string;
-
-  @ApiProperty({ example: '12345678' })
-  @IsString()
-  @Length(8, 8, { message: 'Təsdiq kodu 8 rəqəm olmalıdır' })
-  @Matches(/^\d{8}$/, { message: 'Təsdiq kodu yalnız rəqəmlərdən ibarət olmalıdır' })
-  code!: string;
-}
-
 export class DeleteAccountDto {
   @ApiProperty({ description: 'Cari şifrə' })
   @IsString()

@@ -4,8 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { BookingStatus, ServiceStatus, type Prisma } from '@prisma/client';
-import { ACTIVE_BOOKING_STATUSES as SHARED_ACTIVE_BOOKING_STATUSES } from '@xidmetal/shared';
+import { ServiceStatus, type Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/database/prisma.service';
 import {
   AvailabilityOverrideType,
@@ -19,14 +18,11 @@ import {
   UpsertWorkingHoursDto,
   CreateAvailabilityOverrideDto,
 } from './dto';
-import { bookingWindowEndMs, rangesOverlap } from '../../common/booking/booking-overlap';
+import { ServiceCapacityService } from '../../common/booking/service-capacity.service';
 
 /** Azərbaycan sabit UTC+4 (DST yoxdur) — iş saatları bu zonada saxlanılır */
 const BAKU_OFFSET = '+04:00';
 const DEFAULT_DURATION_MINUTES = 60;
-const ACTIVE_BOOKING_STATUSES: BookingStatus[] = [
-  ...SHARED_ACTIVE_BOOKING_STATUSES,
-] as BookingStatus[];
 
 interface TimeRange {
   startMin: number;
@@ -34,11 +30,13 @@ interface TimeRange {
 }
 
 type DbClient = PrismaService | Prisma.TransactionClient;
-type BookingScope = 'provider' | 'service';
 
 @Injectable()
 export class AvailabilityService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private capacity: ServiceCapacityService,
+  ) {}
 
   async getWorkingHours(serviceId: string, userId: string): Promise<WorkingHoursDay[]> {
     await this.assertServiceOwner(serviceId, userId);
@@ -150,16 +148,16 @@ export class AvailabilityService {
     from: string,
     to: string,
     db: DbClient = this.prisma,
+    options?: { excludeBookingId?: string },
   ): Promise<DayAvailability[]> {
     return this.resolveSlotsInternal(serviceId, from, to, db, {
-      bookingScope: 'provider',
       requirePublicService: false,
+      excludeBookingId: options?.excludeBookingId,
     });
   }
 
   async resolvePublicSlots(serviceId: string, from: string, to: string): Promise<DayAvailability[]> {
     return this.resolveSlotsInternal(serviceId, from, to, this.prisma, {
-      bookingScope: 'service',
       requirePublicService: true,
     });
   }
@@ -170,8 +168,8 @@ export class AvailabilityService {
     to: string,
     db: DbClient,
     options: {
-      bookingScope: BookingScope;
       requirePublicService: boolean;
+      excludeBookingId?: string;
     },
   ): Promise<DayAvailability[]> {
     this.assertDateRange(from, to);
@@ -207,7 +205,7 @@ export class AvailabilityService {
     const fromDate = this.parseDateOnly(from);
     const toDate = this.parseDateOnly(to);
 
-    const [workingHours, overrides, bookings] = await Promise.all([
+    const [workingHours, overrides, capacityCtx] = await Promise.all([
       db.serviceWorkingHours.findMany({
         where: { serviceId, isActive: true },
       }),
@@ -217,34 +215,18 @@ export class AvailabilityService {
           date: { gte: fromDate, lte: toDate },
         },
       }),
-      db.booking.findMany({
-        where: {
-          ...(options.bookingScope === 'provider'
-            ? { providerId: service.providerId }
-            : { serviceId }),
-          status: { in: ACTIVE_BOOKING_STATUSES },
-          scheduledAt: {
-            gte: fromDate,
-            lt: this.addDays(toDate, 1),
-          },
-        },
-        select: {
-          scheduledAt: true,
-          service: { select: { duration: true } },
-        },
-      }),
+      this.capacity.resolveContext(serviceId, db),
     ]);
 
+    const occupancyWindows = await this.capacity.loadOccupancyWindows(
+      capacityCtx,
+      this.addDays(fromDate, -1),
+      this.addDays(toDate, 2),
+      db,
+      options.excludeBookingId,
+    );
+
     const hasCalendar = workingHours.length > 0 || overrides.length > 0;
-    const busyRanges = bookings.map((b) => {
-      const start = b.scheduledAt;
-      const bookingDuration =
-        b.service.duration && b.service.duration > 0 ? b.service.duration : DEFAULT_DURATION_MINUTES;
-      return {
-        startMs: start.getTime(),
-        endMs: bookingWindowEndMs(start.getTime(), bookingDuration),
-      };
-    });
 
     const days: DayAvailability[] = [];
     for (let cursor = new Date(fromDate); cursor <= toDate; cursor = this.addDays(cursor, 1)) {
@@ -264,8 +246,11 @@ export class AvailabilityService {
           const slotEnd = this.combineDateAndMinutes(cursor, endMin);
           const startMs = slotStart.getTime();
           const endMs = slotEnd.getTime();
-          const overlapsBusy = busyRanges.some((busy) =>
-            rangesOverlap(startMs, endMs, busy.startMs, busy.endMs),
+          const overlapsBusy = this.capacity.isBusyAt(
+            startMs,
+            endMs,
+            occupancyWindows,
+            capacityCtx.capacity,
           );
           slots.push({
             start: slotStart.toISOString(),
@@ -293,7 +278,9 @@ export class AvailabilityService {
   ): Promise<void> {
     const db: DbClient = options?.tx ?? this.prisma;
     const dateStr = this.formatDateOnly(scheduledAt);
-    const days = await this.resolveSlots(serviceId, dateStr, dateStr, db);
+    const days = await this.resolveSlots(serviceId, dateStr, dateStr, db, {
+      excludeBookingId: options?.excludeBookingId,
+    });
     const day = days[0];
     if (!day || !day.hasCalendar) {
       throw new BadRequestException('Xidmət verən hələ təqvim təyin etməyib');
@@ -305,45 +292,6 @@ export class AvailabilityService {
     }
 
     if (slot.status === AvailabilitySlotStatus.BUSY) {
-      if (options?.excludeBookingId) {
-        const service = await db.service.findUnique({
-          where: { id: serviceId },
-          select: { providerId: true, duration: true },
-        });
-        if (!service) throw new NotFoundException('Xidmət tapılmadı');
-        const duration =
-          service.duration && service.duration > 0 ? service.duration : DEFAULT_DURATION_MINUTES;
-        const endMs = bookingWindowEndMs(scheduledAt.getTime(), duration);
-        const candidates = await db.booking.findMany({
-          where: {
-            providerId: service.providerId,
-            status: { in: ACTIVE_BOOKING_STATUSES },
-            id: { not: options.excludeBookingId },
-            scheduledAt: {
-              gte: this.addDays(this.parseDateOnly(dateStr), -1),
-              lt: this.addDays(this.parseDateOnly(dateStr), 2),
-            },
-          },
-          select: {
-            scheduledAt: true,
-            service: { select: { duration: true } },
-          },
-        });
-        const startMs = scheduledAt.getTime();
-        const hasConflict = candidates.some((b) => {
-          const bDuration =
-            b.service.duration && b.service.duration > 0
-              ? b.service.duration
-              : DEFAULT_DURATION_MINUTES;
-          const bStart = b.scheduledAt.getTime();
-          const bEnd = bookingWindowEndMs(bStart, bDuration);
-          return rangesOverlap(startMs, endMs, bStart, bEnd);
-        });
-        if (hasConflict) {
-          throw new BadRequestException('Seçilmiş vaxt doludur və ya əlçatan deyil');
-        }
-        return;
-      }
       throw new BadRequestException('Seçilmiş vaxt doludur və ya əlçatan deyil');
     }
   }

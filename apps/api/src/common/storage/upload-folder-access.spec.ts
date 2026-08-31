@@ -5,7 +5,7 @@ import { assertUploadFolderAccess } from './upload-folder-access';
 import { UPLOAD_FOLDERS } from './storage.types';
 
 describe('assertUploadFolderAccess', () => {
-  it('müştəriyə KYC və services qadağandır', () => {
+  it('xidmət alana KYC və services qadağandır', () => {
     expect(() =>
       assertUploadFolderAccess(UPLOAD_FOLDERS.KYC, UserRole.CUSTOMER),
     ).toThrow(ForbiddenException);
@@ -23,7 +23,7 @@ describe('assertUploadFolderAccess', () => {
     ).not.toThrow();
   });
 
-  it('müştəri avatars/bookings/messages yükləyə bilər', () => {
+  it('xidmət alan avatars/bookings/messages yükləyə bilər', () => {
     expect(() =>
       assertUploadFolderAccess(UPLOAD_FOLDERS.AVATARS, UserRole.CUSTOMER),
     ).not.toThrow();

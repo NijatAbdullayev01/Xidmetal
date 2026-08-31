@@ -14,7 +14,7 @@ export const PROVIDER_BOOKING_TRANSITIONS: Partial<
   [BookingStatus.IN_PROGRESS]: [BookingStatus.COMPLETED],
 };
 
-/** Müştəri yalnız ləğv (iş başladıqdan sonra ləğv yox) */
+/** Xidmət alan yalnız ləğv (iş başladıqdan sonra ləğv yox) */
 export const CUSTOMER_BOOKING_TRANSITIONS: Partial<
   Record<BookingStatus, readonly BookingStatus[]>
 > = {
@@ -35,6 +35,42 @@ export const ACTIVE_BOOKING_STATUSES: readonly BookingStatus[] = [
   BookingStatus.ARRIVED,
   BookingStatus.IN_PROGRESS,
 ] as const;
+
+/**
+ * Təcili axtarış (INSTANT + PENDING) hələ icraçıya bağlanmayıb —
+ * komanda tutumunu tutmur. Planlaşdırılmış PENDING rezervasiyadır.
+ */
+export const INSTANT_CAPACITY_HOLDING_STATUSES: readonly BookingStatus[] = [
+  BookingStatus.CONFIRMED,
+  BookingStatus.EN_ROUTE,
+  BookingStatus.ARRIVED,
+  BookingStatus.IN_PROGRESS,
+] as const;
+
+export function bookingHoldsServiceCapacity(
+  type: BookingType | string,
+  status: BookingStatus | string,
+): boolean {
+  if (type === BookingType.INSTANT) {
+    return (INSTANT_CAPACITY_HOLDING_STATUSES as readonly string[]).includes(status);
+  }
+  return (ACTIVE_BOOKING_STATUSES as readonly string[]).includes(status);
+}
+
+/** Şirkət: aktiv komanda sayı; fərdi: həmişə 1 */
+export function effectiveServiceCapacity(
+  accountType: string | null | undefined,
+  activeTeamCount: number,
+): number {
+  if (accountType === 'COMPANY') {
+    return Math.max(1, activeTeamCount);
+  }
+  return 1;
+}
+
+export function isSlotAtCapacity(occupied: number, capacity: number): boolean {
+  return occupied >= Math.max(1, capacity);
+}
 
 export function isBookingTransitionAllowed(
   current: BookingStatus,
@@ -64,7 +100,7 @@ export function isCancellableBookingStatus(status: BookingStatus): boolean {
 
 /**
  * Təcili sifariş qəbul olunub, iş hələ başlamayıb —
- * müştəri qiyməti bəyənməsə başqa xidmət verən axtara bilər.
+ * xidmət alan qiyməti bəyənməsə başqa xidmət verən axtara bilər.
  */
 export function isInstantProviderSkippable(
   type: BookingType | string,
@@ -100,7 +136,7 @@ export function bookingMessagingBlockedMessage(status: BookingStatus | string): 
 }
 
 /**
- * Sifariş qiyməti yalnız xidmət verən qəbul etdikdən sonra müştəridə görünür.
+ * Sifariş qiyməti yalnız xidmət verən qəbul etdikdən sonra xidmət alanda görünür.
  * Xidmət verən tərəfdə qiymət göstərilmir.
  */
 export function isBookingPriceVisibleToCustomer(

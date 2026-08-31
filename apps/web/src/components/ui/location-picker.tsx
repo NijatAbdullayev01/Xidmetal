@@ -25,7 +25,7 @@ export interface LocationPickerProps {
   /** Siyahıda olmayan köhnə/xüsusi dəyərlər */
   extraOptions?: readonly string[];
   /**
-   * Müştəri ünvanı: Bakı seçiləndə daxili inzibati rayon ayrıca dropdown-da məcburidir.
+   * Xidmət alan ünvanı: Bakı seçiləndə daxili inzibati rayon ayrıca dropdown-da məcburidir.
    * Xidmət ərazisi (xidmət verən formları) üçün false saxla.
    */
   requireBakuDistrict?: boolean;

@@ -1,5 +1,12 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { buttonStyles } from '@/components/ui/button';
+import { NOINDEX } from '@/lib/seo';
+
+export const metadata: Metadata = {
+  title: 'Xidmət tapılmadı',
+  robots: NOINDEX,
+};
 
 export default function ServiceNotFound() {
   return (

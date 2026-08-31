@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Mail } from 'lucide-react';
 import { APP } from '@xidmetal/shared';
+import { NOINDEX } from '@/lib/seo';
 
 export const metadata: Metadata = {
   title: 'E-poçt bildirişləri',
   description: `${APP.name} sifariş e-poçtları hesabınızdakı əməliyyatlara görə göndərilir.`,
+  robots: NOINDEX,
 };
 
 export default function MailUnsubscribePage() {

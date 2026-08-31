@@ -2,14 +2,20 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Scale, Mail, FileText } from 'lucide-react';
 import { APP } from '@xidmetal/shared';
+import { PageBreadcrumbs } from '@/components/layout/breadcrumbs';
+import { JsonLd } from '@/components/seo/json-ld';
+import { pageMetadata } from '@/lib/seo';
+import { buildBreadcrumbJsonLd, buildWebPageJsonLd } from '@/lib/seo-schema';
+import { getSiteUrl } from '@/lib/site-url';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'İstifadə qaydaları',
   description:
     'Xidmətal platformasının istifadə şərtləri, tərəflərin hüquq və öhdəlikləri, sifariş və məsuliyyət qaydaları.',
-};
+  canonical: '/terms',
+});
 
-const LAST_UPDATED = '2 avqust 2026';
+const LAST_UPDATED = '31 avqust 2026';
 
 const sections: {
   id: string;
@@ -25,7 +31,7 @@ const sections: {
       `Bu İstifadə qaydaları («Qaydalar») ${APP.name} platformasının («Platforma», «biz», «bizim») istifadəsi ilə bağlı hüquqi şərtləri, tərəflərin hüquq və öhdəliklərini müəyyən edir.`,
       'Platformaya daxil olmaq, qeydiyyatdan keçmək və ya Platformanın istənilən funksiyasından istifadə etməklə bu Qaydaları tam oxuduğunuzu, başa düşdüyünüzü və qəbul etdiyinizi təsdiq edirsiniz. Qaydalarla razı deyilsinizsə, Platformadan istifadəni dərhal dayandırmalısınız.',
       'Bu Qaydalar Azərbaycan Respublikasının Mülki Məcəlləsi, «Elektron ticarət haqqında» Qanunu, «İstehlakçıların hüquqlarının müdafiəsi haqqında» Qanunu, «Şəxsi məlumatlar haqqında» Qanunu və digər tətbiq olunan normativ hüquqi aktlar çərçivəsində hazırlanmışdır.',
-      'Qaydalar ictimai oferta xarakteri daşıyır. Hesab yaratmaq və ya Platformadan istifadə etmək oferta qəbulu (aksept) hesab olunur və tərəflər arasında müqavilə münasibətləri yaranır.',
+      'Qaydalar ictimai oferta xarakteri daşıyır. Hesab yaratmaq və ya Platformadan istifadə etmək ofertonun qəbulu hesab olunur və tərəflər arasında müqavilə münasibətləri yaranır.',
     ],
   },
   {
@@ -33,12 +39,12 @@ const sections: {
     title: '2. Təriflər',
     paragraphs: ['Bu Qaydalarda aşağıdakı terminlər aşağıdakı mənalarda istifadə olunur:'],
     list: [
-      'Platforma — xidmət verənlərlə xidmət alanları bir araya gətirən Xidmətal veb-saytı, mobil və digər rəqəmsal interfeyslər.',
-      'İstifadəçi — Platformada qeydiyyatdan keçmiş və ya keçməmiş hər hansı fiziki şəxs.',
-      'Xidmət alan (Customer) — Platforma vasitəsilə xidmət axtaran və/və ya sifariş verən istifadəçi.',
-      'Xidmət verən — Platformada xidmət elanı yerləşdirən və xidmət göstərən istifadəçi.',
+      'Platforma — xidmət verənlərlə xidmət alanları bir araya gətirən Xidmətal veb-saytı və digər rəqəmsal interfeyslər.',
+      'İstifadəçi — Platformada qeydiyyatdan keçmiş və ya keçməmiş hər hansı fiziki şəxs; xidmət verən hüquqi şəxs adından çıxış etdikdə həmin hüquqi şəxs də bu Qaydalardakı öhdəliklərə tabedir.',
+      'Xidmət alan — Platforma vasitəsilə xidmət axtaran və ya sifariş verən istifadəçi.',
+      'Xidmət verən — Platformada xidmət elanı yerləşdirən və xidmət göstərən istifadəçi (fiziki şəxs və ya hüquqi şəxs adından).',
       'Xidmət — xidmət verənin Platformada təklif etdiyi iş, peşə və ya digər ödənişli fəaliyyət.',
-      'Sifariş (Booking) — xidmət alanın konkret xidmət üzrə verdiyi və Platformada qeydə alınan müraciət.',
+      'Sifariş — xidmət alanın konkret xidmət üzrə verdiyi və Platformada qeydə alınan müraciət (planlaşdırılmış və ya təcili).',
       'Hesab — istifadəçinin Platformada fərdi profili və ona bağlı məlumatlar.',
       'Məzmun — istifadəçilərin və ya Platformanın yerləşdirdiyi mətn, şəkil, rəy, qiymət və digər materiallar.',
     ],
@@ -47,14 +53,14 @@ const sections: {
     id: 'platforma-mahiyyeti',
     title: '3. Platformanın mahiyyəti',
     paragraphs: [
-      'Xidmətal xidmət marketplace-idir: biz xidmət verənlərlə xidmət alanlar arasında məlumat və əlaqə vasitəsi təqdim edirik. Platforma, bir qayda olaraq, xidmətin birbaşa icraçısı deyil.',
-      'Xidmət verən və xidmət alan arasında bağlanan xidmət münasibətləri həmin tərəflər arasında yaranır. Platforma bu münasibətlərdə vasitəçi (intermediary) rolunda çıxış edir, əgər ayrıca yazılı razılaşma və ya qanunvericiliklə başqa qayda nəzərdə tutulmayıbsa.',
-      'Biz xidmət verənlərin peşəkarlığını, lisenziya və icazələrini, xidmətin keyfiyyətini və ya nəticəsini avtomatik təmin etmirik. İstifadəçilər sifariş verməzdən əvvəl təklifi, reytinqi və digər məlumatları özləri qiymətləndirməlidirlər.',
+      'Xidmətal xidmət verənlərlə xidmət alanları bir araya gətirən informasiya platformasıdır. Biz, bir qayda olaraq, xidmətin birbaşa icraçısı, işəgötürən və ya tərəflərin nümayəndəsi deyilik.',
+      'Xidmət verən və xidmət alan arasında bağlanan xidmət münasibətləri həmin tərəflər arasında yaranır. Platforma bu münasibətlərdə vasitəçi rolunda çıxış edir, əgər ayrıca yazılı razılaşma və ya qanunvericiliklə başqa qayda nəzərdə tutulmayıbsa.',
+      'Biz xidmət verənlərin peşəkarlığını, lisenziya və icazələrini, xidmətin keyfiyyətini və ya nəticəsini avtomatik təmin etmirik. Elanın yoxlanması və ya «təsdiqlənmiş» nişanı yalnız Platforma qaydalarına uyğun ilkin yoxlamanı bildirir, xidmətin nəticəsinə zəmanət deyil. İstifadəçilər sifariş verməzdən əvvəl təklifi, reytinqi və digər məlumatları özləri qiymətləndirməlidirlər.',
     ],
     list: [
-      'Platforma xidmət kataloqu, axtarış, sifariş idarəetməsi, mesajlaşma və reytinq funksiyalarını təqdim edir',
+      'Platforma xidmət kataloqu, axtarış, sifariş idarəetməsi, mesajlaşma, bildiriş və reytinq funksiyalarını təqdim edir',
       'Xidmətin faktiki icrası, vaxtı, qiyməti və şərtləri xidmət verən ilə xidmət alan arasında razılaşdırılır',
-      'Platforma tərəflər arasındakı mübahisələrdə məcburi arbitraj orqanı deyil, lakin ədalətli həll üçün dəstək göstərə bilər',
+      'Platforma tərəflər arasındakı mübahisələrdə məhkəmə və ya məcburi həll orqanı deyil; ədalətli həll üçün dəstək göstərə və şikayətə baxa bilər',
     ],
   },
   {
@@ -62,13 +68,13 @@ const sections: {
     title: '4. Hesabın yaradılması və təhlükəsizlik',
     paragraphs: [
       'Platformanın əsas funksiyalarından istifadə üçün qeydiyyat tələb oluna bilər. Qeydiyyat zamanı doğru, dəqiq və aktual məlumat təqdim etməlisiniz.',
-      'Hesab yalnız 18 yaşını tamamlamış fiziki şəxslər üçün nəzərdə tutulub. Qeydiyyatdan keçməklə bu yaş tələbinə cavab verdiyinizi təsdiq edirsiniz.',
+      'Hesab yalnız 18 yaşı tamam olmuş fiziki şəxslər üçün nəzərdə tutulub. Qeydiyyatdan keçməklə bu yaş tələbinə cavab verdiyinizi təsdiq edirsiniz. Hüquqi şəxs adından qeydiyyat aparan şəxs müvafiq səlahiyyətə malik olduğunu təsdiq edir.',
       'Hesab məlumatlarınızın və parolunuzun məxfiliyinə siz cavabdehsiniz. Hesabınızda baş verən hərəkətlər, icazəniz olmadan üçüncü şəxslərin müdaxiləsi sübut edilməyibsə, sizin hesabınıza aid edilə bilər.',
+      'Bir şəxs eyni vaxtda həm xidmət alan, həm də xidmət verən ola bilməz; hər rol üçün ayrı hesab tələb olunur.',
     ],
     list: [
-      'Bir şəxs üçün yalnız bir əsas hesab saxlamaq tövsiyə olunur; saxta və ya çoxsaylı hesablar qadağandır',
+      'Saxta, başqasının adından və ya çoxsaylı hesablar qadağandır',
       'Hesabınıza icazəsiz giriş aşkar etdikdə dərhal parolu dəyişin və bizimlə əlaqə saxlayın',
-      'Başqasının adından, saxta şəxsiyyətlə və ya qanunsuz məqsədlə hesab yaratmaq qadağandır',
       'Biz yanlış məlumat, təhlükəsizlik riski və ya Qaydaların pozulması halında hesabı yoxlaya, məhdudlaşdıra və ya bağlaya bilərik',
     ],
   },
@@ -76,15 +82,16 @@ const sections: {
     id: 'umumi-oveklik',
     title: '5. Ümumi istifadəçi öhdəlikləri',
     paragraphs: [
-      'Platformadan istifadə edərkən qanunvericiliyə, bu Qaydalara və digər dərc olunmuş siyasətlərə riayət etməlisiniz.',
+      'Platformadan istifadə edərkən qanunvericiliyə, bu Qaydalara və Məxfilik siyasətinə riayət etməlisiniz.',
     ],
     list: [
       'Dəqiq və aktual məlumat təqdim etmək',
       'Digər istifadəçilərə hörmətlə yanaşmaq, təhqir, təhdid və ayrı-seçkilikdən çəkinmək',
-      'Platformanın işinə zərər verən texniki müdaxilələrdən (hack, scraping, reverse engineering və s.) çəkinmək',
-      'Virus, zərərli kod və ya avtomatlaşdırılmış botlarla Platformaya zərər verməmək',
+      'Platformanın işinə zərər verən texniki müdaxilələrdən (icazəsiz daxilolma, avtomatik məlumat yığımı, proqram kodunun tərsinə açılması və s.) çəkinmək',
+      'Zərərli proqram və ya avtomatik vasitələrlə Platformaya zərər verməmək',
       'Üçüncü şəxslərin əqli mülkiyyət və şəxsi məlumat hüquqlarını pozmamaq',
       'Platformanı qanunsuz fəaliyyət, fırıldaqçılıq və ya aldatma üçün istifadə etməmək',
+      'Sifariş və mesajlarda yalnız doğru və qanuni məlumat yerləşdirmək',
     ],
   },
   {
@@ -97,7 +104,7 @@ const sections: {
       'Sifariş zamanı doğru ünvan, əlaqə və xidmətə dair zəruri məlumat vermək',
       'Razılaşdırılmış vaxtda xidmətin göstərilməsi üçün şərait yaratmaq (giriş, təhlükəsizlik və s.)',
       'Sifariş statusuna uyğun ləğv qaydalarına riayət etmək',
-      'Ödəniş mexanizmi aktiv olduqda razılaşdırılmış məbləği vaxtında ödəmək',
+      'Tərəflər arasında razılaşdırılmış xidmət haqqını vaxtında ödəmək (ödəniş hazırda Platforma daxilində aparılmır)',
       'Tamamlanmış xidmət barədə obyektiv və doğru rəy yazmaq',
       'Xidmət verənlə bağlı mübahisə yaranarsa, əvvəlcə tərəflər arasında, sonra Platforma dəstəyi vasitəsilə həllə cəhd etmək',
     ],
@@ -107,23 +114,25 @@ const sections: {
     title: '7. Xidmət verənin hüquq və öhdəlikləri',
     paragraphs: [
       'Xidmət verən Platformada xidmət elanı yerləşdirməklə təklifinin qanuni, dəqiq və icra edilə bilən olduğunu təsdiq edir.',
-      'Xidmət verən fəaliyyəti üçün tələb olunan lisenziya, icazə, vergi və digər hüquqi öhdəliklərə özü cavabdehdir. Platforma bu öhdəlikləri sizin adınızdan yerinə yetirmir.',
+      'Xidmət verən fəaliyyəti üçün tələb olunan lisenziya, icazə, vergi, sosial ödəniş və digər hüquqi öhdəliklərə özü cavabdehdir. Platforma bu öhdəlikləri sizin adınızdan yerinə yetirmir.',
+      'Təcili sifariş və ya «xidmətə açıq» statusu üçün cihazın yer məlumatına icazə verməklə bu məlumatın Məxfilik siyasətinə uyğun emalına razılıq verirsiniz.',
     ],
     list: [
       'Xidmət təsvirində doğru qiymət, müddət, əhatə və şərtlər göstərmək',
       'Qəbul etdiyi sifarişləri peşəkarlıqla və razılaşdırılmış vaxtda yerinə yetirmək',
-      'Müştəri məlumatlarını yalnız sifarişin icrası üçün istifadə etmək və məxfi saxlamaq',
+      'Xidmət alanın məlumatlarını yalnız sifarişin icrası üçün istifadə etmək və məxfi saxlamaq',
       'Qanunsuz, təhlükəli və ya lisenziyasız xidmətləri elan etməmək',
       'Süni reytinq, saxta rəy və ya aldadıcı reklam üsullarından istifadə etməmək',
-      'Sifarişi ləğv etdikdə və ya dəyişdirdikdə müştərini və Platformanı vaxtında məlumatlandırmaq',
-      'Platformanın komissiya və ya ödəniş qaydaları (tətbiq olunduqda) ilə razılaşmaq',
+      'Sifarişi ləğv etdikdə və ya dəyişdirdikdə xidmət alanı və Platformanı vaxtında məlumatlandırmaq',
+      'Tələb olunduqda kimlik təsdiqi sənədlərini doğru təqdim etmək',
+      'Şirkət hesabında komanda təyinatı doğru olsun; icraçı işçilərinizin hərəkətlərinə görə siz məsuliyyət daşıyırsınız',
     ],
   },
   {
     id: 'sifarisler',
     title: '8. Sifarişlər, ləğv və dəyişiklik',
     paragraphs: [
-      'Sifariş Platformada yaradıldıqda müvafiq statuslarla (məsələn, gözləmədə, təsdiqlənib, tamamlanıb, ləğv edilib) izlənilir. Statusların dəqiq siyahısı Platformanın cari funksionallığına uyğun dəyişə bilər.',
+      'Sifariş Platformada yaradıldıqda müvafiq statuslarla (məsələn, gözləmədə, təsdiqlənib, yolda, tamamlanıb, ləğv edilib) izlənilir. Statusların dəqiq siyahısı Platformanın cari funksiyalarına uyğun dəyişə bilər.',
       'Sifarişin ləğvi və dəyişdirilməsi sifarişin statusundan, tərəflərin razılığından və Platformada göstərilən qaydalardan asılıdır. Əsassız və təkrarlanan ləğvlər hesab məhdudiyyətinə səbəb ola bilər.',
     ],
     subsections: [
@@ -136,7 +145,20 @@ const sections: {
       {
         title: '8.2. Ləğv',
         paragraphs: [
-          'Ləğv imkanları kabinetinizdə və/və ya sifariş detallarında göstərilir. Artıq başlanmış və ya tamamlanmış xidmət üzrə ləğv məhdudlaşdırıla bilər. Ödəniş funksiyası aktiv olduqda geri ödəniş (refund) qaydaları ayrıca tətbiq oluna bilər.',
+          'Ləğv imkanları kabinetinizdə və ya sifariş təfərrüatlarında göstərilir. Artıq başlanmış və ya tamamlanmış xidmət üzrə ləğv məhdudlaşdırıla bilər. Gələcəkdə Platforma daxilində ödəniş aktiv olsa, geri qaytarma qaydaları ayrıca dərc olunacaq.',
+        ],
+      },
+      {
+        title: '8.3. Təcili sifariş',
+        paragraphs: [
+          '«İndi çağır» və oxşar təcili sifariş yaxınlıqdakı xidmətə açıq icraçılara təklif göndərir. Qəbul edilməzsə, axtarış pəncərəsi bitdikdə sifariş avtomatik ləğv oluna bilər. Xidmət alan qiyməti qəbul etmədikdə başqa icraçı axtara bilər; bu, əvvəlki icraçı üçün öhdəlik yaratmır.',
+          'Təcili sifarişdə ünvan və (verildikdə) mövqe məlumatı yalnız axtarış və icra üçün istifadə olunur.',
+        ],
+      },
+      {
+        title: '8.4. Mesajlaşma',
+        paragraphs: [
+          'Sifarişə bağlı yazışmalar xidmətin razılaşdırılması üçündür. Təhqir, təhdid, qanunsuz təklif və Platformadan kənar fırıldaqçılıq qadağandır. Mübahisə və təhlükəsizlik üçün yazışmalar saxlanıla bilər.',
         ],
       },
     ],
@@ -145,28 +167,27 @@ const sections: {
     id: 'odenisler',
     title: '9. Qiymətlər, ödəniş və komissiya',
     paragraphs: [
-      'Xidmət qiymətləri xidmət verənlər tərəfindən müəyyən edilir və Platformada göstərilir. Qiymətlər Azərbaycan manatı (AZN) və ya Platformada qeyd olunan digər valyutada ifadə oluna bilər.',
-      'Hal-hazırda Platforma xidmət verənlərdən və xidmət alanlardan heç bir komissiya, abunə və ya platforma haqqı tutmur. Ödəniş (əgər lazımdırsa) tərəflər arasında birbaşa razılaşdırılır; Platforma daxilində ödəniş/hold/capture mexanizmi yoxdur.',
-      'Gələcəkdə daxili ödəniş və ya komissiya tətbiq edilərsə, müvafiq şərtlər Platformada əlavə olaraq dərc olunacaq və bu Qaydaların tərkib hissəsi hesab ediləcək.',
+      'Xidmət qiymətləri xidmət verənlər tərəfindən müəyyən edilir və Platformada Azərbaycan manatı ilə və ya elanda qeyd olunan qaydada göstərilir.',
+      'Hal-hazırda Platforma xidmət verənlərdən və xidmət alanlardan komissiya, abunə və ya platforma haqqı tutmur. Xidmət haqqı tərəflər arasında birbaşa (nağd və ya öz razılaşmalarına uyğun digər üsulla) ödənilir; Platforma daxilində kartla ödəniş, məbləğin tutulması və ya saxlanması yoxdur.',
+      'Gələcəkdə daxili ödəniş və ya komissiya tətbiq edilərsə, müvafiq şərtlər Platformada əlavə olaraq dərc olunacaq və bu Qaydaların tərkib hissəsi hesab ediləcək. Belə dəyişiklik mühüm şərt sayılır və barədə məlumat veriləcək.',
     ],
     list: [
-      'Hal-hazırda xidmət verənlərdən Platforma haqqı / komissiya alınmır',
-      'Xidmət haqqı (müştəri ↔ xidmət verən) tərəflərin öz razılaşmasına əsasən ödənilir',
+      'Hal-hazırda xidmət verənlərdən Platforma haqqı və ya komissiya alınmır',
+      'Xidmət haqqı xidmət alan ilə xidmət verən arasında razılaşmaya əsasən ödənilir',
       'Vergi, sosial ödəniş və digər dövlət öhdəlikləri hər tərəfin öz qanuni məsuliyyətidir',
-      'Qiymət və komissiya dəyişiklikləri barədə Platformada əvvəlcədən məlumat veriləcək',
     ],
   },
   {
     id: 'reyting',
     title: '10. Reytinq və rəylər',
     paragraphs: [
-      'Reytinq və rəy sistemi digər istifadəçilərə obyektiv seçim etməyə kömək etmək üçündür. Rəylər yalnız real sifariş təcrübəsinə əsaslanmalıdır.',
+      'Reytinq və rəy sistemi digər istifadəçilərə obyektiv seçim etməyə kömək etmək üçündür. Rəylər yalnız real, tamamlanmış sifariş təcrübəsinə əsaslanmalıdır.',
     ],
     list: [
       'Saxta, alınmış və ya qarşılıqlı razılaşma ilə süni reytinq yaratmaq qadağandır',
       'Təhqiredici, böhtanlı və ya qanunsuz məzmunlu rəylər silinə bilər',
       'Platforma reytinq manipulyasiyası aşkar etdikdə rəyi gizlədə və hesabı məhdudlaşdıra bilər',
-      'Reytinq statistikası alqoritmik və ədalətli göstəricilərə əsasən hesablana bilər',
+      'Reytinq orta göstərici və Platformanın dərc etdiyi qaydalara əsasən hesablana bilər',
     ],
   },
   {
@@ -176,11 +197,11 @@ const sections: {
     list: [
       'Qanunsuz, lisenziyasız və ya təhlükəli xidmətlərin təklif edilməsi',
       'Fırıldaqçılıq, saxta sənəd, şəxsiyyət oğurluğu',
-      'Spam, istənməyən reklam və digər istifadəçilərin narahat edilməsi',
+      'İstənməyən reklam və digər istifadəçilərin narahat edilməsi',
       'Platformanı rəqib məhsula yönləndirmək üçün sistematik sui-istifadə',
       'Digər istifadəçilərin əlaqə məlumatlarını icazəsiz toplamaq və ya satmaq',
       'Uşaq əməyi, ayrı-seçkilik və ya zorakılıq təşviq edən məzmun',
-      'Platformanın təhlükəsizlik və ya ödəniş sistemlərini pozmağa cəhd',
+      'Platformanın təhlükəsizlik sistemlərini pozmağa cəhd',
     ],
   },
   {
@@ -188,29 +209,30 @@ const sections: {
     title: '12. Əqli mülkiyyət',
     paragraphs: [
       'Platformanın dizaynı, loqosu, proqram təminatı, mətnləri, qrafikası və digər brend elementləri Xidmətala və ya müvafiq hüquq sahiblərinə məxsusdur. Bu materialların icazəsiz surəti, dəyişdirilməsi və kommersiya istifadəsi qadağandır.',
-      'İstifadəçi Platformaya məzmun (elan, şəkil, rəy və s.) yerləşdirməklə həmin məzmuna dair lazımi hüquqlara malik olduğunu təsdiq edir və Platformaya məzmunu Platformanın fəaliyyəti çərçivəsində göstərmək, saxlamaq və texniki cəhətdən emal etmək üçün qeyri-eksklüziv, ödənişsiz lisenziya verir.',
-      'Hüquq pozuntusu barədə müraciət üçün legal@xidmetal.com ünvanına yazın.',
+      'İstifadəçi Platformaya məzmun (elan, şəkil, rəy və s.) yerləşdirməklə həmin məzmuna dair lazımi hüquqlara malik olduğunu təsdiq edir və Platformaya məzmunu Platformanın fəaliyyəti çərçivəsində göstərmək, saxlamaq və texniki cəhətdən emal etmək üçün müstəsna olmayan, ödənişsiz icazə verir. Bu icazə məzmun silinənə və ya hesab bağlanana qədər, habelə qanuni saxlama müddəti ərzində qüvvədə qalır.',
+      'Hüquq pozuntusu barədə müraciət üçün info@xidmetal.com ünvanına yazın.',
     ],
   },
   {
     id: 'mesuliyyet',
     title: '13. Məsuliyyətin məhdudlaşdırılması',
     paragraphs: [
-      'Qanunvericiliyin yol verdiyi maksimum həddə Platforma aşağıdakılara görə məsuliyyət daşımır:',
+      'Qanunvericiliyin yol verdiyi həddə və istehlakçıların məcburi hüquqları saxlanılmaqla Platforma aşağıdakılara görə məsuliyyət daşımır:',
     ],
     list: [
       'Xidmət verən ilə xidmət alan arasında yaranan xidmətin keyfiyyəti, gecikmə, zərər və ya itki',
       'İstifadəçilərin verdiyi məlumatların düzgünlüyü və tamlığı',
-      'Üçüncü tərəf xidmətləri, ödəniş provayderləri və ya xarici keçidlər',
-      'İnternet kəsintisi, texniki nasazlıq, texniki xidmət və fors-major halları',
+      'Üçüncü tərəf xidmətləri, xarici keçidlər və xəritə göstərilməsi',
+      'İnternet kəsintisi, texniki nasazlıq, texniki xidmət və qarşısıalınmaz qüvvə halları',
       'İstifadəçinin öz hesab məlumatlarını qoruya bilməməsi nəticəsində yaranan zərər',
     ],
     subsections: [
       {
         title: '13.1. Məsuliyyət həddi',
         paragraphs: [
-          'Qanunvericiliklə məcburi məsuliyyət halları istisna olmaqla, Platformanın ümumi məsuliyyəti son 12 (on iki) ay ərzində sizin Platformaya ödədiyiniz xidmət haqqı / komissiya məbləği ilə məhdudlaşır. Belə ödəniş olmadıqda məsuliyyət qanunvericiliyin yol verdiyi minimum həddə məhdudlaşdırılır.',
-          'Heç bir halda Platforma dolayı, təsadüfi, cərimə xarakterli və ya mənfəət itkisi ilə bağlı zərərlərə görə məsuliyyət daşımır — belə zərərin ehtimalı barədə xəbərdar edilmiş olsaydıq belə.',
+          'Qanunvericiliklə istisna edilə bilməyən məsuliyyət (o cümlədən qəsd, ağır ehtiyatsızlıq və istehlakçının məcburi hüquqları) saxlanılır.',
+          'Bundan başqa, Platformanın təqsiri ilə vurulmuş birbaşa zərərə görə məsuliyyət, son 12 (on iki) ay ərzində sizin Platformaya ödədiyiniz xidmət haqqı və ya komissiya məbləği ilə məhdudlaşır. Belə ödəniş olmadıqda Platforma yalnız özünün sübut edilmiş təqsiri nəticəsində vurulmuş birbaşa zərərə görə, qanunun yol verdiyi həddə cavabdehdir.',
+          'Dolayı zərər, mənfəət itkisi və cərimə xarakterli tələblərə görə Platforma, qanun bunu qadağan etmədiyi halda, məsuliyyət daşımır.',
         ],
       },
     ],
@@ -219,15 +241,15 @@ const sections: {
     id: 'zemanet',
     title: '14. Zəmanətlərin rəddi',
     paragraphs: [
-      'Platforma «olduğu kimi» (as is) və «mövcud olduğu kimi» (as available) təqdim olunur. Qanunvericiliyin yol verdiyi həddə açıq və ya dolayısı ilə hər hansı ticarətə yararlılıq, müəyyən məqsədə uyğunluq və pozulmazlıq zəmanətləri rədd edilir.',
+      'Platforma mövcud vəziyyətdə, «olduğu kimi» təqdim olunur. Qanunvericiliyin yol verdiyi həddə ticarətə yararlılıq, müəyyən məqsədə uyğunluq və hüquq pozuntusunun olmaması barədə əlavə zəmanətlər verilmir.',
       'Platformanın fasiləsiz, xətasız və ya təhlükəsiz işləyəcəyinə dair zəmanət vermirik. Funksiyalar vaxtaşırı dəyişdirilə, dayandırıla və ya yenilənə bilər.',
     ],
   },
   {
-    id: 'indemnifikasiya',
-    title: '15. Zərərin ödənilməsi (indemnifikasiya)',
+    id: 'zererin-odenilmesi',
+    title: '15. Zərərin ödənilməsi',
     paragraphs: [
-      'Bu Qaydaları, qanunvericiliyi və ya üçüncü şəxslərin hüquqlarını pozmağınız nəticəsində yaranan iddia, zərər, cərimə və hüquqi xərclərə görə Platformanı, onun idarəçilərini və əməkdaşlarını qorumağı və zərəri ödəməyi öhdəyə götürürsünüz.',
+      'Bu Qaydaları, qanunvericiliyi və ya üçüncü şəxslərin hüquqlarını pozmağınız nəticəsində Platformaya, onun idarəçilərinə və əməkdaşlarına qarşı irəli sürülən əsaslı iddia, zərər, cərimə və məhkəmə xərclərini qanunun yol verdiyi həddə ödəməyi öhdəyə götürürsünüz. Bu müddəa istehlakçının qanunla qorunan hüquqlarını məhdudlaşdırmır.',
     ],
   },
   {
@@ -235,7 +257,7 @@ const sections: {
     title: '16. Hesabın dayandırılması və ləğvi',
     paragraphs: [
       'İstədiyiniz zaman hesabınızı bağlamaq üçün bizimlə əlaqə saxlaya və ya mövcud hesab parametrlərindən istifadə edə bilərsiniz. Aktiv sifarişlər və qanuni saxlama öhdəlikləri olduqda bağlanma prosesi tamamlanana qədər müəyyən məlumatlar saxlanıla bilər.',
-      'Biz Qaydaların pozulması, fırıldaqçılıq şübhəsi, digər istifadəçilərin hüquqlarının pozulması və ya Platformanın təhlükəsizliyi üçün risk yaradan hallarda hesabı xəbərdarlıqla və ya təcili hallarda xəbərdarlıqsız məhdudlaşdıra, dayandıra və ya silə bilərik.',
+      'Biz Qaydaların pozulması, fırıldaqçılıq şübhəsi, digər istifadəçilərin hüquqlarının pozulması və ya Platformanın təhlükəsizliyi üçün risk yaradan hallarda hesabı xəbərdarlıqla və ya təcili hallarda xəbərdarlıqsız məhdudlaşdıra, dayandıra və ya silə bilərik. Mümkün olduqda səbəb barədə qısa məlumat veriləcək.',
     ],
   },
   {
@@ -243,7 +265,7 @@ const sections: {
     title: '17. Məxfilik',
     paragraphs: [
       'Şəxsi məlumatlarınızın emalı ayrıca Məxfilik siyasəti ilə tənzimlənir. Platformadan istifadə etməklə Məxfilik siyasətinin şərtlərini də qəbul etmiş olursunuz.',
-      'Ətraflı məlumat üçün /privacy səhifəsinə baxın.',
+      'Ətraflı məlumat üçün bu saytdakı Məxfilik siyasəti səhifəsinə baxın.',
     ],
   },
   {
@@ -251,8 +273,8 @@ const sections: {
     title: '18. Qaydaların dəyişdirilməsi',
     paragraphs: [
       'Biz bu Qaydaları vaxtaşırı yeniləyə bilərik. Yenilənmiş versiya Platformada dərc edildiyi andan qüvvəyə minir, əgər daha gec tarix göstərilməyibsə.',
-      'Mühüm dəyişikliklər barədə e-poçt və/və ya Platforma daxilində bildiriş göndərə bilərik. Dəyişikliklərdən sonra istifadəni davam etdirməyiniz yenilənmiş Qaydalarla razılaşdığınızı bildirir.',
-      'Dəyişikliklərlə razı deyilsinizsə, hesabınızı bağlayıb Platformadan istifadəni dayandırmalısınız.',
+      'Mühüm dəyişikliklər (ödəniş, komissiya, məsuliyyət həddi və ya əsas hüquqlar) barədə e-poçt və ya Platforma daxilində bildiriş göndərməyə çalışacağıq. Dəyişikliklərlə razı deyilsinizsə, hesabınızı bağlayıb istifadəni dayandırmalısınız.',
+      'Qanun istehlakçıya əlavə müdafiə verdikdə, həmin müdafiə bu Qaydalardan üstün tutulur.',
     ],
   },
   {
@@ -260,7 +282,7 @@ const sections: {
     title: '19. Tətbiq olunan hüquq və mübahisələr',
     paragraphs: [
       'Bu Qaydalar Azərbaycan Respublikasının qanunvericiliyinə uyğun tənzimlənir və şərh edilir.',
-      'Mübahisələr əvvəlcə danışıqlar yolu ilə həll edilməlidir. Razılıq əldə olunmadıqda mübahisələrə Azərbaycan Respublikasının səlahiyyətli məhkəmələri baxır — qanunvericiliklə istehlakçıya verilən məcburi hüquqlar saxlanılmaqla.',
+      'Mübahisələr əvvəlcə danışıqlar yolu ilə həll edilməlidir. Razılıq əldə olunmadıqda mübahisələrə Azərbaycan Respublikasının səlahiyyətli məhkəmələri baxır. İstehlakçı qanunvericiliyə uyğun olaraq öz yaşayış yeri üzrə məhkəməyə müraciət etmək hüququnu saxlayır.',
       'İstehlakçı hüquqlarının müdafiəsi ilə bağlı qanunvericilikdə nəzərdə tutulmuş hüquqlar bu Qaydalarla məhdudlaşdırıla bilməz.',
     ],
   },
@@ -271,29 +293,50 @@ const sections: {
     list: [
       'Bu Qaydaların hər hansı müddəası etibarsız hesab edilsə, qalan müddəalar qüvvədə qalır.',
       'Hüququmuzdan istifadə etməməyimiz ondan imtina demək deyil.',
-      'Bu Qaydalar tərəflər arasındakı razılaşmanın tam mətnini təşkil edir və əvvəlki şifahi/yazılı razılaşmaları əvəz edir (ayrıca yazılı müqavilə istisna olmaqla).',
+      'Bu Qaydalar tərəflər arasındakı razılaşmanın tam mətnini təşkil edir və əvvəlki şifahi və yazılı razılaşmaları əvəz edir (ayrıca yazılı müqavilə istisna olmaqla).',
       'Qaydaları üçüncü şəxslərə ötürmə hüququ olmadan qəbul edirsiniz; biz Platformanın idarəetmə hüququnu hüquqi varislərə ötürə bilərik.',
-      'Fors-major (təbii fəlakət, müharibə, dövlət qərarları, internet infrastrukturunun kütləvi sıradan çıxması və s.) hallarında öhdəliklərin yerinə yetirilməməsi məsuliyyət doğurmur.',
+      'Qarşısıalınmaz qüvvə (təbii fəlakət, müharibə, dövlət qərarları, internet infrastrukturunun kütləvi sıradan çıxması və s.) hallarında öhdəliklərin yerinə yetirilməməsi məsuliyyət doğurmur.',
     ],
   },
   {
     id: 'elaqe',
     title: '21. Əlaqə',
     paragraphs: [
-      'İstifadə qaydaları ilə bağlı sual, bildiriş və hüquqi müraciətlərinizi aşağıdakı ünvanlara göndərə bilərsiniz:',
+      'İstifadə qaydaları ilə bağlı sual, bildiriş və hüquqi müraciətlərinizi aşağıdakı vasitələrlə göndərə bilərsiniz:',
     ],
     list: [
-      'Hüquqi müraciətlər: legal@xidmetal.com',
-      'Ümumi əlaqə: info@xidmetal.com',
+      'E-poçt: info@xidmetal.com',
       'Ünvan: Bakı, Azərbaycan',
-      'Əlaqə forması: /contact səhifəsi',
+      'Əlaqə səhifəsi vasitəsilə yazılı müraciət',
     ],
   },
 ];
 
 export default function TermsPage() {
+  const siteUrl = getSiteUrl();
   return (
     <>
+      <JsonLd
+        data={[
+          buildBreadcrumbJsonLd(siteUrl, [
+            { name: 'Ana səhifə', path: '/' },
+            { name: 'İstifadə qaydaları', path: '/terms' },
+          ]),
+          buildWebPageJsonLd(siteUrl, {
+            name: 'İstifadə qaydaları',
+            description:
+              'Xidmətal platformasının istifadə şərtləri, tərəflərin hüquq və öhdəlikləri, sifariş və məsuliyyət qaydaları.',
+            path: '/terms',
+            dateModified: '2026-08-31',
+          }),
+        ]}
+      />
+      <PageBreadcrumbs
+        items={[
+          { href: '/', label: 'Ana səhifə' },
+          { label: 'İstifadə qaydaları' },
+        ]}
+      />
       <section className="relative overflow-hidden bg-gradient-to-b from-brand/15 via-brand/5 to-background">
         <div className="mx-auto max-w-7xl px-4 pt-16 pb-12 sm:px-6 lg:px-8 lg:pt-24">
           <div className="mx-auto max-w-3xl text-center">
@@ -308,7 +351,7 @@ export default function TermsPage() {
               barədə hüquqi çərçivə.
             </p>
             <p className="mt-4 text-sm text-muted-foreground">
-              Son yenilənmə: <time dateTime="2026-08-02">{LAST_UPDATED}</time>
+              Son yenilənmə: <time dateTime="2026-08-31">{LAST_UPDATED}</time>
             </p>
           </div>
         </div>
@@ -344,8 +387,8 @@ export default function TermsPage() {
             <article className="lg:col-span-9">
               <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-10">
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  Bu sənəd {APP.name} marketplace platformasının istifadə şərtlərini müəyyən
-                  edir. Qeydiyyat və ya Platformadan istifadə bu Qaydaların qəbulu hesab olunur.
+                  Bu sənəd {APP.name} platformasının istifadə şərtlərini müəyyən edir.
+                  Qeydiyyat və ya Platformadan istifadə bu Qaydaların qəbulu hesab olunur.
                   Məxfiliklə bağlı ətraflı məlumat üçün{' '}
                   <Link
                     href="/privacy"
@@ -415,10 +458,10 @@ export default function TermsPage() {
                     <p className="mt-2 text-sm leading-relaxed text-brand-foreground/80">
                       İstifadə qaydaları ilə bağlı müraciətinizi{' '}
                       <a
-                        href="mailto:legal@xidmetal.com"
+                        href="mailto:info@xidmetal.com"
                         className="font-medium underline underline-offset-2 hover:text-brand-foreground"
                       >
-                        legal@xidmetal.com
+                        info@xidmetal.com
                       </a>{' '}
                       ünvanına göndərə və ya{' '}
                       <Link

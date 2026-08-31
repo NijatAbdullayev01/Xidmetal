@@ -55,6 +55,7 @@ function makeService(prisma: unknown) {
     {} as never,
     {} as never,
     { findExisting: vi.fn() } as never,
+    {} as never,
   );
 }
 
@@ -69,7 +70,7 @@ describe('BookingsService.findById', () => {
     ).rejects.toThrow('Sifariş tapılmadı');
   });
 
-  it('iştirakçı olmayan müştəriyə icazə vermir', async () => {
+  it('iştirakçı olmayan xidmət alana icazə vermir', async () => {
     const service = makeService({
       booking: { findUnique: vi.fn().mockResolvedValue(bookingRow()) },
     });
@@ -79,7 +80,7 @@ describe('BookingsService.findById', () => {
     ).rejects.toThrow('Sifariş tapılmadı');
   });
 
-  it('müştəri iştirakçısına sifarişi qaytarır', async () => {
+  it('xidmət alan iştirakçısına sifarişi qaytarır', async () => {
     const service = makeService({
       booking: { findUnique: vi.fn().mockResolvedValue(bookingRow()) },
     });
@@ -189,7 +190,7 @@ describe('BookingsService.create', () => {
 });
 
 describe('BookingsService.skipProvider', () => {
-  it('iştirakçı olmayan müştəriyə icazə vermir', async () => {
+  it('iştirakçı olmayan xidmət alana icazə vermir', async () => {
     const service = makeService({
       booking: {
         findUnique: vi.fn().mockResolvedValue(
@@ -254,7 +255,7 @@ describe('BookingsService.findAll', () => {
     };
   }
 
-  it('müştəri siyahısında sifariş nömrəsini status ilə AND edir', async () => {
+  it('xidmət alan siyahısında sifariş nömrəsini status ilə AND edir', async () => {
     const prisma = listPrisma();
     const service = makeService(prisma);
 

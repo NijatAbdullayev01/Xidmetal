@@ -1,14 +1,8 @@
 import type { MetadataRoute } from 'next';
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3120';
+import { isPublicComingSoonEnabled } from '@/lib/coming-soon';
+import { buildRobotsConfig } from '@/lib/robots-config';
+import { getSiteUrl } from '@/lib/site-url';
 
 export default function robots(): MetadataRoute.Robots {
-  return {
-    rules: {
-      userAgent: '*',
-      allow: '/',
-      disallow: ['/dashboard/', '/api/'],
-    },
-    sitemap: `${APP_URL}/sitemap.xml`,
-  };
+  return buildRobotsConfig(getSiteUrl(), isPublicComingSoonEnabled());
 }

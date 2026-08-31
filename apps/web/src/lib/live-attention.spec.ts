@@ -9,7 +9,7 @@ import {
 } from './live-attention';
 
 describe('dashboard attention paths', () => {
-  it('xidmət verən və müştəri kabinetinə ayırır', () => {
+  it('xidmət verən və xidmət alan kabinetinə ayırır', () => {
     expect(dashboardNotificationsPath(UserRole.PROVIDER)).toBe(
       '/dashboard/provider/notifications',
     );

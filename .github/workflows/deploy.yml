@@ -85,7 +85,7 @@ jobs:
             NEXT_PUBLIC_FCM_PROJECT_ID=${{ vars.NEXT_PUBLIC_FCM_PROJECT_ID }}
             NEXT_PUBLIC_FCM_APP_ID=${{ vars.NEXT_PUBLIC_FCM_APP_ID }}
             NEXT_PUBLIC_FCM_MESSAGING_SENDER_ID=${{ vars.NEXT_PUBLIC_FCM_MESSAGING_SENDER_ID }}
-            NEXT_PUBLIC_COMING_SOON=${{ vars.NEXT_PUBLIC_COMING_SOON }}
+            NEXT_PUBLIC_COMING_SOON=false
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:latest
             ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ github.sha }}

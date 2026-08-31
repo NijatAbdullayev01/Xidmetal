@@ -1,4 +1,6 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
+import { APP } from '@xidmetal/shared';
 import Link from 'next/link';
 import {
   Search,
@@ -20,9 +22,25 @@ import { UrgentOrderButton } from '@/components/home/urgent-order-button';
 import { HomeCategoriesSkeleton } from '@/components/ui/page-skeletons';
 import { api } from '@/lib/api';
 import { getCategoryIcon } from '@/lib/category-icons';
+import { JsonLd } from '@/components/seo/json-ld';
+import {
+  buildCategoriesItemListJsonLd,
+  buildWebPageJsonLd,
+} from '@/lib/seo-schema';
+import { pageMetadata } from '@/lib/seo';
+import { getSiteUrl } from '@/lib/site-url';
+import { FAQ_ITEMS } from '@/lib/faq-items';
+import { bakuCategoryPath, PUBLIC_CATEGORY_HUBS } from '@/lib/seo-hubs';
 
-/** Kateqoriyalar ISR ilə yenilənir — hər soft nav-də API gözlədilmir */
 export const revalidate = 60;
+
+export const metadata: Metadata = pageMetadata({
+  title: `${APP.name} — lazım olan xidməti asanlıqla tapın`,
+  description:
+    'Xidmətal xidmət verənlərlə xidmət alanları bir araya gətirən etibarlı platformadır. Təmizlik, təmir, gözəllik və daha çoxu — Bakı və Azərbaycanda bir yerdə.',
+  canonical: '/',
+  absoluteTitle: true,
+});
 
 const FALLBACK_CATEGORIES: {
   icon: LucideIcon;
@@ -72,7 +90,7 @@ const features = [
   {
     icon: Search,
     title: 'Asan axtarış',
-    description: 'Minlərlə xidmət arasından ehtiyacınıza uyğun olanı tapın.',
+    description: 'Kateqoriyalar və axtarış ilə ehtiyacınıza uyğun xidməti tapın.',
   },
   {
     icon: Shield,
@@ -125,6 +143,7 @@ async function HomeCategories() {
 
   return (
     <section className="pt-4 pb-12 sm:pt-6 sm:pb-20">
+      <JsonLd data={buildCategoriesItemListJsonLd(getSiteUrl(), categoryCards)} />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
           Xidmətlər
@@ -186,8 +205,19 @@ async function HomeCategories() {
 }
 
 export default function HomePage() {
+  const siteUrl = getSiteUrl();
+  const homeFaqs = FAQ_ITEMS.slice(0, 4);
+
   return (
     <>
+      <JsonLd
+        data={buildWebPageJsonLd(siteUrl, {
+          name: `${APP.name} — lazım olan xidməti asanlıqla tapın`,
+          description:
+            'Xidmətal xidmət verənlərlə xidmət alanları bir araya gətirən etibarlı platformadır. Təmizlik, təmir, gözəllik və daha çoxu — Bakı və Azərbaycanda bir yerdə.',
+          path: '/',
+        })}
+      />
       {/* Hero — data gözləmədən dərhal stream olunur */}
       <section className="relative overflow-hidden bg-gradient-to-b from-brand/10 to-background">
         <div className="mx-auto max-w-7xl px-4 pt-12 pb-0 sm:px-6 sm:pt-20 lg:px-8 lg:pt-28">
@@ -236,6 +266,68 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="py-16 sm:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl">
+            <h2 className="text-3xl font-bold tracking-tight">Bakıda xidmətlər</h2>
+            <p className="mt-3 text-muted-foreground">
+              Ən çox axtarılan kateqoriyalar üzrə Bakı elanlarına birbaşa keçin — qiymət,
+              reytinq və rəyləri müqayisə edin.
+            </p>
+          </div>
+          <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {PUBLIC_CATEGORY_HUBS.map((category) => (
+              <li key={category.slug}>
+                <Link
+                  href={bakuCategoryPath(category.slug)}
+                  className="flex min-h-11 items-center justify-center rounded-xl border border-border bg-card px-3 py-3 text-center text-sm font-medium transition-colors hover:border-brand/50 hover:text-brand-dark"
+                >
+                  Bakıda {category.name.toLocaleLowerCase('az')}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-6 text-sm">
+            <Link
+              href="/how-it-works"
+              className="font-medium text-brand-dark underline-offset-2 hover:underline"
+            >
+              Necə işləyir?
+            </Link>
+            <span className="text-muted-foreground"> — sifarişdən rəyə qədər 5 addım.</span>
+          </p>
+        </div>
+      </section>
+
+      <section className="border-t border-border bg-muted/30 py-16 sm:py-20">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+          <h2 className="text-center text-3xl font-bold tracking-tight">Tez-tez verilən suallar</h2>
+          <div className="mt-8 space-y-3">
+            {homeFaqs.map((faq) => (
+              <details
+                key={faq.question}
+                className="group rounded-xl border border-border bg-card shadow-sm [&_summary::-webkit-details-marker]:hidden"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-medium transition-colors hover:text-brand-dark">
+                  {faq.question}
+                </summary>
+                <div className="border-t border-border px-5 py-4 text-sm leading-relaxed text-muted-foreground">
+                  {faq.answer}
+                </div>
+              </details>
+            ))}
+          </div>
+          <p className="mt-6 text-center text-sm">
+            <Link
+              href="/faq"
+              className="font-medium text-brand-dark underline-offset-2 hover:underline"
+            >
+              Bütün suallara bax
+            </Link>
+          </p>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -244,7 +336,7 @@ export default function HomePage() {
               Xidmət verməyə hazırsınız?
             </h2>
             <p className="mt-4 text-brand-foreground/80">
-              Xidmət verən kimi qeydiyyatdan keçin və minlərlə potensial müştəriyə çatın.
+              Xidmət verən kimi qeydiyyatdan keçin və yeni xidmət alanlara çatın.
             </p>
             <BecomeProviderLink className="mt-8 inline-flex items-center gap-2 rounded-lg bg-brand-foreground px-6 py-3 font-medium text-brand transition-colors hover:bg-brand-foreground/90">
               İndi başla

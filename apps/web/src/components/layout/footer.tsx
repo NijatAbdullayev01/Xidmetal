@@ -19,7 +19,11 @@ const footerSections: { key: string; title: string; links: FooterLink[] }[] = [
     key: 'platform',
     title: 'Platforma',
     links: [
-      { href: '/faq', label: 'Tez-tez verilən suallar' },
+      { href: '/services', label: 'Xidmətlər' },
+            { href: '/categories', label: 'Kateqoriyalar' },
+            { href: '/categories/temizlik', label: 'Təmizlik' },
+            { href: '/categories/temir', label: 'Təmir' },
+            { href: '/faq', label: 'Tez-tez verilən suallar' },
       { href: '/how-it-works', label: 'Necə işləyir?' },
       { href: '/terms', label: 'İstifadə qaydaları' },
     ],

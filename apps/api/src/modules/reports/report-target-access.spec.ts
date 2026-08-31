@@ -25,7 +25,7 @@ describe('report-target-access', () => {
     expect(mayReportBooking({ reporterId: 'c1', booking: null })).toBe(false);
   });
 
-  it('service — müştəri booking tarixçəsi + öz xidmət yox', () => {
+  it('service — xidmət alan booking tarixçəsi + öz xidmət yox', () => {
     expect(
       mayReportService({
         reporterId: 'c1',

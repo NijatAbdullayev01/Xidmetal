@@ -16,7 +16,12 @@ export function isComingSoonExemptPath(pathname: string): boolean {
     pathname === '/apple-touch-icon.png' ||
     pathname === '/apple-touch-icon-precomposed.png' ||
     pathname === '/logo.png' ||
-    pathname === '/logo-transparent.png'
+    pathname === '/logo-transparent.png' ||
+    pathname === '/google3ca31a5fa705ff79.html' ||
+    pathname === '/opengraph-image' ||
+    pathname === '/twitter-image' ||
+    pathname.startsWith('/opengraph-image') ||
+    pathname.startsWith('/twitter-image')
   ) {
     return true;
   }

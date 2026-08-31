@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
 import { MapPin, Wifi, User, Briefcase, Ruler, Route, Store, Home, type LucideIcon } from 'lucide-react';
 import type { ServiceSummary } from '@xidmetal/shared';
 import {
@@ -9,6 +11,8 @@ import {
   formatServiceVenue,
   ServiceVenue,
   toDisplayMediaUrl,
+  servicePublicPath,
+  providerPublicPath,
 } from '@xidmetal/shared';
 import { formatPrice, cn } from '@/lib/utils';
 import { ServiceOrderButton } from '@/components/services/service-order-button';
@@ -35,12 +39,15 @@ function ProviderAvatar({
 
   if (avatarUrl) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={toDisplayMediaUrl(avatarUrl)}
-        alt={`${name} profil şəkli`}
-        className="h-11 w-11 rounded-full object-cover"
-      />
+      <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full">
+        <Image
+          src={toDisplayMediaUrl(avatarUrl)}
+          alt={`${name} profil şəkli`}
+          fill
+          sizes="44px"
+          className="object-cover"
+        />
+      </span>
     );
   }
 
@@ -171,7 +178,12 @@ export function ServiceCard({
           ) : null}
 
           <h3 className="line-clamp-2 text-base font-semibold leading-snug tracking-tight text-foreground sm:text-[1.05rem]">
-            {service.title}
+            <Link
+              href={servicePublicPath(service)}
+              className="pointer-events-auto hover:text-brand-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            >
+              {service.title}
+            </Link>
           </h3>
 
           {service.description ? (
@@ -249,7 +261,12 @@ export function ServiceCard({
             />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-foreground">
-                {service.providerName}
+                <Link
+                  href={providerPublicPath(service.providerId)}
+                  className="pointer-events-auto hover:text-brand-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                >
+                  {service.providerName}
+                </Link>
               </p>
               <div className="mt-1">
                 {hasReviews ? (

@@ -2,7 +2,7 @@
 
 Bu sənəd Xidmətal-ın **real-time, on-demand** platformaya çevrilməsi üçün lazım olan hədəf arxitekturanı təsvir edir.
 
-> **Kontekst:** İstifadəçi xidməti rezerv edir → xidmət verəni çağırır → xidmət verən yolda olduqda xəritədə **canlı izlənir** → iş bitdikdə tamamlanır → müştəri **rəy verir**.
+> **Kontekst:** İstifadəçi xidməti rezerv edir → xidmət verəni çağırır → xidmət verən yolda olduqda xəritədə **canlı izlənir** → iş bitdikdə tamamlanır → xidmət alan **rəy verir**.
 >
 > Mövcud arxitektura klassik "randevu/booking" platformasıdır. Bu sənəd aradakı boşluğu bağlayan hədəf vəziyyəti müəyyən edir. Mövcud vəziyyət üçün [ARCHITECTURE.md](./ARCHITECTURE.md)-ə baxın.
 
@@ -72,7 +72,7 @@ Cari vəziyyət üçün: [ARCHITECTURE.md](./ARCHITECTURE.md). Aşağıdakı cə
 |-------|------------|----------------|
 | `reviews` | Rəy yaratma + rating aggregate | ✅ MVP (dərhal APPROVED; admin REJECT) |
 | `notifications` | In-app oxu/siyahı + push kanalları | ✅ (FCM adapter; default noop) |
-| `messages` | Müştəri↔provider chat | ✅ REST + polling (WS typing hələ yox; TypingPresence DB) |
+| `messages` | Xidmət alan↔provider chat | ✅ REST + polling (WS typing hələ yox; TypingPresence DB) |
 | `realtime` (gateway) | Socket.IO gateway, otaqlar; provider presence | ✅ |
 | `tracking` | Provider lokasiya axını, marşrut, ETA, LocationPing | ✅ |
 | `dispatch` | On-demand provider tapma/təklif/timeout (BullMQ) | ✅ |
@@ -105,11 +105,11 @@ Canlı izləmə üçün REST **kifayət deyil** (saniyəlik location update-lər
 Sifarişin iki tipi olur: `INSTANT` (indi çağır) və `SCHEDULED` (planlaşdırılmış).
 
 `INSTANT` axını:
-1. Müştəri sifariş yaradır (koordinatlar ilə).
+1. Xidmət alan sifariş yaradır (koordinatlar ilə).
 2. Dispatch engine PostGIS ilə **yaxın + online + uyğun** provider-ləri tapır.
 3. Eyni xidmət növü + şəhər üzrə ONLINE provider-lərə təklif (tək timeout yox; axtarış ~10 dəq).
 4. Xidmət verən qəbul edir → `CONFIRMED`; rədd → 2 dəq sonra eyni xidmət verənə yenidən təklif (10 dəq pəncərə / qəbul olunana qədər).
-5. Axtarış pəncərəsi bitəndə qəbul yoxdursa → müştəriyə bildiriş.
+5. Axtarış pəncərəsi bitəndə qəbul yoxdursa → xidmət alana bildiriş.
 
 Ətraflı: [BOOKING_LIFECYCLE.md](./BOOKING_LIFECYCLE.md).
 
@@ -130,7 +130,7 @@ Prisma PostGIS-i native dəstəkləmədiyi üçün `Unsupported("geography(Point
 
 > **Cari məhsul qərarı:** Platforma ödənişsizdir. Modulu **scaffolding + `PAYMENTS_ENABLED=false`** ilə mövcuddur; aktivləşdirmə gələcək məhsul qərarındandır.
 
-- Hədəf model: müştəri ödəyir → platforma komissiya tutur → provider-ə payout.
+- Hədəf model: xidmət alan ödəyir → platforma komissiya tutur → provider-ə payout.
 - `PaymentIntent` → **hold** → **capture**; Noop + Stripe stub adapter.
 - İdempotency: `Payment.idempotencyKey` + `IdempotencyRecord` + `Idempotency-Key` header.
 - Booking create/confirm/complete **PaymentIntent tələb etmir** (flag off).

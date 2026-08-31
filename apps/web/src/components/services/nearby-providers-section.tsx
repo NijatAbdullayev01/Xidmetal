@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, MapPin, Navigation, ShieldCheck } from 'lucide-react';
+import { providerPublicPath } from '@xidmetal/shared';
 import { Button, buttonStyles } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { GeoPositionError, readCurrentPositionWithFallback } from '@/lib/geolocation';
@@ -172,10 +173,10 @@ export function NearbyProvidersSection({ className }: { className?: string }) {
                   )}
                 </div>
                 <Link
-                  href={`/services?q=${encodeURIComponent(`${p.firstName} ${p.lastName}`.trim())}`}
+                  href={providerPublicPath(p.userId)}
                   className={cn(buttonStyles('outline', 'sm'), 'mt-3 min-h-11 w-full')}
                 >
-                  Xidmətlərə bax
+                  Profilə bax
                 </Link>
               </li>
             ))}

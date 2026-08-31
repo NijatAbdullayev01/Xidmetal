@@ -4,16 +4,22 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import type { CategorySummary } from '@xidmetal/shared';
 import { CategoryPageSkeleton } from '@/components/ui/page-skeletons';
+import { Breadcrumbs } from '@/components/layout/breadcrumbs';
+import { JsonLd } from '@/components/seo/json-ld';
 import { getCategoryIcon } from '@/lib/category-icons';
 import { api } from '@/lib/api';
+import { buildBreadcrumbJsonLd, buildCategoriesItemListJsonLd } from '@/lib/seo-schema';
+import { pageMetadata } from '@/lib/seo';
+import { getSiteUrl } from '@/lib/site-url';
 
 export const revalidate = 60;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Kateqoriyalar',
   description:
     'Xidmətal-da bütün xidmət kateqoriyalarını kəşf edin — təmizlik, təmir, gözəllik və daha çox.',
-};
+  canonical: '/categories',
+});
 
 async function loadCategories(): Promise<CategorySummary[]> {
   try {
@@ -25,11 +31,27 @@ async function loadCategories(): Promise<CategorySummary[]> {
 
 async function CategoriesIndexContent() {
   const categories = await loadCategories();
+  const siteUrl = getSiteUrl();
 
   return (
     <section className="pb-16 pt-8 sm:pb-20 sm:pt-12">
+      <JsonLd
+        data={[
+          buildBreadcrumbJsonLd(siteUrl, [
+            { name: 'Ana səhifə', path: '/' },
+            { name: 'Kateqoriyalar', path: '/categories' },
+          ]),
+          buildCategoriesItemListJsonLd(siteUrl, categories),
+        ]}
+      />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="max-w-2xl">
+        <Breadcrumbs
+          items={[
+            { href: '/', label: 'Ana səhifə' },
+            { label: 'Kateqoriyalar' },
+          ]}
+        />
+        <div className="mt-6 max-w-2xl">
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Kateqoriyalar</h1>
           <p className="mt-2 text-sm text-muted-foreground sm:text-base">
             Axtardığınız xidmət növünü seçin və etibarlı xidmət verənləri müqayisə edin.

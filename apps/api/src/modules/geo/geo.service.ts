@@ -81,7 +81,7 @@ export class GeoService {
 
   /**
    * Directions yalnız sifariş iştirakçısı + booking dest üçün.
-   * Təyinat müştəri `to` parametrindən gəlmir — ödənişli API sui-istifadəsi olmasın.
+   * Təyinat xidmət alan `to` parametrindən gəlmir — ödənişli API sui-istifadəsi olmasın.
    */
   async assertDrivingRouteDest(
     userId: string,
@@ -233,7 +233,7 @@ export class GeoService {
 
   /**
    * Seçilmiş xidmət növü üzrə hazırda ONLINE olan xidmət verənlərin sayı.
-   * Təcili sifariş UI-də müştəriyə göstərilir.
+   * Təcili sifariş UI-də xidmət alana göstərilir.
    */
   async countOnlineProviders(
     dto: OnlineProvidersCountQueryDto,

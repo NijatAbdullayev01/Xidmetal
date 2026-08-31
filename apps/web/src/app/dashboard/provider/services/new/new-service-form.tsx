@@ -501,7 +501,7 @@ export function NewServiceForm() {
                     <p className="text-xs text-muted-foreground">
                       {serviceTypes
                         ? 'Təklif etdiyiniz xidmət növünü seçin.'
-                        : 'Qısa və aydın xidmət növü müştərilərin diqqətini cəlb edir.'}
+                        : 'Qısa və aydın xidmət növü xidmət alanların diqqətini cəlb edir.'}
                     </p>
                   </div>
                 )}
@@ -843,7 +843,7 @@ export function NewServiceForm() {
                     </span>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {isProviderVerified
-                        ? 'Xidmət yaradıldıqdan sonra admin yoxlamasına göndəriləcək. Təsdiqdən sonra müştərilərə görünəcək.'
+                        ? 'Xidmət yaradıldıqdan sonra admin yoxlamasına göndəriləcək. Təsdiqdən sonra xidmət alanlara görünəcək.'
                         : 'Hesabınız hələ admin təsdiqi gözləyir — xidmət qaralama kimi saxlanılacaq. Hesab və elan təsdiqindən sonra görünəcək.'}
                     </p>
                   </div>

@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
+import { NOINDEX } from '@/lib/seo';
 
 export const metadata: Metadata = {
   title: 'Tezliklə',
   description: 'Xidmətal tezliklə istifadəyə veriləcək.',
-  robots: { index: true, follow: false },
+  robots: NOINDEX,
 };
 
 export default function ComingSoonPage() {

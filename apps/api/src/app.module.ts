@@ -33,6 +33,7 @@ import { MetricsModule } from './common/metrics/metrics.module';
 import { CaptchaModule } from './common/captcha/captcha.module';
 import { JwtAuthGuard } from './common/guards';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { ServiceTeamsModule } from './modules/service-teams/service-teams.module';
 import { RedisThrottlerStorage } from './common/throttler/redis-throttler.storage';
 
 @Module({
@@ -111,6 +112,7 @@ import { RedisThrottlerStorage } from './common/throttler/redis-throttler.storag
     NotificationsModule,
     AdminModule,
     UploadsModule,
+    ServiceTeamsModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: SentryGlobalFilter },

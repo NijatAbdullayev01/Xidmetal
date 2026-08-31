@@ -14,10 +14,10 @@ const PROVIDER_DASHBOARD_HREF = '/dashboard/provider';
 
 /**
  * Məhsul qərarı: bir hesab = bir rol. CUSTOMER → PROVIDER upgrade yoxdur.
- * Mövcud müştəriyə ayrı hesab lazım olduğunu izah edir — bu axını dəyişmə.
+ * Mövcud xidmət alana ayrı hesab lazım olduğunu izah edir — bu axını dəyişmə.
  */
 const CUSTOMER_MESSAGE =
-  'Artıq siz bu profillə müştəri kimi qeydiyyat etmişsiniz. Əgər xidmət verən olmaq istəyirsinizsə, başqa hesab yaradın.';
+  'Artıq siz bu profillə xidmət alan kimi qeydiyyat etmişsiniz. Əgər xidmət verən olmaq istəyirsinizsə, başqa hesab yaradın.';
 
 interface BecomeProviderLinkProps {
   children: ReactNode;

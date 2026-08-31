@@ -180,7 +180,7 @@ describe('PaymentsService access hardening', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('müştəri booking məbləği ilə intent yaradır', async () => {
+  it('xidmət alan booking məbləği ilə intent yaradır', async () => {
     const { svc, prisma } = makeService({
       booking: {
         id: 'b1',

@@ -50,6 +50,8 @@ export function sanitizeInternalPath(value: unknown): string | null {
   if (!trimmed.startsWith('/') || trimmed.startsWith('//')) return null;
   if (trimmed.includes('\\') || /%5c/i.test(trimmed)) return null;
   if (trimmed.includes('://')) return null;
+  // C0/DEL — açıq nəzarət simvolları (no-control-regex istisnası)
+  // eslint-disable-next-line no-control-regex -- \u0000-\u001f, \u007f
   if (/[\u0000-\u001f\u007f]/.test(trimmed)) return null;
 
   // Path-də `//` (protocol-relative) və ya `\` qalıqları olmamalıdır

@@ -1,6 +1,6 @@
 # E-poçt çatdırılması (spam qovluğu)
 
-Müştəri məktublarının inbox-a düşməsi üçün **DNS imzası** (SPF/DKIM/DMARC) və **göndərən kimliyi** uyğun olmalıdır. Kod tərəfi `MailService` bu başlıqları qoyur; DNS-i Cloudflare-də dərc etmək lazımdır.
+Xidmət alanlara göndərilən məktubların inbox-a düşməsi üçün **DNS imzası** (SPF/DKIM/DMARC) və **göndərən kimliyi** uyğun olmalıdır. Kod tərəfi `MailService` bu başlıqları qoyur; DNS-i Cloudflare-də dərc etmək lazımdır.
 
 ## Nə yoxlanılıb (xidmetal.com)
 

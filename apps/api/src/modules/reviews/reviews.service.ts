@@ -122,7 +122,7 @@ export class ReviewsService {
     });
   }
 
-  /** İctimai — müştərilər digər rəylərə baxa bilir (qismən anonim ad) */
+  /** İctimai — xidmət alanlar digər rəylərə baxa bilir (qismən anonim ad) */
   async findPublicByProvider(providerId: string, query: ReviewQueryDto) {
     const provider = await this.prisma.user.findFirst({
       where: {

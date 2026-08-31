@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Loader2, Pencil, PlusCircle, Trash2, X } from 'lucide-react';
-import { ServiceStatus, canSubmitServiceForReview } from '@xidmetal/shared';
+import { AlertTriangle, Loader2, Pencil, PlusCircle, Trash2, Users, X } from 'lucide-react';
+import { ProviderAccountType, ServiceStatus, canSubmitServiceForReview } from '@xidmetal/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button, buttonStyles } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +42,7 @@ export function MyServicesPage() {
     enabled: !!token,
   });
   const isVerified = me?.providerProfile?.isVerified === true;
+  const isCompany = me?.providerProfile?.accountType === ProviderAccountType.COMPANY;
 
   const { data, isLoading } = useQuery({
     queryKey: ['services', 'mine'],
@@ -217,7 +218,7 @@ export function MyServicesPage() {
                 </p>
                 {service.status === ServiceStatus.PENDING_REVIEW ? (
                   <p className="mt-1.5 text-sm text-muted-foreground sm:mt-2">
-                    Admin yoxlamasındadır — təsdiqdən sonra müştərilərə görünəcək.
+                    Admin yoxlamasındadır — təsdiqdən sonra xidmət alanlara görünəcək.
                   </p>
                 ) : null}
                 <div className="mt-1.5 flex flex-col gap-1 text-xs text-muted-foreground sm:mt-2 sm:flex-row sm:flex-wrap sm:gap-3">
@@ -229,6 +230,11 @@ export function MyServicesPage() {
                       : formatPrice(service.price)}
                   </span>
                   <span>Yaradılıb: {formatDate(service.createdAt)}</span>
+                  {isCompany ? (
+                    <span>
+                      Komanda: {service.teamCount ?? 1}
+                    </span>
+                  ) : null}
                 </div>
                 {needsRevision && service.reviewNote ? (
                   <p
@@ -249,6 +255,16 @@ export function MyServicesPage() {
                   <Pencil className="h-4 w-4" />
                   Düzəliş et
                 </Link>
+                {isCompany ? (
+                  <Link
+                    href={`/dashboard/provider/services/${service.id}/teams`}
+                    className={cn(buttonStyles('outline', 'sm'), 'shrink-0')}
+                    aria-label={`${service.title} komandaları`}
+                  >
+                    <Users className="h-4 w-4" />
+                    Komandalar
+                  </Link>
+                ) : null}
                 {(service.status === ServiceStatus.DRAFT ||
                   service.status === ServiceStatus.NEEDS_REVISION) && (
                   <Button

@@ -130,7 +130,7 @@ describe('booking status transitions (shared lifecycle)', () => {
     expect(ACTIVE_BOOKING_STATUSES).toContain(BookingStatus.ARRIVED);
   });
 
-  it('qiymət yalnız xidmət verən qəbul etdikdən sonra müştəridə görünür', () => {
+  it('qiymət yalnız xidmət verən qəbul etdikdən sonra xidmət alanda görünür', () => {
     expect(isBookingPriceVisibleToCustomer(BookingStatus.PENDING)).toBe(false);
     expect(isBookingPriceVisibleToCustomer(BookingStatus.REJECTED)).toBe(false);
     expect(

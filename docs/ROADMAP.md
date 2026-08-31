@@ -6,7 +6,7 @@ Bu sənəd hədəf arxitekturaya çatmaq üçün mərhələli, prioritetləşdir
 
 > **Cari baza (2026-08):** marketplace MVP + on-demand — auth, services, availability, bookings (SCHEDULED + INSTANT), dispatch, live tracking (Socket.IO), reviews, messages (REST), in-app/push kanalları (env), payments scaffolding (flag OFF), reports, contact, admin panel. Aşağıdakı checkbox-lar hədəf yola nisbətən yenilənib.
 
-> **Məhsul qərarı (rol):** bir hesab = bir rol (`CUSTOMER` **və ya** `PROVIDER`). Eyni hesabla müştəridən xidmət verənə keçid / dual-role **yoxdur** — bu boşluq deyil, qəsdən qərardır. Xidmət verən olmaq üçün ayrı qeydiyyat. Ətraflı: [ARCHITECTURE.md](./ARCHITECTURE.md) § Rollar.
+> **Məhsul qərarı (rol):** bir hesab = bir rol (`CUSTOMER` **və ya** `PROVIDER`). Eyni hesabla xidmət alandan xidmət verənə keçid / dual-role **yoxdur** — bu boşluq deyil, qəsdən qərardır. Xidmət verən olmaq üçün ayrı qeydiyyat. Ətraflı: [ARCHITECTURE.md](./ARCHITECTURE.md) § Rollar.
 
 ---
 
