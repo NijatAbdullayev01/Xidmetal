@@ -8,6 +8,8 @@ export const REFRESH_COOKIE = 'xidmetal_refresh';
 
 export const ACCESS_COOKIE_MARKETPLACE = 'xidmetal_access_marketplace';
 export const REFRESH_COOKIE_MARKETPLACE = 'xidmetal_refresh_marketplace';
+export const ACCESS_COOKIE_PROVIDER = 'xidmetal_access_provider';
+export const REFRESH_COOKIE_PROVIDER = 'xidmetal_refresh_provider';
 export const ACCESS_COOKIE_ADMIN = 'xidmetal_access_admin';
 export const REFRESH_COOKIE_ADMIN = 'xidmetal_refresh_admin';
 
@@ -25,14 +27,18 @@ export function accessCookieName(
   const base =
     clientApp === CLIENT_APP.ADMIN
       ? ACCESS_COOKIE_ADMIN
-      : ACCESS_COOKIE_MARKETPLACE;
+      : clientApp === CLIENT_APP.PROVIDER
+        ? ACCESS_COOKIE_PROVIDER
+        : ACCESS_COOKIE_MARKETPLACE;
   return hostPrefix ? `${HOST_PREFIX}${base}` : base;
 }
 
 export function refreshCookieName(clientApp: ClientApp): string {
   return clientApp === CLIENT_APP.ADMIN
     ? REFRESH_COOKIE_ADMIN
-    : REFRESH_COOKIE_MARKETPLACE;
+    : clientApp === CLIENT_APP.PROVIDER
+      ? REFRESH_COOKIE_PROVIDER
+      : REFRESH_COOKIE_MARKETPLACE;
 }
 
 export function parseDurationMs(duration: string, fallbackMs: number): number {
@@ -132,7 +138,7 @@ export function clearAuthCookies(
 
   const apps: ClientApp[] = clientApp
     ? [clientApp]
-    : [CLIENT_APP.MARKETPLACE, CLIENT_APP.ADMIN];
+    : [CLIENT_APP.MARKETPLACE, CLIENT_APP.PROVIDER, CLIENT_APP.ADMIN];
 
   for (const app of apps) {
     clearNamedCookie(res, accessOpts, accessCookieName(app, false));
@@ -161,6 +167,8 @@ function accessCookieCandidates(clientApp?: ClientApp): string[] {
   return [
     accessCookieName(CLIENT_APP.MARKETPLACE, true),
     ACCESS_COOKIE_MARKETPLACE,
+    accessCookieName(CLIENT_APP.PROVIDER, true),
+    ACCESS_COOKIE_PROVIDER,
     accessCookieName(CLIENT_APP.ADMIN, true),
     ACCESS_COOKIE_ADMIN,
     ACCESS_COOKIE,
@@ -190,7 +198,12 @@ export function readRefreshTokenFromRequest(
   const cookies = req.cookies as Record<string, unknown> | undefined;
   const names = clientApp
     ? [refreshCookieName(clientApp), REFRESH_COOKIE]
-    : [REFRESH_COOKIE_MARKETPLACE, REFRESH_COOKIE_ADMIN, REFRESH_COOKIE];
+    : [
+        REFRESH_COOKIE_MARKETPLACE,
+        REFRESH_COOKIE_PROVIDER,
+        REFRESH_COOKIE_ADMIN,
+        REFRESH_COOKIE,
+      ];
 
   for (const name of names) {
     const value = readCookieValue(cookies, name);

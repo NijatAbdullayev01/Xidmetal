@@ -4,7 +4,7 @@
   "description": "Xidmət verənlər və xidmət alanlar üçün marketplace",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FFFFFF",
+  "background_color": "#FFCC00",
   "theme_color": "#FFCC00",
   "lang": "az",
   "icons": [

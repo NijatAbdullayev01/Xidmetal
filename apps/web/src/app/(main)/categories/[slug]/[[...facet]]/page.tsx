@@ -5,7 +5,6 @@ import {
   categoryLocationPath,
   categoryTypePath,
   locationLocativeAz,
-  resolveServiceCity,
   type CategorySummary,
   type PaginatedResponse,
   type ServiceSummary,
@@ -131,15 +130,6 @@ function listingQuery(facet: Exclude<CategoryFacet, { kind: 'invalid' }>): {
     return { title: facet.typeTitle, location: facet.locationLabel };
   }
   return {};
-}
-
-export async function generateStaticParams() {
-  try {
-    const categories = await api.categories();
-    return categories.map((category) => ({ slug: category.slug }));
-  } catch {
-    return [];
-  }
 }
 
 export async function generateMetadata({
@@ -290,24 +280,6 @@ async function CategoryPageBody({
 
   const siteUrl = getSiteUrl();
   const basePath = categoryFacetPath(slug, facet);
-  const predefined = getServiceTypesForCategory(slug) ?? [];
-  const typeLinks = predefined.map((title) => ({
-    href: categoryTypePath(slug, title),
-    label: title,
-  }));
-
-  const locationSet = new Map<string, string>();
-  for (const service of servicesPage.items) {
-    if (!service.location) continue;
-    const city = resolveServiceCity(service.location);
-    if (!locationSet.has(city)) {
-      locationSet.set(city, categoryLocationPath(slug, city));
-    }
-  }
-  const locationLinks = [...locationSet.entries()].map(([label, href]) => ({
-    href,
-    label,
-  }));
 
   return (
     <>
@@ -338,8 +310,6 @@ async function CategoryPageBody({
           totalPages: servicesPage.totalPages,
           basePath,
         }}
-        typeLinks={facet.kind === 'none' || facet.kind === 'location' ? typeLinks : []}
-        locationLinks={facet.kind === 'none' || facet.kind === 'type' ? locationLinks : []}
       />
     </>
   );

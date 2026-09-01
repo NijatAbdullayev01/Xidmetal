@@ -11,6 +11,7 @@ export function resolveSocketCorsOrigins(
     ...corsOriginRaw.split(','),
     config.get<string>('NEXT_PUBLIC_APP_URL'),
     config.get<string>('NEXT_PUBLIC_ADMIN_URL'),
+    config.get<string>('NEXT_PUBLIC_PROVIDER_URL'),
   ]
     .map((origin) => origin?.trim())
     .filter((origin): origin is string => Boolean(origin))

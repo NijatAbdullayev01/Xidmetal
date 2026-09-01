@@ -23,6 +23,7 @@ import { JsonLd } from '@/components/seo/json-ld';
 import { buildBreadcrumbJsonLd, buildFaqPageJsonLd, buildHowToJsonLd } from '@/lib/seo-schema';
 import { pageMetadata } from '@/lib/seo';
 import { getSiteUrl } from '@/lib/site-url';
+import { getProviderAppUrl } from '@/lib/auth';
 import { ProviderGuideHeroCta } from './provider-guide-hero-cta';
 
 export const metadata: Metadata = pageMetadata({
@@ -380,13 +381,13 @@ export default function ProviderGuidePage() {
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/dashboard/provider"
+              <a
+                href={getProviderAppUrl()}
                 className={buttonStyles('default', 'md') + ' mt-8'}
               >
                 Kabineti aç
                 <ArrowRight className="h-4 w-4" />
-              </Link>
+              </a>
             </div>
 
             <div className="relative">

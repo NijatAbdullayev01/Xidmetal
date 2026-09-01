@@ -5,10 +5,8 @@ import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { ProviderAccountType, UserRole, type RegisterInput } from '@xidmetal/shared';
+import { UserRole, type RegisterInput } from '@xidmetal/shared';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import { ProviderAccountTypeSelector } from '@/components/auth/provider-account-type-selector';
-import { RoleSelector } from '@/components/auth/role-selector';
 import { registerFormSchema, type RegisterFormValues, type PublicUserRole } from '@/components/auth/register-schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,15 +37,11 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
     register,
     control,
     handleSubmit,
-    watch,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerFormSchema),
     defaultValues: {
       role: defaultRole,
-      providerAccountType:
-        defaultRole === UserRole.PROVIDER ? ProviderAccountType.INDIVIDUAL : undefined,
       firstName: '',
       lastName: '',
       companyName: '',
@@ -57,11 +51,6 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
       confirmPassword: '',
     },
   });
-
-  const selectedRole = watch('role');
-  const selectedAccountType = watch('providerAccountType');
-  const isProvider = selectedRole === UserRole.PROVIDER;
-  const isCompany = isProvider && selectedAccountType === ProviderAccountType.COMPANY;
 
   const onSubmit = async (values: RegisterFormValues) => {
     setServerError(null);
@@ -75,23 +64,15 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
       const { confirmPassword, phone, companyName, providerAccountType, firstName, lastName, ...rest } =
         values;
       void confirmPassword;
-      const isCompanyAccount =
-        rest.role === UserRole.PROVIDER &&
-        (providerAccountType ?? ProviderAccountType.INDIVIDUAL) === ProviderAccountType.COMPANY;
+      void companyName;
+      void providerAccountType;
       const payload: RegisterInput = {
         ...rest,
         phone: phone.trim(),
         captchaToken: captchaToken ?? undefined,
-        ...(isCompanyAccount
-          ? {}
-          : { firstName: firstName?.trim(), lastName: lastName?.trim() }),
+        firstName: firstName?.trim(),
+        lastName: lastName?.trim(),
       };
-      if (rest.role === UserRole.PROVIDER) {
-        payload.providerAccountType = providerAccountType ?? ProviderAccountType.INDIVIDUAL;
-        if (payload.providerAccountType === ProviderAccountType.COMPANY) {
-          payload.companyName = companyName?.trim() || undefined;
-        }
-      }
       const response = await api.auth.register(payload);
 
       stashDevEmailCode(response.previewCode);
@@ -108,125 +89,41 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-2.5 sm:space-y-3" noValidate>
-      <div className="space-y-2.5 sm:space-y-3">
-        <Label>Hesab növü</Label>
-        <Controller
-          name="role"
-          control={control}
-          render={({ field }) => (
-            <RoleSelector
-              value={field.value}
-              onChange={(role) => {
-                field.onChange(role);
-                if (role === UserRole.PROVIDER) {
-                  setValue(
-                    'providerAccountType',
-                    selectedAccountType ?? ProviderAccountType.INDIVIDUAL,
-                  );
-                } else {
-                  setValue('providerAccountType', undefined);
-                  setValue('companyName', '');
-                }
-              }}
-              disabled={isSubmitting}
-            />
-          )}
-        />
-        {errors.role && (
-          <p className="text-sm text-destructive" role="alert">
-            {errors.role.message}
-          </p>
-        )}
-      </div>
-
-      {isProvider && (
-        <div className="space-y-2.5 sm:space-y-3">
-          <Label>Qeydiyyat növü</Label>
-          <Controller
-            name="providerAccountType"
-            control={control}
-            render={({ field }) => (
-              <ProviderAccountTypeSelector
-                value={field.value ?? ProviderAccountType.INDIVIDUAL}
-                onChange={(next) => {
-                  field.onChange(next);
-                  if (next === ProviderAccountType.COMPANY) {
-                    setValue('firstName', '');
-                    setValue('lastName', '');
-                  } else {
-                    setValue('companyName', '');
-                  }
-                }}
-                disabled={isSubmitting}
-              />
-            )}
-          />
-          {errors.providerAccountType && (
-            <p className="text-sm text-destructive" role="alert">
-              {errors.providerAccountType.message}
-            </p>
-          )}
-        </div>
-      )}
-
-      {isCompany && (
-        <div className="space-y-2">
-          <Label htmlFor="companyName">Şirkətin adı</Label>
+      <div className="grid grid-cols-2 gap-3 min-w-0 sm:gap-4">
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="firstName">Ad</Label>
           <Input
-            id="companyName"
-            autoComplete="organization"
-            placeholder="məs. Xidmətal MMC"
-            error={!!errors.companyName}
+            id="firstName"
+            autoComplete="given-name"
+            placeholder="Əli"
+            error={!!errors.firstName}
             disabled={isSubmitting}
-            {...register('companyName')}
+            {...register('firstName')}
           />
-          {errors.companyName ? (
-            <p className="text-sm text-destructive" role="alert">
-              {errors.companyName.message}
+          {errors.firstName && (
+            <p className="text-xs text-destructive" role="alert">
+              {errors.firstName.message}
             </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">Xidmətlərdə bu ad görünəcək.</p>
           )}
         </div>
-      )}
 
-      {!isCompany && (
-        <div className="grid grid-cols-2 gap-3 min-w-0 sm:gap-4">
-          <div className="min-w-0 space-y-2">
-            <Label htmlFor="firstName">Ad</Label>
-            <Input
-              id="firstName"
-              autoComplete="given-name"
-              placeholder="Əli"
-              error={!!errors.firstName}
-              disabled={isSubmitting}
-              {...register('firstName')}
-            />
-            {errors.firstName && (
-              <p className="text-sm text-destructive" role="alert">
-                {errors.firstName.message}
-              </p>
-            )}
-          </div>
-
-          <div className="min-w-0 space-y-2">
-            <Label htmlFor="lastName">Soyad</Label>
-            <Input
-              id="lastName"
-              autoComplete="family-name"
-              placeholder="Məmmədov"
-              error={!!errors.lastName}
-              disabled={isSubmitting}
-              {...register('lastName')}
-            />
-            {errors.lastName && (
-              <p className="text-sm text-destructive" role="alert">
-                {errors.lastName.message}
-              </p>
-            )}
-          </div>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="lastName">Soyad</Label>
+          <Input
+            id="lastName"
+            autoComplete="family-name"
+            placeholder="Məmmədov"
+            error={!!errors.lastName}
+            disabled={isSubmitting}
+            {...register('lastName')}
+          />
+          {errors.lastName && (
+            <p className="text-xs text-destructive" role="alert">
+              {errors.lastName.message}
+            </p>
+          )}
         </div>
-      )}
+      </div>
 
       <div className="grid grid-cols-2 gap-3 min-w-0 sm:gap-4">
         <div className="min-w-0 space-y-2">
@@ -241,7 +138,7 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
             {...register('email')}
           />
           {errors.email && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="text-xs text-destructive" role="alert">
               {errors.email.message}
             </p>
           )}
@@ -292,13 +189,8 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
             )}
           />
           {errors.phone && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="text-xs text-destructive" role="alert">
               {errors.phone.message}
-            </p>
-          )}
-          {!errors.phone && (
-            <p className="text-xs text-muted-foreground">
-              Sifariş və dəstək üçün sizinlə əlaqə saxlamaq üçündür.
             </p>
           )}
         </div>
@@ -328,13 +220,9 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          {errors.password ? (
-            <p className="text-sm text-destructive" role="alert">
-              {errors.password.message}
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Ən azı 8 simvol, bir böyük hərf və bir rəqəm olmalıdır.
+          {errors.password && (
+            <p className="text-xs text-destructive" role="alert">
+              Şifrə ən azı 8 simvol, bir böyük hərf və bir rəqəm olmalıdır.
             </p>
           )}
         </div>
@@ -363,7 +251,7 @@ export function RegisterForm({ defaultRole = UserRole.CUSTOMER }: RegisterFormPr
             </button>
           </div>
           {errors.confirmPassword && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="text-xs text-destructive" role="alert">
               {errors.confirmPassword.message}
             </p>
           )}

@@ -7,7 +7,6 @@ import { useSearchParams } from 'next/navigation';
 import { Filter, PackageSearch, SlidersHorizontal, X } from 'lucide-react';
 import type { CategorySummary, ServiceSummary } from '@xidmetal/shared';
 import { ServiceCard } from '@/components/services/service-card';
-import { ServiceIndexLinks } from '@/components/services/service-index-links';
 import { Breadcrumbs, type BreadcrumbCrumb } from '@/components/layout/breadcrumbs';
 import { PaginationNav } from '@/components/layout/pagination-nav';
 import {
@@ -41,8 +40,6 @@ interface CategoryContentProps {
     totalPages: number;
     basePath: string;
   };
-  typeLinks?: { href: string; label: string }[];
-  locationLinks?: { href: string; label: string }[];
 }
 
 function resolveInitialFilters(
@@ -75,8 +72,6 @@ export function CategoryContent({
   intro,
   breadcrumbItems,
   pagination,
-  typeLinks = [],
-  locationLinks = [],
 }: CategoryContentProps) {
   const searchParams = useSearchParams();
   const initialServiceType = searchParams.get('type')?.trim() || undefined;
@@ -224,7 +219,7 @@ export function CategoryContent({
   return (
     <section
       className={cn(
-        'py-8 sm:py-12',
+        'pt-2.5 pb-8 sm:pt-2.5 sm:pb-12',
         !hasServices &&
           'flex min-h-[calc(100dvh-3.5rem)] flex-col pb-[40px] sm:min-h-[calc(100vh-4rem)] sm:pb-[40px]',
       )}
@@ -237,47 +232,9 @@ export function CategoryContent({
       >
         <div className="mb-6 shrink-0 sm:mb-8">
           <Breadcrumbs items={breadcrumbItems} />
-          <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{heading}</h1>
+          <h1 className="mt-[30px] text-2xl font-bold tracking-tight sm:text-3xl">{heading}</h1>
           {intro ? (
             <p className="mt-2 max-w-2xl text-muted-foreground">{intro}</p>
-          ) : null}
-          {typeLinks.length > 0 || locationLinks.length > 0 ? (
-            <div className="mt-4 flex flex-col gap-3">
-              {typeLinks.length > 0 ? (
-                <nav aria-label="Xidmət növləri">
-                  <p className="text-xs font-medium text-muted-foreground">Xidmət növləri</p>
-                  <ul className="mt-1.5 flex flex-wrap gap-2">
-                    {typeLinks.map((link) => (
-                      <li key={link.href}>
-                        <Link
-                          href={link.href}
-                          className="inline-flex min-h-8 items-center rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground transition-colors hover:border-brand/50 hover:text-brand-dark"
-                        >
-                          {link.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </nav>
-              ) : null}
-              {locationLinks.length > 0 ? (
-                <nav aria-label="Şəhərlər">
-                  <p className="text-xs font-medium text-muted-foreground">Şəhərlər</p>
-                  <ul className="mt-1.5 flex flex-wrap gap-2">
-                    {locationLinks.map((link) => (
-                      <li key={link.href}>
-                        <Link
-                          href={link.href}
-                          className="inline-flex min-h-8 items-center rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground transition-colors hover:border-brand/50 hover:text-brand-dark"
-                        >
-                          {link.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </nav>
-              ) : null}
-            </div>
           ) : null}
         </div>
 
@@ -390,7 +347,6 @@ export function CategoryContent({
                   ))}
                 </div>
               )}
-              <ServiceIndexLinks services={services} />
               {pagination ? (
                 <PaginationNav
                   page={pagination.page}

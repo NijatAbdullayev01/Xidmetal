@@ -165,6 +165,46 @@ else
   rm -f /etc/nginx/conf.d/admin.conf
 fi
 
-echo "xidmetal-edge: mode=${MODE} web=${WEB_HOST} admin=${ADMIN_HOST:-} www=${WWW_HOST:-}"
+if [ -n "${PROVIDER_HOST:-}" ]; then
+  if [ "$MODE" = "ssl" ]; then
+    {
+      cat <<EOF
+server {
+  listen 80;
+  server_name ${PROVIDER_HOST};
+  location /healthz {
+    access_log off;
+    return 200 'ok';
+    add_header Content-Type text/plain;
+  }
+  location / {
+    return 301 https://\$host\$request_uri;
+  }
+}
+server {
+  listen 443 ssl;
+  http2 on;
+  server_name ${PROVIDER_HOST};
+  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+EOF
+      write_proxy_locations "provider:3022"
+      echo "}"
+    } > /etc/nginx/conf.d/provider.conf
+  else
+    {
+      cat <<EOF
+server {
+  listen 80;
+  server_name ${PROVIDER_HOST};
+EOF
+      write_proxy_locations "provider:3022"
+      echo "}"
+    } > /etc/nginx/conf.d/provider.conf
+  fi
+else
+  rm -f /etc/nginx/conf.d/provider.conf
+fi
+
+echo "xidmetal-edge: mode=${MODE} web=${WEB_HOST} admin=${ADMIN_HOST:-} provider=${PROVIDER_HOST:-} www=${WWW_HOST:-}"
 nginx -t
 exec nginx -g 'daemon off;'

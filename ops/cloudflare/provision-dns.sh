@@ -16,9 +16,10 @@ TOKEN="${CLOUDFLARE_API_TOKEN:-${CF_API_TOKEN:-}}"
 if [[ -z "$TOKEN" ]]; then
   echo "CLOUDFLARE_API_TOKEN təyin olunmayıb." >&2
   echo "Dashboard: https://dash.cloudflare.com → xidmetal.com → DNS" >&2
-  echo "  A  @      ${ORIGIN_IP}  Proxied" >&2
-  echo "  A  www    ${ORIGIN_IP}  Proxied" >&2
-  echo "  A  admin  ${ORIGIN_IP}  Proxied" >&2
+  echo "  A  @        ${ORIGIN_IP}  Proxied" >&2
+  echo "  A  www      ${ORIGIN_IP}  Proxied" >&2
+  echo "  A  admin    ${ORIGIN_IP}  Proxied" >&2
+  echo "  A  provider ${ORIGIN_IP}  Proxied" >&2
   echo "SSL/TLS: Full; Always Use HTTPS: ON; WebSockets: ON" >&2
   exit 2
 fi
@@ -72,6 +73,7 @@ print(r[0]["id"] if r else "")' <<<"$list")"
 upsert_a "${ZONE_NAME}"
 upsert_a "www.${ZONE_NAME}"
 upsert_a "admin.${ZONE_NAME}"
+upsert_a "provider.${ZONE_NAME}"
 
 # E-poçt autentifikasiyası (Gmail/Mail.ru spam). DKIM CNAME-ləri Resend dashboard-dandır.
 # SPF: Resend/SES. Mövcud v=spf1 varsa yenilənir (duplikat SPF = permerror).
@@ -125,5 +127,5 @@ patch_setting websockets on
 patch_setting min_tls_version "1.2"
 patch_setting opportunistic_https on
 
-echo "hazır: https://${ZONE_NAME}  https://admin.${ZONE_NAME}"
+echo "hazır: https://${ZONE_NAME}  https://admin.${ZONE_NAME}  https://provider.${ZONE_NAME}"
 echo "e-poçt: docs/EMAIL.md — Resend DKIM + Email Routing (info@) əl ilə"

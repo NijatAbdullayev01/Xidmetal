@@ -17,7 +17,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { CategorySummary } from '@xidmetal/shared';
-import { BecomeProviderLink } from '@/components/auth/become-provider-link';
 import { UrgentOrderButton } from '@/components/home/urgent-order-button';
 import { HomeCategoriesSkeleton } from '@/components/ui/page-skeletons';
 import { api } from '@/lib/api';
@@ -29,8 +28,6 @@ import {
 } from '@/lib/seo-schema';
 import { pageMetadata } from '@/lib/seo';
 import { getSiteUrl } from '@/lib/site-url';
-import { FAQ_ITEMS } from '@/lib/faq-items';
-import { bakuCategoryPath, PUBLIC_CATEGORY_HUBS } from '@/lib/seo-hubs';
 
 export const revalidate = 60;
 
@@ -206,7 +203,6 @@ async function HomeCategories() {
 
 export default function HomePage() {
   const siteUrl = getSiteUrl();
-  const homeFaqs = FAQ_ITEMS.slice(0, 4);
 
   return (
     <>
@@ -266,82 +262,23 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl">
-            <h2 className="text-3xl font-bold tracking-tight">Bakıda xidmətlər</h2>
-            <p className="mt-3 text-muted-foreground">
-              Ən çox axtarılan kateqoriyalar üzrə Bakı elanlarına birbaşa keçin — qiymət,
-              reytinq və rəyləri müqayisə edin.
-            </p>
-          </div>
-          <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {PUBLIC_CATEGORY_HUBS.map((category) => (
-              <li key={category.slug}>
-                <Link
-                  href={bakuCategoryPath(category.slug)}
-                  className="flex min-h-11 items-center justify-center rounded-xl border border-border bg-card px-3 py-3 text-center text-sm font-medium transition-colors hover:border-brand/50 hover:text-brand-dark"
-                >
-                  Bakıda {category.name.toLocaleLowerCase('az')}
-                </Link>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-6 text-sm">
-            <Link
-              href="/how-it-works"
-              className="font-medium text-brand-dark underline-offset-2 hover:underline"
-            >
-              Necə işləyir?
-            </Link>
-            <span className="text-muted-foreground"> — sifarişdən rəyə qədər 5 addım.</span>
-          </p>
-        </div>
-      </section>
-
-      <section className="border-t border-border bg-muted/30 py-16 sm:py-20">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-center text-3xl font-bold tracking-tight">Tez-tez verilən suallar</h2>
-          <div className="mt-8 space-y-3">
-            {homeFaqs.map((faq) => (
-              <details
-                key={faq.question}
-                className="group rounded-xl border border-border bg-card shadow-sm [&_summary::-webkit-details-marker]:hidden"
-              >
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-medium transition-colors hover:text-brand-dark">
-                  {faq.question}
-                </summary>
-                <div className="border-t border-border px-5 py-4 text-sm leading-relaxed text-muted-foreground">
-                  {faq.answer}
-                </div>
-              </details>
-            ))}
-          </div>
-          <p className="mt-6 text-center text-sm">
-            <Link
-              href="/faq"
-              className="font-medium text-brand-dark underline-offset-2 hover:underline"
-            >
-              Bütün suallara bax
-            </Link>
-          </p>
-        </div>
-      </section>
-
-      {/* CTA */}
+      {/* Necə işləyir? CTA */}
       <section className="py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="rounded-2xl bg-brand px-5 py-10 text-center sm:px-16 sm:py-16">
             <h2 className="text-2xl font-bold text-brand-foreground sm:text-3xl">
-              Xidmət verməyə hazırsınız?
+              Necə işləyir?
             </h2>
             <p className="mt-4 text-brand-foreground/80">
-              Xidmət verən kimi qeydiyyatdan keçin və yeni xidmət alanlara çatın.
+              Xidmət tapmaq, sifariş vermək və prosesi izləmək — 5 sadə addımda.
             </p>
-            <BecomeProviderLink className="mt-8 inline-flex items-center gap-2 rounded-lg bg-brand-foreground px-6 py-3 font-medium text-brand transition-colors hover:bg-brand-foreground/90">
-              İndi başla
+            <Link
+              href="/how-it-works"
+              className="mt-8 inline-flex items-center gap-2 rounded-lg bg-brand-foreground px-6 py-3 font-medium text-brand transition-colors hover:bg-brand-foreground/90"
+            >
+              Addımları gör
               <ArrowRight className="h-5 w-5" />
-            </BecomeProviderLink>
+            </Link>
           </div>
         </div>
       </section>

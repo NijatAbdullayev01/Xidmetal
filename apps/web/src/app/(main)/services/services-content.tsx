@@ -6,13 +6,9 @@ import { useRouter } from 'next/navigation';
 import { ArrowRight, LayoutGrid, SearchX } from 'lucide-react';
 import type { CategorySummary, ServiceSummary } from '@xidmetal/shared';
 import { BecomeProviderLink } from '@/components/auth/become-provider-link';
-import { Breadcrumbs } from '@/components/layout/breadcrumbs';
 import { PaginationNav } from '@/components/layout/pagination-nav';
 import { buttonStyles } from '@/components/ui/button';
 import { ServiceCard } from '@/components/services/service-card';
-import { ServiceIndexLinks } from '@/components/services/service-index-links';
-import { NearbyProvidersSection } from '@/components/services/nearby-providers-section';
-import { ServiceSearch } from '@/components/search/service-search';
 import { getCategoryIcon } from '@/lib/category-icons';
 import { normalizeSearchText, scoreMatch } from '@/lib/search';
 import { cn } from '@/lib/utils';
@@ -75,40 +71,6 @@ export function ServicesContent({
 
   return (
     <>
-      <section className="border-b border-border/60 bg-gradient-to-b from-brand/10 to-background pt-8 pb-6 sm:pt-12 sm:pb-8">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <Breadcrumbs
-            items={[
-              { href: '/', label: 'Ana səhifə' },
-              { label: hasQuery ? 'Axtarış' : 'Xidmətlər' },
-            ]}
-          />
-          <div className="mx-auto mt-4 max-w-2xl">
-            <h1 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
-              {hasQuery ? 'Axtarış nəticələri' : 'Xidmətlər'}
-            </h1>
-            {hasQuery ? (
-              <p className="mt-2 text-center text-sm text-muted-foreground sm:text-base">
-                «{query}» üzrə nəticələr
-              </p>
-            ) : (
-              <p className="mt-2 text-center text-sm text-muted-foreground sm:text-base">
-                Kateqoriya seçin və ya axtarış edin
-              </p>
-            )}
-            <div className="mt-6">
-              <ServiceSearch
-                categories={categories}
-                initialQuery={query}
-                syncUrlOnSubmit
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {!hasQuery && <NearbyProvidersSection />}
-
       {!hasQuery ? (
         <section className="pt-8 pb-4 sm:pt-10 sm:pb-6">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -317,8 +279,6 @@ export function ServicesContent({
                   })
                 }
               />
-
-              <ServiceIndexLinks services={services} />
             </>
           )}
         </div>

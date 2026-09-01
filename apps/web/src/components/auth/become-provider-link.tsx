@@ -1,23 +1,23 @@
 'use client';
 
 import { useState, type MouseEvent, type ReactNode } from 'react';
-import Link from 'next/link';
 import { X } from 'lucide-react';
 import { UserRole } from '@xidmetal/shared';
-import { Button } from '@/components/ui/button';
+import { Button, buttonStyles } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { useAuthHydrated } from '@/hooks/use-auth-hydrated';
 import { useAuthStore } from '@/store/auth.store';
+import { getProviderAppUrl } from '@/lib/auth';
 
-const PROVIDER_REGISTER_HREF = '/register?role=provider';
-const PROVIDER_DASHBOARD_HREF = '/dashboard/provider';
+const providerRegisterHref = () => `${getProviderAppUrl()}/register`;
 
 /**
  * Məhsul qərarı: bir hesab = bir rol. CUSTOMER → PROVIDER upgrade yoxdur.
- * Mövcud xidmət alana ayrı hesab lazım olduğunu izah edir — bu axını dəyişmə.
+ * Xidmət verənlər ayrı panelə (apps/provider) qeydiyyatdan keçir.
+ * Mövcud xidmət alana ayrı hesab lazım olduğunu izah edir.
  */
 const CUSTOMER_MESSAGE =
-  'Artıq siz bu profillə xidmət alan kimi qeydiyyat etmişsiniz. Əgər xidmət verən olmaq istəyirsinizsə, başqa hesab yaradın.';
+  'Artıq siz bu profillə xidmət alan kimi qeydiyyat etmisiniz. Xidmət verən olmaq üçün ayrıca hesab yaradın.';
 
 interface BecomeProviderLinkProps {
   children: ReactNode;
@@ -31,9 +31,6 @@ export function BecomeProviderLink({ children, className }: BecomeProviderLinkPr
   const [open, setOpen] = useState(false);
 
   const isCustomer = hydrated && isAuthenticated && user?.role === UserRole.CUSTOMER;
-  const isProvider = hydrated && isAuthenticated && user?.role === UserRole.PROVIDER;
-
-  const href = isProvider ? PROVIDER_DASHBOARD_HREF : PROVIDER_REGISTER_HREF;
 
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!isCustomer) return;
@@ -43,9 +40,9 @@ export function BecomeProviderLink({ children, className }: BecomeProviderLinkPr
 
   return (
     <>
-      <Link href={href} className={className} onClick={handleClick}>
+      <a href={providerRegisterHref()} className={className} onClick={handleClick}>
         {children}
-      </Link>
+      </a>
 
       <Modal
         open={open}
@@ -68,10 +65,13 @@ export function BecomeProviderLink({ children, className }: BecomeProviderLinkPr
           <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
             {CUSTOMER_MESSAGE}
           </p>
-          <div className="mt-6 flex justify-end">
-            <Button type="button" onClick={() => setOpen(false)}>
-              Anladım
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Bağla
             </Button>
+            <a href={providerRegisterHref()} className={buttonStyles('default', 'md')}>
+              Xidmət verən panelinə keç
+            </a>
           </div>
         </div>
       </Modal>

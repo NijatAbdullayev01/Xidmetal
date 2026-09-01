@@ -86,6 +86,7 @@ jobs:
           # Next build üçün placeholder (runtime secrets CI-də lazım deyil)
           NEXT_PUBLIC_APP_URL: http://localhost:3020
           NEXT_PUBLIC_ADMIN_URL: http://localhost:3021
+          NEXT_PUBLIC_PROVIDER_URL: http://localhost:3022
           NEXT_PUBLIC_API_URL: ""
           JWT_SECRET: ci-only-not-for-production-use-32chars
 

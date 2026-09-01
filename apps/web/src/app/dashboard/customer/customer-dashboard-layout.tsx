@@ -21,7 +21,7 @@ export function CustomerDashboardLayout({ children }: { children: React.ReactNod
   return (
     <RequireRole role={UserRole.CUSTOMER}>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        <DashboardSidebar variant="customer" />
+        <DashboardSidebar />
         <main
           className={cn('min-h-0 flex-1', isFillViewport ? 'overflow-hidden' : 'overflow-y-auto')}
         >

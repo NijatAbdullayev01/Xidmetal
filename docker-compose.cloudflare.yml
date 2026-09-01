@@ -9,6 +9,7 @@
 # App portlarını internetə açmayın:
 #   WEB_HOST_PORT=127.0.0.1:3020
 #   ADMIN_HOST_PORT=127.0.0.1:3021
+#   PROVIDER_HOST_PORT=127.0.0.1:3022
 #   API_HOST_PORT=127.0.0.1:4000
 
 services:
@@ -21,6 +22,8 @@ services:
         condition: service_healthy
       admin:
         condition: service_healthy
+      provider:
+        condition: service_healthy
       api-proxy:
         condition: service_healthy
     ports:
@@ -29,6 +32,7 @@ services:
     environment:
       WEB_HOST: ${WEB_HOST:-}
       ADMIN_HOST: ${ADMIN_HOST:-}
+      PROVIDER_HOST: ${PROVIDER_HOST:-}
       WWW_HOST: ${WWW_HOST:-}
     volumes:
       - ./ops/nginx/edge-entrypoint.sh:/edge-entrypoint.sh:ro

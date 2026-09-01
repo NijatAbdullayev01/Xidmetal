@@ -8,11 +8,8 @@ import {
   Bell,
   MessageSquare,
   CheckCircle2,
-  UserPlus,
-  Briefcase,
   Shield,
   Clock,
-  Users,
   ListFilter,
   MapPin,
   type LucideIcon,
@@ -155,33 +152,6 @@ const benefits: {
   },
 ];
 
-const providerQuickSteps: {
-  icon: LucideIcon;
-  title: string;
-  text: string;
-}[] = [
-  {
-    icon: UserPlus,
-    title: 'Qeydiyyat',
-    text: 'Pulsuz hesab yaradın və profilinizi tamamlayın.',
-  },
-  {
-    icon: Briefcase,
-    title: 'Xidmət əlavə edin',
-    text: 'Kateqoriya, qiymət və təsvir ilə xidmətinizi dərc edin.',
-  },
-  {
-    icon: CalendarCheck,
-    title: 'Sifariş qəbul edin',
-    text: 'Gələn sifarişləri təsdiqləyin və icra edin.',
-  },
-  {
-    icon: Star,
-    title: 'Reytinq qazanın',
-    text: 'Keyfiyyətli xidmətlə daha çox xidmət alan cəlb edin.',
-  },
-];
-
 export default function HowItWorksPage() {
   const siteUrl = getSiteUrl();
 
@@ -223,12 +193,8 @@ export default function HowItWorksPage() {
               Aşağıda hər addımı vizual və aydın şəkildə izah etdik — 5 addımda hazırsınız.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link href="/services" className={buttonStyles('default', 'lg')}>
-                Xidmətlərə bax
-                <ArrowRight className="h-5 w-5" />
-              </Link>
               <Link href="/register" className={buttonStyles('outline', 'lg')}>
-                Pulsuz qeydiyyat
+                Ödənişsiz qeydiyyat
               </Link>
             </div>
           </div>
@@ -241,7 +207,7 @@ export default function HowItWorksPage() {
           <div className="grid gap-6 sm:grid-cols-3">
             {[
               { value: '5 addım', label: 'Sifarişdən rəyə qədər' },
-              { value: 'Pulsuz', label: 'Axtarış və qeydiyyat' },
+              { value: 'Ödənişsiz', label: 'Axtarış və qeydiyyat' },
               { value: 'Aydın', label: 'Hər mərhələdə status izləmə' },
             ].map((item) => (
               <div
@@ -447,86 +413,6 @@ export default function HowItWorksPage() {
                 </div>
               );
             })}
-          </div>
-        </div>
-      </section>
-
-      {/* Provider path */}
-      <section className="py-16 sm:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-2xl border border-border bg-card p-8 shadow-sm sm:p-10">
-            <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-              <div className="max-w-xl">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand/20">
-                  <Users className="h-6 w-6 text-brand-dark" />
-                </div>
-                <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl">
-                  Xidmət verən olmaq istəyirsiniz?
-                </h2>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  Əgər bacarıqlarınızı monetizasiya etmək istəyirsinizsə, 4 sadə addımla
-                  platformada xidmət təklif edə bilərsiniz. Ətraflı bələdçi üçün aşağıdakı
-                  linkə keçin.
-                </p>
-                <Link
-                  href="/provider/guide"
-                  className={buttonStyles('default', 'md') + ' mt-6'}
-                >
-                  Xidmət verən bələdçisi
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2 lg:max-w-lg">
-                {providerQuickSteps.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <div
-                      key={item.title}
-                      className="flex gap-3 rounded-xl border border-border/70 bg-muted/30 p-4"
-                    >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/15">
-                        <Icon className="h-5 w-5 text-brand-dark" />
-                      </div>
-                      <div>
-                        <p className="font-medium">{item.title}</p>
-                        <p className="mt-0.5 text-sm text-muted-foreground">{item.text}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="pb-16 sm:pb-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-2xl bg-brand px-8 py-12 text-center sm:px-16 sm:py-16">
-            <h2 className="text-3xl font-bold text-brand-foreground">
-              İndi sınayın — çox sadədir
-            </h2>
-            <p className="mx-auto mt-4 max-w-xl text-brand-foreground/80">
-              Lazım olan xidməti tapın, sifariş verin və prosesi kabinetinizdən izləyin.
-              Bir neçə dəqiqəyə hazırsınız.
-            </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link
-                href="/services"
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-foreground px-6 py-3 font-medium text-brand transition-colors hover:bg-brand-foreground/90"
-              >
-                Xidmət axtar
-                <ArrowRight className="h-5 w-5" />
-              </Link>
-              <Link
-                href="/categories"
-                className="inline-flex items-center gap-2 rounded-lg border border-brand-foreground/30 px-6 py-3 font-medium text-brand-foreground transition-colors hover:bg-brand-foreground/10"
-              >
-                Kateqoriyalara bax
-              </Link>
-            </div>
           </div>
         </div>
       </section>

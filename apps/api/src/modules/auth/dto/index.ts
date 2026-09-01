@@ -83,6 +83,14 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   captchaToken?: string;
+
+  @ApiPropertyOptional({
+    enum: ['marketplace', 'provider', 'admin'],
+    description: 'Klient audinesi — məcburi; yanlış app-də session cookie qoyulmur',
+  })
+  @IsOptional()
+  @IsIn(['marketplace', 'provider', 'admin'])
+  clientApp?: 'marketplace' | 'provider' | 'admin';
 }
 
 export class LoginDto {
@@ -96,11 +104,11 @@ export class LoginDto {
   password!: string;
 
   @ApiProperty({
-    enum: ['marketplace', 'admin'],
+    enum: ['marketplace', 'provider', 'admin'],
     description: 'Klient audinesi — məcburi; yanlış app-də session cookie qoyulmur',
   })
-  @IsIn(['marketplace', 'admin'])
-  clientApp!: 'marketplace' | 'admin';
+  @IsIn(['marketplace', 'provider', 'admin'])
+  clientApp!: 'marketplace' | 'provider' | 'admin';
 
   @ApiPropertyOptional({ description: 'Cloudflare Turnstile token' })
   @IsOptional()

@@ -7,6 +7,7 @@ import { AttentionProvider } from '@/components/providers/attention-provider';
 import { AnalyticsProvider } from '@/components/analytics/analytics-provider';
 import { NavigationProgress } from '@/components/layout/navigation-progress';
 import { PwaRegister } from '@/components/pwa/pwa-register';
+import { PwaInstallPrompt } from '@/components/pwa/pwa-install-prompt';
 import { JsonLd } from '@/components/seo/json-ld';
 import { buildOrganizationJsonLd, buildWebSiteJsonLd } from '@/lib/seo-schema';
 import { getSiteUrl } from '@/lib/site-url';
@@ -20,6 +21,7 @@ const inter = Inter({
 });
 
 const siteUrl = getSiteUrl();
+const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() || '';
 
 export const viewport: Viewport = {
   themeColor: BRAND.primary,
@@ -86,10 +88,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <NavigationProgress />
               </Suspense>
               <PwaRegister />
+              <PwaInstallPrompt />
               {children}
             </AttentionProvider>
           </QueryProvider>
         </ThemeProvider>
+        {gaMeasurementId ? (
+          <>
+            <script
+              async
+              src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}
+            />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${gaMeasurementId}');`,
+              }}
+            />
+          </>
+        ) : null}
       </body>
     </html>
   );

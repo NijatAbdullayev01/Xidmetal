@@ -97,6 +97,7 @@ async function bootstrap() {
     ...corsOriginRaw.split(','),
     configService.get<string>('NEXT_PUBLIC_APP_URL'),
     configService.get<string>('NEXT_PUBLIC_ADMIN_URL'),
+    configService.get<string>('NEXT_PUBLIC_PROVIDER_URL'),
   ]
     .map((origin) => origin?.trim())
     .filter((origin): origin is string => Boolean(origin))

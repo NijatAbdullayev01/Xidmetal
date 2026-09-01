@@ -38,12 +38,20 @@ import {
 } from '@xidmetal/shared';
 
 function resolveClientApp(req: Request, bodyClientApp?: string): ClientApp {
-  if (bodyClientApp === CLIENT_APP.MARKETPLACE || bodyClientApp === CLIENT_APP.ADMIN) {
+  if (
+    bodyClientApp === CLIENT_APP.MARKETPLACE ||
+    bodyClientApp === CLIENT_APP.PROVIDER ||
+    bodyClientApp === CLIENT_APP.ADMIN
+  ) {
     return bodyClientApp;
   }
   const header = req.headers[CLIENT_APP_HEADER];
   const raw = Array.isArray(header) ? header[0] : header;
-  if (raw === CLIENT_APP.MARKETPLACE || raw === CLIENT_APP.ADMIN) {
+  if (
+    raw === CLIENT_APP.MARKETPLACE ||
+    raw === CLIENT_APP.PROVIDER ||
+    raw === CLIENT_APP.ADMIN
+  ) {
     return raw;
   }
   throw new BadRequestException(
@@ -80,11 +88,13 @@ export class AuthController {
   @Post('register')
   @ApiOperation({ summary: 'Yeni istifadəçi qeydiyyatı' })
   async register(
+    @Req() req: Request,
     @Body() dto: RegisterDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.register(dto);
-    setAuthCookies(res, this.config, result.tokens, CLIENT_APP.MARKETPLACE);
+    const clientApp = resolveClientApp(req, dto.clientApp);
+    const result = await this.authService.register(dto, clientApp);
+    setAuthCookies(res, this.config, result.tokens, clientApp);
     return toAuthResponse(result);
   }
 

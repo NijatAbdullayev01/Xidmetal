@@ -15,7 +15,6 @@ import { api, ApiError } from '@/lib/api';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Breadcrumbs } from '@/components/layout/breadcrumbs';
 import { ServiceCard } from '@/components/services/service-card';
-import { ServiceIndexLinks } from '@/components/services/service-index-links';
 import { ReviewListItem } from '@/components/reviews/review-list-item';
 import { ReviewStars } from '@/components/reviews/review-stars';
 import { NOINDEX_FOLLOW, pageMetadata, truncateMetaDescription } from '@/lib/seo';
@@ -165,7 +164,6 @@ async function ProviderPageBody({ id }: { id: string }) {
                 />
               ))}
             </div>
-            <ServiceIndexLinks services={services} />
           </section>
         ) : (
           <p className="mt-10 text-sm text-muted-foreground">

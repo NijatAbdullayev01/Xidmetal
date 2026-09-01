@@ -26,6 +26,7 @@ export const VERIFICATION_CODE_DIGITS = 8 as const;
 /** Brauzer klientləri — login audience (yanlış app-də cookie sızmasının qarşısı) */
 export const CLIENT_APP = {
   MARKETPLACE: 'marketplace',
+  PROVIDER: 'provider',
   ADMIN: 'admin',
 } as const;
 

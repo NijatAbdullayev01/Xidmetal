@@ -4,13 +4,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
-  PlusCircle,
-  Briefcase,
   ClipboardList,
-  CalendarDays,
   MessageSquare,
   Bell,
-  Star,
   Settings,
   LogOut,
   Menu,
@@ -21,22 +17,18 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { toDisplayMediaUrl, UserRole } from '@xidmetal/shared';
+import { toDisplayMediaUrl } from '@xidmetal/shared';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth.store';
 import { useLogout } from '@/hooks/use-logout';
 import { useMessageNotifications } from '@/hooks/use-message-notifications';
 import { useBookingNotifications } from '@/hooks/use-booking-notifications';
-import { useReviewNotifications } from '@/hooks/use-review-notifications';
 import { useNotifications } from '@/hooks/use-notifications';
-import { useProviderServiceAttention } from '@/hooks/use-provider-service-attention';
 import { cn } from '@/lib/utils';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
 import { formatNavAttentionAria } from '@/lib/nav-attention';
 import { NavAttentionIndicator } from '@/components/layout/nav-attention-indicator';
-
-type DashboardVariant = 'provider' | 'customer';
 
 interface NavItem {
   href: string;
@@ -45,20 +37,7 @@ interface NavItem {
   exact?: boolean;
 }
 
-const PROVIDER_NAV: NavItem[] = [
-  { href: '/dashboard/provider', label: 'İcmal', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/provider/services/new', label: 'Xidmət ver', icon: PlusCircle },
-  { href: '/dashboard/provider/services', label: 'Xidmətlərim', icon: Briefcase },
-  { href: '/dashboard/provider/calendar', label: 'Təqvim', icon: CalendarDays },
-  { href: '/dashboard/provider/bookings', label: 'Sifarişlər', icon: ClipboardList },
-  { href: '/dashboard/provider/messages', label: 'Mesajlarım', icon: MessageSquare },
-  { href: '/dashboard/provider/notifications', label: 'Bildirişlər', icon: Bell },
-  { href: '/dashboard/provider/ratings', label: 'Reytinq', icon: Star },
-  { href: '/dashboard/provider/report', label: 'Şikayət', icon: Flag },
-  { href: '/dashboard/provider/settings', label: 'Tənzimləmələr', icon: Settings },
-];
-
-const CUSTOMER_NAV: NavItem[] = [
+const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/customer', label: 'İcmal', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/customer/bookings', label: 'Sifarişlərim', icon: ClipboardList },
   { href: '/dashboard/customer/messages', label: 'Mesajlarım', icon: MessageSquare },
@@ -68,14 +47,7 @@ const CUSTOMER_NAV: NavItem[] = [
   { href: '/dashboard/customer/settings', label: 'Tənzimləmələr', icon: Settings },
 ];
 
-const ROLE_LABELS: Record<DashboardVariant, string> = {
-  provider: 'Xidmət verən',
-  customer: 'Xidmət alan',
-};
-
-interface DashboardSidebarProps {
-  variant: DashboardVariant;
-}
+const ROLE_LABEL = 'Xidmət alan';
 
 function isMessagesNavItem(href: string) {
   return href.endsWith('/messages');
@@ -85,19 +57,11 @@ function isBookingsNavItem(href: string) {
   return href.endsWith('/bookings');
 }
 
-function isRatingsNavItem(href: string) {
-  return href.endsWith('/ratings');
-}
-
 function isNotificationsNavItem(href: string) {
   return href.endsWith('/notifications');
 }
 
-function isMyServicesNavItem(href: string) {
-  return href === '/dashboard/provider/services';
-}
-
-export function DashboardSidebar({ variant }: DashboardSidebarProps) {
+export function DashboardSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -107,18 +71,9 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
   const logout = useLogout();
   const { unreadCount: unreadMessages } = useMessageNotifications(!!user);
   const { attentionCount: bookingAttention } = useBookingNotifications(!!user);
-  const { attentionCount: reviewAttention } = useReviewNotifications(
-    !!user && variant === 'provider',
-  );
   const { unreadCount: adminUnread } = useNotifications(!!user);
-  const {
-    needsRevisionCount,
-    unreadApprovedCount,
-    attentionCount: servicesAttention,
-  } = useProviderServiceAttention(!!user && variant === 'provider');
 
-  const navItems = variant === 'provider' ? PROVIDER_NAV : CUSTOMER_NAV;
-  const roleLabel = ROLE_LABELS[variant];
+  const navItems = NAV_ITEMS;
 
   useScrollLock(mobileOpen);
 
@@ -194,14 +149,7 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
   const liveParts: string[] = [];
   if (unreadMessages > 0) liveParts.push(`${unreadMessages} oxunmamış mesaj`);
   if (bookingAttention > 0) liveParts.push(`${bookingAttention} sifariş bildirişi`);
-  if (reviewAttention > 0) liveParts.push(`${reviewAttention} yeni rəy`);
   if (adminUnread > 0) liveParts.push(`${adminUnread} platforma bildirişi`);
-  if (needsRevisionCount > 0) {
-    liveParts.push(`${needsRevisionCount} xidmət düzəliş gözləyir`);
-  }
-  if (unreadApprovedCount > 0) {
-    liveParts.push(`${unreadApprovedCount} xidmət təsdiqi`);
-  }
   const liveMessage = liveParts.join('. ');
 
   const navContent = (
@@ -217,9 +165,7 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
         let attention = 0;
         if (isMessagesNavItem(item.href)) attention = unreadMessages;
         else if (isBookingsNavItem(item.href)) attention = bookingAttention;
-        else if (isRatingsNavItem(item.href)) attention = reviewAttention;
         else if (isNotificationsNavItem(item.href)) attention = adminUnread;
-        else if (isMyServicesNavItem(item.href)) attention = servicesAttention;
         const attentionLabel = formatNavAttentionAria(item.label, attention);
         return (
           <Link
@@ -253,7 +199,7 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
           <p className="truncate text-sm font-medium">
             {user?.firstName} {user?.lastName}
           </p>
-          <p className="text-xs text-muted-foreground">{roleLabel}</p>
+          <p className="text-xs text-muted-foreground">{ROLE_LABEL}</p>
         </div>
       </div>
       <Button
@@ -345,7 +291,7 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
               <p className="truncate text-sm font-medium">
                 {user?.firstName} {user?.lastName}
               </p>
-              <p className="text-xs text-muted-foreground">{roleLabel}</p>
+              <p className="text-xs text-muted-foreground">{ROLE_LABEL}</p>
             </div>
           </div>
           <Button variant="outline" size="sm" className="w-full" onClick={logout}>
@@ -356,8 +302,4 @@ export function DashboardSidebar({ variant }: DashboardSidebarProps) {
       </aside>
     </>
   );
-}
-
-export function getDashboardVariant(role: UserRole): DashboardVariant {
-  return role === UserRole.PROVIDER ? 'provider' : 'customer';
 }

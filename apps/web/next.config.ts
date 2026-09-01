@@ -77,6 +77,10 @@ function buildSecurityHeaders() {
     'https://*.googleapis.com',
     'https://*.gstatic.com',
     'https://challenges.cloudflare.com',
+    'https://www.googletagmanager.com',
+    'https://www.google-analytics.com',
+    'https://region1.google-analytics.com',
+    'https://*.analytics.google.com',
   ].filter(Boolean);
 
   const mediaOrigins = [
@@ -103,12 +107,12 @@ function buildSecurityHeaders() {
     "frame-ancestors 'none'",
     "form-action 'self'",
     "object-src 'none'",
-    `img-src 'self' data: blob: https://challenges.cloudflare.com ${mediaOrigins.join(' ')}`.trim(),
+    `img-src 'self' data: blob: https://challenges.cloudflare.com https://www.google-analytics.com https://www.googletagmanager.com ${mediaOrigins.join(' ')}`.trim(),
     "font-src 'self' data: https://fonts.gstatic.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "script-src 'self' 'unsafe-inline'" +
       (process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'") +
-      ' https://challenges.cloudflare.com',
+      ' https://challenges.cloudflare.com https://www.googletagmanager.com',
     "frame-src 'self' https://challenges.cloudflare.com",
     "worker-src 'self' blob:",
     `connect-src ${connectSrc.join(' ')}`,

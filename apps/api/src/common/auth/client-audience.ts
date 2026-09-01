@@ -11,7 +11,11 @@ import type { Request } from 'express';
 /** JWT aud claim → ClientApp (string | string[] normallaşdırma) */
 export function normalizeTokenAudience(aud: unknown): ClientApp | undefined {
   const raw = Array.isArray(aud) ? aud[0] : aud;
-  if (raw === CLIENT_APP.ADMIN || raw === CLIENT_APP.MARKETPLACE) {
+  if (
+    raw === CLIENT_APP.ADMIN ||
+    raw === CLIENT_APP.MARKETPLACE ||
+    raw === CLIENT_APP.PROVIDER
+  ) {
     return raw;
   }
   return undefined;
@@ -23,7 +27,11 @@ export function readClientAppFromHeaders(
   if (!headers) return undefined;
   const header = headers[CLIENT_APP_HEADER];
   const raw = Array.isArray(header) ? header[0] : header;
-  if (raw === CLIENT_APP.MARKETPLACE || raw === CLIENT_APP.ADMIN) {
+  if (
+    raw === CLIENT_APP.MARKETPLACE ||
+    raw === CLIENT_APP.PROVIDER ||
+    raw === CLIENT_APP.ADMIN
+  ) {
     return raw;
   }
   return undefined;
@@ -62,7 +70,10 @@ export function assertSessionAudience(options: {
     reject('Sessiya bu tətbiq üçün etibarsızdır');
   }
 
-  if (effectiveApp === CLIENT_APP.MARKETPLACE && role === UserRole.ADMIN) {
+  if (effectiveApp === CLIENT_APP.MARKETPLACE && role !== UserRole.CUSTOMER) {
+    reject('Sessiya bu tətbiq üçün etibarsızdır');
+  }
+  if (effectiveApp === CLIENT_APP.PROVIDER && role !== UserRole.PROVIDER) {
     reject('Sessiya bu tətbiq üçün etibarsızdır');
   }
   if (effectiveApp === CLIENT_APP.ADMIN && role !== UserRole.ADMIN) {

@@ -4,14 +4,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
 import { Logo } from '@/components/layout/logo';
-import { BecomeProviderLink } from '@/components/auth/become-provider-link';
+import { FooterInstallCard } from '@/components/layout/footer-install-card';
 import { APP } from '@xidmetal/shared';
 import { cn } from '@/lib/utils';
 
 type FooterLink = {
   href: string;
   label: string;
-  becomeProvider?: boolean;
 };
 
 const footerSections: { key: string; title: string; links: FooterLink[] }[] = [
@@ -19,21 +18,22 @@ const footerSections: { key: string; title: string; links: FooterLink[] }[] = [
     key: 'platform',
     title: 'Platforma',
     links: [
-      { href: '/services', label: 'Xidmətlər' },
-            { href: '/categories', label: 'Kateqoriyalar' },
-            { href: '/categories/temizlik', label: 'Təmizlik' },
-            { href: '/categories/temir', label: 'Təmir' },
-            { href: '/faq', label: 'Tez-tez verilən suallar' },
+      { href: '/faq', label: 'Tez-tez verilən suallar' },
       { href: '/how-it-works', label: 'Necə işləyir?' },
       { href: '/terms', label: 'İstifadə qaydaları' },
     ],
   },
   {
-    key: 'provider',
-    title: 'Xidmət verən üçün',
+    key: 'services',
+    title: 'Xidmətlər',
     links: [
-      { href: '/register?role=provider', label: 'Xidmət verən ol', becomeProvider: true },
-      { href: '/provider/guide', label: 'Xidmət verən bələdçisi' },
+      { href: '/services', label: 'Xidmətlər' },
+      { href: '/categories/temizlik', label: 'Təmizlik' },
+      { href: '/categories/temir', label: 'Təmir' },
+      { href: '/categories/gozellik', label: 'Gözəllik' },
+      { href: '/categories/dezinfeksiya', label: 'Dezinfeksiya' },
+      { href: '/categories/neqliyyat', label: 'Nəqliyyat' },
+      { href: '/categories/catdirilma', label: 'Çatdırılma' },
     ],
   },
   {
@@ -61,15 +61,9 @@ function FooterLinkList({
     <ul className={className ?? 'mt-3 space-y-2'}>
       {links.map((link) => (
         <li key={link.href}>
-          {link.becomeProvider ? (
-            <BecomeProviderLink className={linkClassName}>
-              {link.label}
-            </BecomeProviderLink>
-          ) : (
-            <Link href={link.href} className={linkClassName}>
-              {link.label}
-            </Link>
-          )}
+          <Link href={link.href} className={linkClassName}>
+            {link.label}
+          </Link>
         </li>
       ))}
     </ul>
@@ -145,6 +139,7 @@ export function Footer() {
               <Logo className="h-10" variant="transparent" />
             </Link>
             <p className="text-sm text-muted-foreground">{APP.description}</p>
+            <FooterInstallCard />
           </div>
 
           <FooterMobileNav />

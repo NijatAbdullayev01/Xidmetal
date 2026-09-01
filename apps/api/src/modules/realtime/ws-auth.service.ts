@@ -139,13 +139,21 @@ export class WsAuthService {
 
   private readClientApp(client: Socket): ClientApp | undefined {
     const fromAuth = client.handshake.auth?.clientApp;
-    if (fromAuth === CLIENT_APP.MARKETPLACE || fromAuth === CLIENT_APP.ADMIN) {
+    if (
+      fromAuth === CLIENT_APP.MARKETPLACE ||
+      fromAuth === CLIENT_APP.PROVIDER ||
+      fromAuth === CLIENT_APP.ADMIN
+    ) {
       return fromAuth;
     }
 
     const header = client.handshake.headers[CLIENT_APP_HEADER];
     const raw = Array.isArray(header) ? header[0] : header;
-    if (raw === CLIENT_APP.MARKETPLACE || raw === CLIENT_APP.ADMIN) {
+    if (
+      raw === CLIENT_APP.MARKETPLACE ||
+      raw === CLIENT_APP.PROVIDER ||
+      raw === CLIENT_APP.ADMIN
+    ) {
       return raw;
     }
     return undefined;

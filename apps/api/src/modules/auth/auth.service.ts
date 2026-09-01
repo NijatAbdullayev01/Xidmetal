@@ -72,7 +72,7 @@ export class AuthService {
     private sessions: SessionRevocationService,
   ) {}
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto, clientApp: ClientApp = CLIENT_APP.MARKETPLACE) {
     await this.captcha.assertValid(dto.captchaToken);
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findFirst({
@@ -89,6 +89,12 @@ export class AuthService {
     const role = dto.role ?? UserRole.CUSTOMER;
     if (role === UserRole.ADMIN) {
       throw new BadRequestException('Bu hesab növü ilə qeydiyyat mümkün deyil');
+    }
+    if (clientApp === CLIENT_APP.PROVIDER && role !== UserRole.PROVIDER) {
+      throw new BadRequestException('Bu panel yalnız xidmət verənlər üçündür');
+    }
+    if (clientApp === CLIENT_APP.MARKETPLACE && role !== UserRole.CUSTOMER) {
+      throw new BadRequestException('Marketplace yalnız xidmət alanlar üçündür');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
@@ -143,7 +149,7 @@ export class AuthService {
       user.id,
       user.email,
       user.role,
-      CLIENT_APP.MARKETPLACE,
+      clientApp,
     );
     return {
       user: await this.sanitizeUser(user),
@@ -186,7 +192,7 @@ export class AuthService {
   }
 
   /**
-   * Marketplace yalnız CUSTOMER/PROVIDER; admin panel yalnız ADMIN.
+   * Marketplace yalnız CUSTOMER; provider paneli yalnız PROVIDER; admin yalnız ADMIN.
    * clientApp məcburidir — yanlış app-də session yaradılmır.
    */
   assertClientAudience(role: string, clientApp: ClientApp): void {
@@ -194,6 +200,14 @@ export class AuthService {
       throw new ForbiddenException(
         'Administrator hesabı marketplace-ə aid deyil. Admin panelinə keçin.',
       );
+    }
+    if (clientApp === CLIENT_APP.MARKETPLACE && role === UserRole.PROVIDER) {
+      throw new ForbiddenException(
+        'Xidmət verən hesabı marketplace-ə aid deyil. Xidmət verən panelinə keçin.',
+      );
+    }
+    if (clientApp === CLIENT_APP.PROVIDER && role !== UserRole.PROVIDER) {
+      throw new ForbiddenException('Bu panel yalnız xidmət verənlər üçündür');
     }
     if (clientApp === CLIENT_APP.ADMIN && role !== UserRole.ADMIN) {
       throw new ForbiddenException('Bu panel yalnız administrator üçündür');
@@ -238,7 +252,9 @@ export class AuthService {
     }
 
     const storedApp =
-      stored.clientApp === CLIENT_APP.ADMIN || stored.clientApp === CLIENT_APP.MARKETPLACE
+      stored.clientApp === CLIENT_APP.ADMIN ||
+      stored.clientApp === CLIENT_APP.MARKETPLACE ||
+      stored.clientApp === CLIENT_APP.PROVIDER
         ? stored.clientApp
         : CLIENT_APP.MARKETPLACE;
 

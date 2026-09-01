@@ -1,5 +1,5 @@
 /* PWA service worker — shell cache + push (FCM background) */
-const SHELL_CACHE = 'xidmetal-shell-v1';
+const SHELL_CACHE = 'xidmetal-shell-v3';
 const SHELL_URLS = ['/', '/manifest.webmanifest', '/logo.png'];
 
 self.addEventListener('install', (event) => {
