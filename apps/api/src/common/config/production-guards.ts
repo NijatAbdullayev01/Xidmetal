@@ -15,6 +15,9 @@ export type ProductionGuardEnv = {
   paymentsEnabled?: string | null;
   paymentProvider?: string | null;
   databaseUrl?: string | null;
+  cardEncryptionKey?: string | null;
+  epointPublicKey?: string | null;
+  epointPrivateKey?: string | null;
 };
 
 const WEAK_DB_FRAGMENTS = ['xidmetal_dev', ':xidmetal@'] as const;
@@ -120,6 +123,22 @@ export function assertProductionRuntimeConfig(env: ProductionGuardEnv): void {
   if (paymentProvider === 'stripe') {
     missing.push(
       'PAYMENT_PROVIDER=stripe (real Stripe hələ yoxdur; production-da istifadə etməyin)',
+    );
+  }
+
+  // Kart token şifrələmə açarı — JWT_SECRET ilə təkrar istifadə key-reuse riskidir.
+  const cardKey = env.cardEncryptionKey?.trim();
+  if (!cardKey || cardKey.length < 32) {
+    missing.push(
+      'CARD_ENCRYPTION_KEY (kart token AES-256-GCM üçün ən azı 32 simvol)',
+    );
+  }
+
+  // Epoint açarları olmadan kart top-up "simulyasiya" rejiminə keçir — production-da
+  // bu real ödəniş olmadan balans artırmaq deməkdir və qadağandır.
+  if (!env.epointPublicKey?.trim() || !env.epointPrivateKey?.trim()) {
+    missing.push(
+      'EPOINT_PUBLIC_KEY / EPOINT_PRIVATE_KEY (kart top-up production-da simulyasiya qadağandır)',
     );
   }
 

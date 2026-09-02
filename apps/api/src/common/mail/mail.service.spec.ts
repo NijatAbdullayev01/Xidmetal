@@ -91,7 +91,7 @@ describe('MailService SMTP failures', () => {
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
-  it('DEV-də SMTP auth xətası OTP-ni preview-ə düşürmür', async () => {
+  it('DEV-də istənilən SMTP xətası (məs. auth 535) OTP-ni preview-ə düşürür', async () => {
     sendMail.mockRejectedValue(new Error('Invalid login: 535 5.7.8'));
     const service = new MailService(
       makeConfig({
@@ -103,7 +103,24 @@ describe('MailService SMTP failures', () => {
 
     await expect(
       service.sendSignupVerificationCode('ali@test.az', '123456'),
-    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    ).resolves.toEqual({ delivered: false, previewCode: '123456' });
+  });
+
+  it('DEV-də qeyri-mövcud ünvan (Resend 550) OTP-ni preview-ə düşürür', async () => {
+    sendMail.mockRejectedValue(
+      new Error("Message failed: 550 Invalid `to` field. Please use our testing email address instead of domains like `example.com`."),
+    );
+    const service = new MailService(
+      makeConfig({
+        NODE_ENV: 'development',
+        SMTP_HOST: 'smtp.resend.com',
+        SMTP_FROM: 'mail@xidmetal.com',
+      }) as never,
+    );
+
+    await expect(
+      service.sendSignupVerificationCode('user@example.com', '87654321'),
+    ).resolves.toEqual({ delivered: false, previewCode: '87654321' });
   });
 });
 

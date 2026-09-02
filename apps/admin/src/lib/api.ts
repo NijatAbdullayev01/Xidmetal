@@ -27,6 +27,8 @@ import type {
   ContactInboxSummary,
   AdminAuditLogSummary,
   AdminSetKycStatusInput,
+  AdminCommissionSummary,
+  ProviderWalletSummary,
 } from '@xidmetal/shared';
 import { CLIENT_APP, CLIENT_APP_HEADER } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
@@ -313,5 +315,22 @@ export const api = {
         token,
       });
     },
+    commission: (token: string, params?: Record<string, string>) => {
+      const query = params ? `?${new URLSearchParams(params)}` : '';
+      return apiClient<PaginatedResponse<AdminCommissionSummary>>(
+        `/admin/commission${query}`,
+        { token },
+      );
+    },
+    adjustCommission: (
+      token: string,
+      userId: string,
+      data: { amount: number; note?: string },
+    ) =>
+      apiClient<ProviderWalletSummary>(`/admin/commission/${userId}/adjust`, {
+        method: 'POST',
+        token,
+        body: JSON.stringify(data),
+      }),
   },
 };

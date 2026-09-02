@@ -299,3 +299,13 @@ export class AdminContactQueryDto extends AdminPaginationQueryDto {
   @IsBoolean()
   isRead?: boolean;
 }
+
+export class AdminCommissionQueryDto extends AdminPaginationQueryDto {
+  @ApiPropertyOptional({
+    description: 'Ad, soyad, e-poçt və ya hesab nömrəsi axtarışı',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  search?: string;
+}

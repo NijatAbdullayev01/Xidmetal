@@ -19,6 +19,7 @@ import {
   BarChart3,
   Inbox,
   ScrollText,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -50,6 +51,7 @@ const ADMIN_NAV: NavItem[] = [
   { href: '/bookings', label: 'Sifarişlər', icon: ClipboardList },
   { href: '/reviews', label: 'Rəylər', icon: Star },
   { href: '/reports', label: 'Şikayətlər', icon: Flag },
+  { href: '/commission', label: 'Komissiya', icon: Wallet },
   { href: '/contact', label: 'Əlaqə', icon: Inbox },
   { href: '/audit', label: 'Audit', icon: ScrollText },
   { href: '/announcements', label: 'Bildirişlər', icon: Megaphone },

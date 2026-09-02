@@ -57,6 +57,9 @@ import type {
   RegisterDeviceTokenInput,
   UnregisterDeviceTokenInput,
   PublicProviderProfile,
+  ProviderWalletSummary,
+  WalletTransactionSummary,
+  ProviderCardSummary,
 } from '@xidmetal/shared';
 import { BookingStatus, CLIENT_APP, CLIENT_APP_HEADER } from '@xidmetal/shared';
 import { useAuthStore } from '@/store/auth.store';
@@ -766,6 +769,57 @@ export const api = {
         method: 'PATCH',
         token,
         body: JSON.stringify({ availability }),
+      }),
+  },
+
+  commission: {
+    account: (token: string) =>
+      apiClient<ProviderWalletSummary>('/commission/account', { token }),
+
+    transactions: (token: string, params?: Record<string, string>) => {
+      const query = params ? `?${new URLSearchParams(params)}` : '';
+      return apiClient<PaginatedResponse<WalletTransactionSummary>>(
+        `/commission/transactions${query}`,
+        { token },
+      );
+    },
+
+    cards: (token: string) =>
+      apiClient<ProviderCardSummary[]>('/commission/cards', { token }),
+
+    registerCard: (token: string) =>
+      apiClient<{
+        orderId: string;
+        redirectUrl: string | null;
+        card?: ProviderCardSummary;
+      }>('/commission/cards', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({}),
+      }),
+
+    deleteCard: (token: string, id: string) =>
+      apiClient<{ deleted: boolean }>(`/commission/cards/${id}`, {
+        method: 'DELETE',
+        token,
+      }),
+
+    deposit: (
+      token: string,
+      data: { cardId: string; amount: number },
+      options?: { idempotencyKey?: string },
+    ) =>
+      apiClient<{
+        orderId: string;
+        redirectUrl: string | null;
+        wallet?: ProviderWalletSummary;
+      }>('/commission/deposits', {
+        method: 'POST',
+        token,
+        body: JSON.stringify(data),
+        headers: options?.idempotencyKey
+          ? { 'Idempotency-Key': options.idempotencyKey }
+          : undefined,
       }),
   },
 };

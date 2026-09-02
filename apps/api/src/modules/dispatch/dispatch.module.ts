@@ -9,7 +9,7 @@ import { BookingCapacityModule } from '../../common/booking/booking-capacity.mod
 @Module({
   imports: [
     forwardRef(() => RealtimeModule),
-    NotificationChannelsModule,
+    forwardRef(() => NotificationChannelsModule),
     BookingCapacityModule,
   ],
   controllers: [DispatchController],

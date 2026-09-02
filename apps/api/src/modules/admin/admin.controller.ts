@@ -29,7 +29,9 @@ import {
   SetKycStatusDto,
   AdminContactQueryDto,
   AdminPaginationQueryDto,
+  AdminCommissionQueryDto,
 } from './dto';
+import { AdminAdjustWalletDto } from '../commission/dto';
 import { JwtAuthGuard, RolesGuard } from '../../common/guards';
 import { Roles } from '../../common/decorators';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -194,5 +196,23 @@ export class AdminController {
   @ApiOperation({ summary: 'Admin audit jurnalı' })
   listAudit(@Query() query: AdminPaginationQueryDto) {
     return this.adminService.listAuditLogs(query);
+  }
+
+  @Get('commission')
+  @ApiOperation({ summary: 'Xidmət verənlərin borc/balans siyahısı' })
+  listCommission(@Query() query: AdminCommissionQueryDto) {
+    return this.adminService.listCommission(query);
+  }
+
+  @Post('commission/:userId/adjust')
+  @ApiOperation({
+    summary: 'Köçürmə ilə ödənişi qeyd et (borcu azaldır)',
+  })
+  adjustCommission(
+    @Param('userId') userId: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: AdminAdjustWalletDto,
+  ) {
+    return this.adminService.adjustCommission(userId, adminId, dto);
   }
 }

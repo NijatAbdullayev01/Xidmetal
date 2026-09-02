@@ -19,6 +19,7 @@ describe('AuthService.register', () => {
     const jwt = { signAsync: vi.fn() };
     const config = { get: vi.fn() };
     const storage = { toReadableMediaUrl: vi.fn() };
+    const commission = { ensureWallet: vi.fn().mockResolvedValue(undefined) };
 
     return {
       service: new AuthService(
@@ -30,6 +31,7 @@ describe('AuthService.register', () => {
         storage as never,
         { isAvailable: () => false, incr: vi.fn(), expire: vi.fn(), del: vi.fn(), get: vi.fn() } as never,
         { revokeAll: vi.fn(), publish: vi.fn() } as never,
+        commission as never,
       ),
       prisma,
       captcha,
@@ -122,6 +124,7 @@ describe('AuthService.forgotPassword', () => {
         get: vi.fn(),
       } as never,
       { revokeAll: vi.fn(), publish: vi.fn() } as never,
+      { ensureWallet: vi.fn().mockResolvedValue(undefined) } as never,
     );
     return { service, mail, prisma };
   }

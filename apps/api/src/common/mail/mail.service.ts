@@ -24,7 +24,6 @@ import {
   type MailKind,
 } from './mail-identity';
 import {
-  isSmtpConnectFailure,
   normalizeSmtpHost,
   parseSmtpPort,
 } from './smtp-host';
@@ -338,6 +337,19 @@ export class MailService {
     /** true → SMTP yoxdursa və ya göndərmə uğursuzdursa throw etmə (best-effort) */
     softFailInProduction?: boolean;
   }): Promise<MailSendResult> {
+    // Dev/test rejimində OTP/təsdiq kod poçtları real SMTP-yə (Resend və s.)
+    // göndərilməsin — kod yalnız API cavabında test üçün qayıdır. Production-da
+    // isə bu guard keçmir və poçt normal göndərilir (previewCode prod-da gizlədilir).
+    if (!this.isProduction && input.previewCode) {
+      this.logger.log(
+        `[DEV] SMTP-ə kod poçtu göndərilmədi — test kodu (${input.to}): ${input.previewCode}`,
+      );
+      return {
+        delivered: false,
+        ...this.devPreview(input.previewCode),
+      };
+    }
+
     if (!this.transporter) {
       if (this.isProduction && !input.softFailInProduction) {
         throw new ServiceUnavailableException(
@@ -374,11 +386,13 @@ export class MailService {
       });
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
-      const devConnectFallback =
-        !this.isProduction && isSmtpConnectFailure(err) && !input.softFailInProduction;
-      if (devConnectFallback) {
+
+      // Dev/test rejimi SMTP-dən asılı olmamalıdır: istənilən xəta (Resend-in
+      // qeyri-mövcud ünvana 550 cavabı daxil) kodun previewCode kimi
+      // qaytarılmasına mane olmamalıdır — qeydiyyat həmişə dev kodu alır.
+      if (!this.isProduction) {
         this.logger.warn(
-          `[DEV] SMTP əlçatan deyil (${detail}) — e-poçt loga yazıldı (${input.to}): ${input.text}`,
+          `[DEV] SMTP göndərmə uğursuz (${detail}) — kod loga yazıldı (${input.to}): ${input.text}`,
         );
         return {
           delivered: false,

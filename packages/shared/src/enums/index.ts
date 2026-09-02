@@ -71,6 +71,40 @@ export enum DevicePlatform {
   IOS = 'IOS',
 }
 
+/** Xidmət verən hesabı (cüzdan) əməliyyat növü */
+export enum WalletTransactionType {
+  /** 15% komissiya — balansı azaldır (borc yaradır) */
+  COMMISSION = 'COMMISSION',
+  /** Kart ilə top-up — balansı artırır */
+  CARD_DEPOSIT = 'CARD_DEPOSIT',
+  /** Admin köçürmə qeydi / borc sıfırlama — balansı artırır */
+  ADMIN_ADJUSTMENT = 'ADMIN_ADJUSTMENT',
+  /** Geri qaytarma — balansı artırır (gələcək) */
+  REFUND = 'REFUND',
+}
+
+/** Epoint vasitəsilə gedən provider ödəniş sifarişi növü */
+export enum ProviderPaymentOrderType {
+  /** Kart qeydiyyatı (tokenizasiya) */
+  CARD_REGISTRATION = 'CARD_REGISTRATION',
+  /** Saxlanmış kart ilə top-up */
+  DEPOSIT = 'DEPOSIT',
+}
+
+/** Provider ödəniş sifarişi statusu */
+export enum ProviderPaymentOrderStatus {
+  PENDING = 'PENDING',
+  SUCCEEDED = 'SUCCEEDED',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+}
+
+/** Hesabın bağlanma (suspension) səbəbi */
+export enum ProviderSuspensionReason {
+  /** Borc müddəti bitdi — 1 iş günü ödənmədi */
+  DEBT_OVERDUE = 'DEBT_OVERDUE',
+}
+
 export enum ServiceStatus {
   DRAFT = 'DRAFT',
   PENDING_REVIEW = 'PENDING_REVIEW',
@@ -128,7 +162,23 @@ export enum NotificationType {
   SERVICE_APPROVED = 'SERVICE_APPROVED',
   /** Admin xidməti düzəlişə göndərdi — Xidmətlərim (inbox-a düşmür) */
   SERVICE_NEEDS_REVISION = 'SERVICE_NEEDS_REVISION',
+  /** Borc 10 AZN-ə çatdı — 1 iş günü ödəmə müddəti (borc səhifəsi badge) */
+  COMMISSION_DEBT_DUE = 'COMMISSION_DEBT_DUE',
+  /** Borc müddəti bitdi — hesab bağlandı */
+  COMMISSION_ACCOUNT_SUSPENDED = 'COMMISSION_ACCOUNT_SUSPENDED',
+  /** Borc ödəndi — hesab yenidən açıldı */
+  COMMISSION_ACCOUNT_RESTORED = 'COMMISSION_ACCOUNT_RESTORED',
 }
+
+/**
+ * Borc/komissiya bildiriş tipləri — borc səhifəsi badge-i.
+ * Inbox-a (ADMIN_NOTIFICATION_TYPES) daxil deyil.
+ */
+export const COMMISSION_NOTIFICATION_TYPES = [
+  NotificationType.COMMISSION_DEBT_DUE,
+  NotificationType.COMMISSION_ACCOUNT_SUSPENDED,
+  NotificationType.COMMISSION_ACCOUNT_RESTORED,
+] as const;
 
 /**
  * Zəng ikonu və dashboard notifications inbox allowlist-i.

@@ -56,6 +56,9 @@ model User {
   deviceTokens            DeviceToken[]
   kycDocuments            ProviderKycDocument[]
   adminAuditLogs          AdminAuditLog[] @relation("AdminAuditActor")
+  providerWallet          ProviderWallet?
+  providerCards           ProviderCard[]
+  paymentOrders           ProviderPaymentOrder[]
 
   @@index([deletedAt])
   @@map("users")
@@ -432,6 +435,123 @@ model Payment {
   @@map("payments")
 }
 
+// ─── Xidmət verən komissiyası & borc hesabı (Faza 6) ─────────────────────────
+
+enum WalletTransactionType {
+  COMMISSION
+  CARD_DEPOSIT
+  ADMIN_ADJUSTMENT
+  REFUND
+}
+
+enum ProviderPaymentOrderType {
+  CARD_REGISTRATION
+  DEPOSIT
+}
+
+enum ProviderPaymentOrderStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+/**
+ * Xidmət verənin virtual hesabı — komissiya borcu + top-up balansı.
+ * `balance` mənfi olduqda borc (`debt = -balance`). Hər xidmət verənə unikal
+ * virtual hesab nömrəsi verilir; köçürmə ilə ödənişdə admin bu nömrə ilə borcu
+ * uyğunlaşdırıb sıfırlayır.
+ */
+model ProviderWallet {
+  id              String    @id @default(uuid())
+  providerId      String    @unique @map("provider_id")
+  accountNumber   String    @unique @map("account_number")
+  balance         Decimal   @default(0) @map("balance") @db.Decimal(12, 2)
+  debtDueAt       DateTime? @map("debt_due_at")
+  debtNotifiedAt  DateTime? @map("debt_notified_at")
+  suspendedAt     DateTime? @map("suspended_at")
+  suspendedReason String?   @map("suspended_reason")
+  /** Borc üzündən avtomatik PAUSED edilmiş xidmət ID-ləri (açılışda bərpa üçün) */
+  suspendedServices Json?  @map("suspended_services")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  provider     User                @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@index([providerId])
+  @@map("provider_wallets")
+}
+
+/** Hesab əməliyyatı (ledger) — balans heç vaxt yerdən götürülmür, hər zaman iz qalır */
+model WalletTransaction {
+  id           String                @id @default(uuid())
+  walletId     String                @map("wallet_id")
+  type         WalletTransactionType
+  amount       Decimal               @map("amount") @db.Decimal(12, 2)
+  balanceAfter Decimal               @map("balance_after") @db.Decimal(12, 2)
+  referenceId  String?               @map("reference_id")
+  description  String?
+  meta         Json?
+  createdAt    DateTime              @default(now()) @map("created_at")
+
+  wallet ProviderWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, createdAt])
+  @@index([type, referenceId])
+  @@map("wallet_transactions")
+}
+
+/**
+ * Tokenləşdirilmiş kart (PCI SAQ-A) — PAN/CVV/expiry heç vaxt saxlanmır.
+ * Yalnız Epoint-in verdiyi token + last4/brand. Token at-rest AES-256-GCM ilə şifrələnir.
+ */
+model ProviderCard {
+  id         String   @id @default(uuid())
+  providerId String   @map("provider_id")
+  tokenHash  String   @unique @map("token_hash")
+  tokenEnc   String   @map("token_enc")
+  brand      String?
+  last4      String   @map("last4")
+  expMonth   Int?     @map("exp_month")
+  expYear    Int?     @map("exp_year")
+  isDefault  Boolean  @default(false) @map("is_default")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  provider User @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@map("provider_cards")
+}
+
+/**
+ * Epoint ödəniş sifarişi — top-up və kart qeydiyyatı üçün lifecycle + idempotency.
+ * `orderId` Epoint order_id ilə unikal əlaqə yaradır; callback yalnız PENDING-i
+ * işləyir (təkrarlanan webhook üçün idempotent).
+ */
+model ProviderPaymentOrder {
+  id           String                     @id @default(uuid())
+  providerId   String                     @map("provider_id")
+  type         ProviderPaymentOrderType
+  status       ProviderPaymentOrderStatus @default(PENDING)
+  amount       Decimal?                   @map("amount") @db.Decimal(12, 2)
+  orderId      String                     @unique @map("order_id")
+  externalId   String?                    @map("external_id")
+  cardToken    String?                    @map("card_token")
+  cardBrand    String?                    @map("card_brand")
+  cardLast4    String?                    @map("card_last4")
+  cardExpMonth Int?                       @map("card_exp_month")
+  cardExpYear  Int?                       @map("card_exp_year")
+  meta         Json?
+  createdAt    DateTime                   @default(now()) @map("created_at")
+  updatedAt    DateTime                   @updatedAt @map("updated_at")
+
+  provider User @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, createdAt])
+  @@map("provider_payment_orders")
+}
+
 // ─── Push cihaz token-ləri (Faza 5) ──────────────────────────────────────────
 
 enum DevicePlatform {
@@ -612,6 +732,12 @@ enum NotificationType {
   SERVICE_APPROVED
   /// Admin xidməti düzəlişə göndərdi — Xidmətlərim (inbox yox)
   SERVICE_NEEDS_REVISION
+  /// Borc 10 AZN-ə çatdı — 1 iş günü müddət (borc səhifəsi)
+  COMMISSION_DEBT_DUE
+  /// Borc müddəti bitdi — hesab bağlandı
+  COMMISSION_ACCOUNT_SUSPENDED
+  /// Borc ödəndi — hesab yenidən açıldı
+  COMMISSION_ACCOUNT_RESTORED
 }
 
 // ─── Şikayətlər ──────────────────────────────────────────────────────────────

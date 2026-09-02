@@ -30,6 +30,7 @@ import { CaptchaService } from '../../common/captcha/captcha.service';
 import { StorageService } from '../../common/storage/storage.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { SessionRevocationService } from '../../common/auth/session-revocation.service';
+import { CommissionService } from '../commission/commission.service';
 
 const UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
 const EMAIL_CODE_EXPIRY_MS = 15 * 60 * 1000;
@@ -70,6 +71,7 @@ export class AuthService {
     private storageService: StorageService,
     private redis: RedisService,
     private sessions: SessionRevocationService,
+    private commission: CommissionService,
   ) {}
 
   async register(dto: RegisterDto, clientApp: ClientApp = CLIENT_APP.MARKETPLACE) {
@@ -136,6 +138,12 @@ export class AuthService {
         throw new ConflictException(REGISTER_CONFLICT_MESSAGE);
       }
       throw error;
+    }
+
+    if (role === UserRole.PROVIDER) {
+      // Xidmət verən qeydiyyatdan keçən kimi virtual hesab (borc/balans) +
+      // köçürmə üçün unikal hesab nömrəsi avtomatik yaradılır.
+      await this.commission.ensureWallet(user.id);
     }
 
     const mail = await this.issueEmailCode(
@@ -371,16 +379,21 @@ export class AuthService {
     });
 
     if (user?.isActive && !user.deletedAt && !user.isVerified) {
-      await this.issueEmailCode(
+      const mail = await this.issueEmailCode(
         user.id,
         user.email,
         EmailVerificationPurpose.SIGNUP_VERIFY,
         (to, code) => this.mailService.sendSignupVerificationCode(to, code),
       );
-    } else {
-      await bcrypt.hash('__xidmetal_mail_pad__', 10);
+      // Test/dev rejimində OTP-ni API cavabında qaytar — verify səhifəsi
+      // (login sonrası avtomatik yeniləmə və «Kodu yenidən göndər») kodu göstərsin.
+      return {
+        message: VERIFY_REQUEST_MESSAGE,
+        ...(mail.previewCode ? { previewCode: mail.previewCode } : {}),
+      };
     }
 
+    await bcrypt.hash('__xidmetal_mail_pad__', 10);
     return { message: VERIFY_REQUEST_MESSAGE };
   }
 

@@ -22,6 +22,7 @@ import { RealtimeModule } from './modules/realtime/realtime.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { DispatchModule } from './modules/dispatch/dispatch.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { CommissionModule } from './modules/commission/commission.module';
 import { DevicesModule } from './modules/devices/devices.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { DatabaseModule } from './common/database/database.module';
@@ -99,6 +100,7 @@ import { RedisThrottlerStorage } from './common/throttler/redis-throttler.storag
     TrackingModule,
     DispatchModule,
     PaymentsModule,
+    CommissionModule,
     DevicesModule,
     AnalyticsModule,
     AuthModule,

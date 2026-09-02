@@ -575,6 +575,82 @@ export interface PaymentSummary {
   updatedAt: string;
 }
 
+/**
+ * Xidmət verənin hesab (cüzdan) xülasəsi.
+ * `balance` mənfi olduqda borc (`debt = -balance`) deməkdir.
+ */
+export interface ProviderWalletSummary {
+  id: string;
+  providerId: string;
+  /** Virtual hesab nömrəsi — köçürmə təyinatında istifadə olunur */
+  accountNumber: string;
+  /** Net balans (AZN); mənfi = borc */
+  balance: number;
+  /** Cari borc (AZN); həmişə >= 0 */
+  debt: number;
+  currency: string;
+  /** Borc limitə çatanda ödəmə son tarixi */
+  debtDueAt?: string | null;
+  /** Hesab borc üzündən bağlanıb? */
+  suspended: boolean;
+  suspendedAt?: string | null;
+  suspendedReason?: string | null;
+  createdAt: string;
+}
+
+/** Hesab əməliyyatı (ledger) */
+export interface WalletTransactionSummary {
+  id: string;
+  walletId: string;
+  type: string;
+  /** Balansa təsir (AZN); müsbət = mədaxil, mənfi = məxaric */
+  amount: number;
+  /** Əməliyyatdan sonrakı balans (audit üçün) */
+  balanceAfter: number;
+  /** bookingId / orderId / cardId */
+  referenceId?: string | null;
+  description?: string | null;
+  createdAt: string;
+}
+
+/** Tokenləşdirilmiş kart — PAN/CVV heç vaxt saxlanmır */
+export interface ProviderCardSummary {
+  id: string;
+  brand?: string | null;
+  last4: string;
+  expMonth?: number | null;
+  expYear?: number | null;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+/** Epoint ödəniş sifarişi (top-up / kart qeydiyyatı) */
+export interface ProviderPaymentOrderSummary {
+  id: string;
+  type: string;
+  status: string;
+  amount?: number | null;
+  orderId: string;
+  externalId?: string | null;
+  redirectUrl?: string | null;
+  createdAt: string;
+}
+
+/** Admin — xidmət verən borc/komissiya sırası */
+export interface AdminCommissionSummary {
+  providerId: string;
+  providerName: string;
+  email: string;
+  accountNumber: string;
+  balance: number;
+  debt: number;
+  debtDueAt?: string | null;
+  suspended: boolean;
+  isActive: boolean;
+  totalCommissionCharged: number;
+  totalDeposits: number;
+}
+
 /** Qeydiyyatlı cihaz tokeni */
 export interface DeviceTokenSummary {
   id: string;

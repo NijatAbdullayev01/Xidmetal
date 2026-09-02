@@ -45,6 +45,7 @@ import { RealtimeService } from '../realtime/realtime.service';
 import { DispatchService } from '../dispatch/dispatch.service';
 import { TrackingService } from '../tracking/tracking.service';
 import { GeoService } from '../geo/geo.service';
+import { CommissionService } from '../commission/commission.service';
 import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
 import { MetricsService } from '../../common/metrics/metrics.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
@@ -106,6 +107,9 @@ export class BookingsService {
     @Optional()
     @Inject(forwardRef(() => GeoService))
     private geo?: GeoService,
+    @Optional()
+    @Inject(forwardRef(() => CommissionService))
+    private commission?: CommissionService,
   ) {}
 
   async findById(id: string, userId: string, role: string) {
@@ -833,6 +837,11 @@ export class BookingsService {
       throw new ForbiddenException('Bu sifarişi idarə etmək icazəniz yoxdur');
     }
 
+    // Borc üzündən bağlı hesab yeni sifariş qəbul edə bilməz
+    if (isProvider && dto.status === BookingStatus.CONFIRMED) {
+      await this.commission?.assertProviderCanOperate(booking.providerId);
+    }
+
     if (
       !isBookingTransitionAllowed(booking.status as BookingStatus, dto.status, {
         isProvider,
@@ -1070,6 +1079,20 @@ export class BookingsService {
         .catch((err) => {
           this.logger.debug(
             `BUSY release: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+    }
+
+    if (dto.status === BookingStatus.COMPLETED) {
+      void this.commission
+        ?.onBookingCompleted(
+          booking.providerId,
+          booking.id,
+          Number(booking.totalPrice),
+        )
+        .catch((err) => {
+          this.logger.warn(
+            `Komissiya hesablanmadı: ${err instanceof Error ? err.message : String(err)}`,
           );
         });
     }

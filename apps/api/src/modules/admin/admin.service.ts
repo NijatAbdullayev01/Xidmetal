@@ -33,6 +33,7 @@ import { PrismaService } from '../../common/database/prisma.service';
 import { NotificationChannelsService } from '../../common/notifications/notification-channels.service';
 import { SessionRevocationService } from '../../common/auth/session-revocation.service';
 import { StorageService } from '../../common/storage/storage.service';
+import { CommissionService } from '../commission/commission.service';
 import {
   hashServiceRevisionListing,
   hasAppliedServiceRevision,
@@ -88,6 +89,7 @@ export class AdminService {
     private prisma: PrismaService,
     private storageService: StorageService,
     private sessions: SessionRevocationService,
+    private commission: CommissionService,
     @Optional() private channels?: NotificationChannelsService,
   ) {}
 
@@ -1285,6 +1287,18 @@ export class AdminService {
       limit,
       totalPages: Math.ceil(total / limit) || 0,
     };
+  }
+
+  async listCommission(query: { page?: number; limit?: number; search?: string }) {
+    return this.commission.listWallets(query);
+  }
+
+  async adjustCommission(
+    providerId: string,
+    adminId: string,
+    dto: { amount: number; note?: string },
+  ) {
+    return this.commission.adminAdjust(providerId, adminId, dto);
   }
 
   private async writeAudit(

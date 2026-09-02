@@ -33,12 +33,13 @@ export function VerifyEmailView() {
   const user = useAuthStore((state) => state.user);
   const setAuth = useAuthStore((state) => state.setAuth);
   const updateUser = useAuthStore((state) => state.updateUser);
+  const logout = useAuthStore((state) => state.logout);
   const [serverError, setServerError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [devCode, setDevCode] = useState<string | null>(null);
   const [isResending, setIsResending] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const autoRequestedRef = useRef(false);
+  const handledRef = useRef(false);
 
   const {
     register,
@@ -65,14 +66,17 @@ export function VerifyEmailView() {
 
     const stashed = takeDevEmailCode();
     if (stashed) {
+      handledRef.current = true;
       setDevCode(stashed);
       setValue('code', stashed);
       return;
     }
 
-    // Login sonrası / stashed yoxdursa — test rejimində kodu avtomatik yenilə
+    // Login sonrası / stashed yoxdursa — test rejimində kodu avtomatik yenilə.
+    // handledRef StrictMode double-run-da stashed kodu sildikdən sonra yenidən
+    // avtomatik kod göndərib düzgün kodu etibarsızlaşdırmasın deyə qoruyur.
     if (
-      autoRequestedRef.current ||
+      handledRef.current ||
       !user?.email ||
       user.isVerified ||
       isTurnstileConfigured()
@@ -80,7 +84,7 @@ export function VerifyEmailView() {
       return;
     }
 
-    autoRequestedRef.current = true;
+    handledRef.current = true;
     void (async () => {
       try {
         const response = await api.auth.requestEmailVerification({
@@ -111,6 +115,14 @@ export function VerifyEmailView() {
     } else {
       router.replace('/login');
     }
+  };
+
+  const handleCancelRegistration = () => {
+    void api.auth.logout().catch(() => {
+      // Şəbəkə xətası ləğvi bloklamamalıdır
+    });
+    logout();
+    router.replace('/login');
   };
 
   const onSubmit = async (values: ConfirmEmailVerificationInput) => {
@@ -297,13 +309,21 @@ export function VerifyEmailView() {
           )}
         </Button>
 
-        {!user && (
-          <p className="text-center text-sm text-muted-foreground">
+        <p className="text-center text-sm text-muted-foreground">
+          {user ? (
+            <button
+              type="button"
+              onClick={handleCancelRegistration}
+              className="font-medium text-brand-dark hover:underline"
+            >
+              Qeydiyyatı ləğv et
+            </button>
+          ) : (
             <Link href="/login" className="font-medium text-brand-dark hover:underline">
               Daxil ol
             </Link>
-          </p>
-        )}
+          )}
+        </p>
       </form>
     </AuthPageShell>
   );

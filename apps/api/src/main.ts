@@ -52,6 +52,9 @@ async function bootstrap() {
     paymentsEnabled: configService.get<string>('PAYMENTS_ENABLED'),
     paymentProvider: configService.get<string>('PAYMENT_PROVIDER'),
     databaseUrl: configService.get<string>('DATABASE_URL'),
+    cardEncryptionKey: configService.get<string>('CARD_ENCRYPTION_KEY'),
+    epointPublicKey: configService.get<string>('EPOINT_PUBLIC_KEY'),
+    epointPrivateKey: configService.get<string>('EPOINT_PRIVATE_KEY'),
   });
 
   if (nodeEnv === 'production' && !configService.get<string>('SENTRY_DSN')?.trim()) {

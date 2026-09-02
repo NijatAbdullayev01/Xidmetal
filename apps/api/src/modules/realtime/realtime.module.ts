@@ -10,7 +10,7 @@ import { ProviderPresenceService } from './provider-presence.service';
 
 @Module({
   imports: [
-    AuthModule,
+    forwardRef(() => AuthModule),
     forwardRef(() => TrackingModule),
     forwardRef(() => DispatchModule),
   ],

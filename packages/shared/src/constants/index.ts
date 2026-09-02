@@ -82,6 +82,30 @@ export const PAYMENTS = {
   IDEMPOTENCY_KEY_MAX_LEN: 128,
 } as const;
 
+/**
+ * Xidmət verən komissiyası & borc hesabı (Faza 6).
+ * Hər tamamlanmış sifarişdən xidmət verənə 15% komissiya yazılır;
+ * borc 10 AZN-ə çatanda 1 iş günü ödəmə müddəti verilir, ödənməzsə hesab bağlanır.
+ */
+export const COMMISSION = {
+  /** Hər tamamlanmış sifariş üzrə platforma komissiyası (15%) */
+  RATE: 0.15,
+  /** Borc limiti — bu məbləğə çatanda (və ya keçəndə) müddət işə düşür (AZN) */
+  DEBT_THRESHOLD_AZN: 10,
+  /** Ödəmə müddəti (iş günü) */
+  DEBT_GRACE_BUSINESS_DAYS: 1,
+  /** Minimal kart top-up (AZN) */
+  MIN_DEPOSIT_AZN: 1,
+  /** Maksimal kart top-up (AZN) */
+  MAX_DEPOSIT_AZN: 100_000,
+  /** Virtual hesab nömrəsi prefiksi (köçürmə təyinatında istifadə olunur) */
+  ACCOUNT_NUMBER_PREFIX: 'XM',
+  /** Virtual hesab nömrəsinin rəqəm uzunluğu (prefix sonrası) */
+  ACCOUNT_NUMBER_DIGITS: 10,
+  /** Kart siyahısı maksimal həddi */
+  MAX_CARDS_PER_PROVIDER: 5,
+} as const;
+
 /** Push / idempotency (Faza 5) */
 export const NOTIFICATION_CHANNELS = {
   /** IdempotencyRecord default TTL (saat) */

@@ -9,6 +9,7 @@ import { GeoModule } from '../geo/geo.module';
 import { NotificationChannelsModule } from '../../common/notifications/notification-channels.module';
 import { IdempotencyModule } from '../../common/idempotency/idempotency.module';
 import { BookingCapacityModule } from '../../common/booking/booking-capacity.module';
+import { CommissionModule } from '../commission/commission.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { BookingCapacityModule } from '../../common/booking/booking-capacity.mod
     forwardRef(() => DispatchModule),
     GeoModule,
     BookingCapacityModule,
+    CommissionModule,
   ],
   controllers: [BookingsController],
   providers: [BookingsService],

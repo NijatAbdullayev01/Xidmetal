@@ -125,6 +125,28 @@ export function formatAzDateTime(input: string | Date): string {
   return `${formatAzDateFromParts(parts)}, ${formatAzTimeFromParts(parts)}`;
 }
 
+/** Həftə sonu (Azərbaycan: Şənbə=Bazar=istirahət; Bazar ertəsi–Cümə iş günü). */
+export function isAzBusinessDay(date: Date): boolean {
+  const day = date.getDay(); // 0=Bazar, 6=Şənbə
+  return day !== 0 && day !== 6;
+}
+
+/**
+ * Verilən andan `count` iş günü sonrasını qaytarır (həftə sonlarını keçərək).
+ * Məs. cümə günü +1 iş günü → bazar ertəsi.
+ */
+export function addAzBusinessDays(from: Date, count: number): Date {
+  const result = new Date(from.getTime());
+  let remaining = count;
+  while (remaining > 0) {
+    result.setDate(result.getDate() + 1);
+    if (isAzBusinessDay(result)) {
+      remaining -= 1;
+    }
+  }
+  return result;
+}
+
 /**
  * Sifariş kartında göstərilən vaxt:
  * SCHEDULED — təyin olunmuş slot; INSTANT — yaradılma vaxtı (slot yoxdur).
