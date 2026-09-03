@@ -8,9 +8,10 @@ import {
   Bug,
   CalendarDays,
   Car,
-  CheckCircle2,
   ClipboardCheck,
+  ClipboardList,
   HelpCircle,
+  Lock,
   MessageSquare,
   Package,
   Scissors,
@@ -31,7 +32,7 @@ export const metadata: Metadata = {
     absolute: 'Xidmət verən olun — Xidmətal ilə biznesinizi böyüdün',
   },
   description:
-    'Xidmətal platformasında pulsuz qeydiyyatdan keçin, xidmətlərinizi əlavə edin və yeni xidmət alanlara çatın. 0% komissiya, asan idarəetmə, real-vaxt sifarişlər.',
+    'Xidmətal platformasında ödənişsiz qeydiyyatdan keçin, xidmətlərinizi əlavə edin və yeni xidmət alanlara çatın. 0% komissiya, asan idarəetmə, real-vaxt sifarişlər.',
   robots: {
     index: true,
     follow: true,
@@ -41,7 +42,7 @@ export const metadata: Metadata = {
 
 const stats = [
   { value: '0%', label: 'Komissiya — hazırda platforma haqqı yoxdur' },
-  { value: 'Pulsuz', label: 'Qeydiyyat və xidmət əlavəsi' },
+  { value: 'Ödənişsiz', label: 'Qeydiyyat və xidmət əlavəsi' },
   { value: '24/7', label: 'Kabinetə istənilən vaxt giriş' },
   { value: 'Tək platforma', label: 'Bütün xidmət alanlar bir yerdə' },
 ];
@@ -59,7 +60,7 @@ const steps: { icon: LucideIcon; title: string; description: string }[] = [
   {
     icon: UserPlus,
     title: 'Qeydiyyatdan keçin',
-    description: 'Pulsuz hesab yaradın və profilinizi tamamlayın.',
+    description: 'Ödənişsiz hesab yaradın və profilinizi tamamlayın.',
   },
   {
     icon: Briefcase,
@@ -113,9 +114,9 @@ const benefits: { icon: LucideIcon; title: string; description: string }[] = [
 
 const faqs: { question: string; answer: string }[] = [
   {
-    question: 'Qeydiyyat pulsuzdur?',
+    question: 'Qeydiyyat ödənişsizdir?',
     answer:
-      'Bəli, xidmət verən kimi qeydiyyat tamamilə pulsuzdur. Hesab yaradıb dərhal xidmət əlavə edə bilərsiniz.',
+      'Bəli, xidmət verən kimi qeydiyyat tamamilə ödənişsizdir. Hesab yaradıb dərhal xidmət əlavə edə bilərsiniz.',
   },
   {
     question: 'Platforma komissiya alır?',
@@ -145,42 +146,134 @@ const faqs: { question: string; answer: string }[] = [
 ];
 
 function HeroDashboardPreview() {
+  const stats = [
+    { icon: Briefcase, label: 'Aktiv xidmətlər', value: '3' },
+    { icon: ClipboardList, label: 'Gözləyən sifariş', value: '2' },
+    { icon: MessageSquare, label: 'Oxunmamış mesaj', value: '5' },
+    { icon: Star, label: 'Reytinq', value: '4.8' },
+  ];
+
+  const orders = [
+    {
+      title: 'Ev təmizliyi',
+      meta: 'Aysel M. · bu gün',
+      badge: 'Yeni',
+      badgeClass: 'bg-brand/15 text-brand-dark',
+    },
+    {
+      title: 'Santexnik təmiri',
+      meta: 'Elnur R. · 12:30',
+      badge: 'Təsdiqləndi',
+      badgeClass: 'bg-success/15 text-success',
+    },
+    {
+      title: 'Mənzil təmizliyi',
+      meta: 'Leyla K. · dünən',
+      badge: 'Tamamlandı',
+      badgeClass: 'bg-muted text-muted-foreground',
+    },
+  ];
+
   return (
     <div className="relative" aria-hidden>
       <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-brand/30 to-brand/5 blur-2xl" />
+
       <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
-        <div className="flex items-center justify-between border-b border-border px-5 py-3">
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-brand" />
-            <span className="text-sm font-semibold">Kabinet</span>
+        {/* Pəncərə çərçivəsi */}
+        <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-4 py-2.5">
+          <div className="flex gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#28C840]" />
           </div>
-          <span className="rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">
+          <div className="mx-auto flex items-center gap-1.5 rounded-md bg-background px-3 py-1 text-[11px] text-muted-foreground ring-1 ring-border">
+            <Lock className="h-3 w-3" />
+            xidmətal.az/kabinet
+          </div>
+          <span className="w-8" aria-hidden />
+        </div>
+
+        {/* Profil başlığı */}
+        <div className="flex items-center gap-3 px-4 pt-4">
+          <div className="relative shrink-0">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand-dark text-sm font-bold text-brand-foreground">
+              ƏM
+            </div>
+            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-success ring-2 ring-card" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">Əhməd Məmmədov</p>
+            <p className="truncate text-xs text-muted-foreground">Xidmət verən kabineti</p>
+          </div>
+          <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
+            <span className="h-1.5 w-1.5 rounded-full bg-success" />
             Onlayn
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 p-5">
-          {[
-            { label: 'Aktiv xidmətlər', value: '3' },
-            { label: 'Gözləyən sifariş', value: '2' },
-            { label: 'Tamamlanan', value: '24' },
-            { label: 'Reytinq', value: '4.8 ★' },
-          ].map((stat) => (
+        {/* Statistika */}
+        <div className="grid grid-cols-2 gap-2.5 p-4">
+          {stats.map(({ icon: Icon, label, value }) => (
             <div
-              key={stat.label}
-              className="rounded-xl border border-border/70 bg-muted/40 px-4 py-3"
+              key={label}
+              className="flex items-center gap-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-2.5"
             >
-              <p className="text-xs text-muted-foreground">{stat.label}</p>
-              <p className="mt-1 text-xl font-bold">{stat.value}</p>
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand/15">
+                <Icon className="h-4 w-4 text-brand-dark" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-base font-bold leading-none tabular-nums">{value}</p>
+                <p className="mt-1 truncate text-[11px] leading-tight text-muted-foreground">
+                  {label}
+                </p>
+              </div>
             </div>
           ))}
         </div>
 
-        <div className="space-y-2 px-5 pb-5">
-          <div className="flex items-center gap-3 rounded-xl border border-brand/30 bg-brand/10 px-4 py-3">
-            <Bell className="h-4 w-4 shrink-0 text-brand-dark" />
-            <p className="text-sm">Yeni sifariş: Ev təmizliyi</p>
-            <span className="ml-auto text-xs font-medium text-brand-dark">Yeni</span>
+        {/* Son sifarişlər */}
+        <div className="border-t border-border px-4 pb-1 pt-3">
+          <div className="mb-1.5 flex items-center justify-between">
+            <p className="text-xs font-semibold">Son sifarişlər</p>
+            <span className="text-[11px] font-medium text-brand-dark">Hamısı</span>
+          </div>
+          <ul className="space-y-0.5">
+            {orders.map((order) => (
+              <li
+                key={order.title}
+                className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-1.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium">{order.title}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">{order.meta}</p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${order.badgeClass}`}
+                >
+                  {order.badge}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Yeni sifariş bildirişi */}
+        <div className="px-4 pb-4 pt-3">
+          <div className="flex items-center gap-3 rounded-xl border border-brand/30 bg-brand/10 px-3 py-2.5">
+            <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand/20">
+              <Bell className="h-4 w-4 text-brand-dark" />
+              <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-destructive/60 motion-safe:animate-ping" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-destructive" />
+              </span>
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold">Yeni sifariş gəldi</p>
+              <p className="truncate text-[11px] text-muted-foreground">Ev təmizliyi · 2 dəq əvvəl</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold text-brand-foreground">
+              Yeni
+            </span>
           </div>
         </div>
       </div>
@@ -198,11 +291,6 @@ export default function ProviderLandingPage() {
         <div className="mx-auto max-w-7xl px-4 pt-14 pb-12 sm:px-6 sm:pt-20 lg:px-8 lg:pt-28 lg:pb-24">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
             <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-brand/40 bg-brand/10 px-3 py-1 text-sm font-medium text-brand-dark">
-                <Star className="h-4 w-4" />
-                Xidmət verənlər üçün platforma
-              </span>
-
               <h1 className="mt-5 text-4xl font-bold tracking-tight text-balance sm:text-5xl lg:text-6xl lg:leading-tight">
                 Xidmətlərinizə{' '}
                 <span className="text-brand-dark">yeni xidmət alanlar</span> tapın
@@ -210,7 +298,7 @@ export default function ProviderLandingPage() {
 
               <p className="mt-5 max-w-xl text-lg text-muted-foreground sm:text-xl">
                 Xidmətal xidmət verənlərlə xidmət alanları bir araya gətirən
-                platformadır. Pulsuz qeydiyyatdan keçin, xidmətinizi əlavə edin və
+                platformadır. Ödənişsiz qeydiyyatdan keçin, xidmətinizi əlavə edin və
                 sifariş qəbul etməyə başlayın.
               </p>
 
@@ -219,7 +307,7 @@ export default function ProviderLandingPage() {
                   href="/register"
                   className={cn(buttonStyles('default', 'lg'), 'justify-center')}
                 >
-                  Pulsuz qeydiyyat
+                  Ödənişsiz qeydiyyat
                   <ArrowRight className="h-5 w-5" />
                 </Link>
                 <Link
@@ -229,20 +317,6 @@ export default function ProviderLandingPage() {
                   Daxil ol
                 </Link>
               </div>
-
-              <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-3">
-                {['Pulsuz qeydiyyat', '0% komissiya', 'Bir neçə dəqiqəyə hazır'].map(
-                  (item) => (
-                    <li
-                      key={item}
-                      className="flex items-center gap-2 text-sm font-medium text-muted-foreground"
-                    >
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-brand-dark" />
-                      {item}
-                    </li>
-                  ),
-                )}
-              </ul>
             </div>
 
             <HeroDashboardPreview />
@@ -429,7 +503,7 @@ export default function ProviderLandingPage() {
                 href="/register"
                 className="inline-flex items-center gap-2 rounded-lg bg-brand-foreground px-6 py-3 font-medium text-brand transition-colors hover:bg-brand-foreground/90"
               >
-                Pulsuz qeydiyyat
+                Ödənişsiz qeydiyyat
                 <ArrowRight className="h-5 w-5" />
               </Link>
               <Link

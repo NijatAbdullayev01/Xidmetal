@@ -98,7 +98,7 @@ const forWhom: {
     title: 'Xidmət verənlər üçün',
     audience: 'Bacarıqlarınızı monetizasiya edin və yeni xidmət alanlara çatın.',
     points: [
-      'Pulsuz qeydiyyat və xidmət əlavəsi',
+      'Ödənişsiz qeydiyyat və xidmət əlavəsi',
       'Sifarişləri bir kabinetdən idarəetmə',
       'Reytinq və rəylərlə görünürlüyün artması',
       'Öz cədvəlinizə və qiymətinizə nəzarət',
@@ -358,7 +358,7 @@ export default async function AboutPage() {
               Bizə qoşulun
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-brand-foreground/80">
-              Xidmət axtarırsınızsa indi kəşf edin, xidmət təklif edirsinizsə pulsuz
+              Xidmət axtarırsınızsa indi kəşf edin, xidmət təklif edirsinizsə ödənişsiz
               qeydiyyatdan keçib ilk xidmət alanlarınıza çatın.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">

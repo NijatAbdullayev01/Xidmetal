@@ -45,7 +45,7 @@ const steps: {
     icon: UserPlus,
     title: 'Qeydiyyatdan keçin',
     description:
-      'Pulsuz hesab yaradın və profilinizi tamamlayın. Xidmət alanların sizi tanıması üçün ad, əlaqə və qısa bio əlavə edin.',
+      'Ödənişsiz hesab yaradın və profilinizi tamamlayın. Xidmət alanların sizi tanıması üçün ad, əlaqə və qısa bio əlavə edin.',
     details: [
       '«Xidmət verən ol» düyməsinə klikləyin',
       'E-poçt və parol ilə hesab yaradın',
@@ -155,9 +155,9 @@ const tips: {
 
 const faqs: { question: string; answer: string }[] = [
   {
-    question: 'Qeydiyyat pulsuzdur?',
+    question: 'Qeydiyyat ödənişsizdir?',
     answer:
-      'Bəli, Xidmətal-da xidmət verən kimi qeydiyyat tamamilə pulsuzdur. Platforma hazırda xidmət verənlərdən komissiya və ya abunə haqqı tutmur — hesab yaradıb dərhal xidmət əlavə edə bilərsiniz.',
+      'Bəli, Xidmətal-da xidmət verən kimi qeydiyyat tamamilə ödənişsizdir. Platforma hazırda xidmət verənlərdən komissiya və ya abunə haqqı tutmur — hesab yaradıb dərhal xidmət əlavə edə bilərsiniz.',
   },
   {
     question: 'Platforma komissiya alır?',
@@ -239,7 +239,7 @@ export default function ProviderGuidePage() {
           <div className="grid gap-6 sm:grid-cols-3">
             {[
               { value: '4 addım', label: 'Başlamaq üçün kifayətdir' },
-              { value: 'Pulsuz', label: 'Qeydiyyat və xidmət əlavəsi' },
+              { value: 'Ödənişsiz', label: 'Qeydiyyat və xidmət əlavəsi' },
               { value: '24/7', label: 'Kabinetə istənilən vaxt giriş' },
             ].map((item) => (
               <div
@@ -508,7 +508,7 @@ export default function ProviderGuidePage() {
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <BecomeProviderLink className="inline-flex items-center gap-2 rounded-lg bg-brand-foreground px-6 py-3 font-medium text-brand transition-colors hover:bg-brand-foreground/90">
-                Pulsuz qeydiyyat
+                Ödənişsiz qeydiyyat
                 <ArrowRight className="h-5 w-5" />
               </BecomeProviderLink>
               <Link

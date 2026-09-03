@@ -14,6 +14,9 @@ describe('assertProductionRuntimeConfig', () => {
     paymentsEnabled: 'false',
     paymentProvider: 'noop',
     databaseUrl: 'postgresql://xidmetal:long-random-db-pass@postgres:5432/xidmetal',
+    cardEncryptionKey: 'card-encryption-key-card-encryption-1234',
+    epointPublicKey: 'epoint-public-key',
+    epointPrivateKey: 'epoint-private-key',
   };
 
   it('development-da heç nə etmir', () => {
@@ -146,5 +149,35 @@ describe('assertProductionRuntimeConfig', () => {
         paymentProvider: 'stripe',
       }),
     ).toThrow(/PAYMENT_PROVIDER/);
+  });
+
+  it('CARD_ENCRYPTION_KEY əskik/32 simvoldan qısadırsa fail edir', () => {
+    expect(() =>
+      assertProductionRuntimeConfig({
+        ...valid,
+        cardEncryptionKey: 'too-short',
+      }),
+    ).toThrow(/CARD_ENCRYPTION_KEY/);
+  });
+
+  it('Epoint açarları əskikdirsə fail edir', () => {
+    expect(() =>
+      assertProductionRuntimeConfig({
+        ...valid,
+        epointPublicKey: '',
+        epointPrivateKey: undefined,
+      }),
+    ).toThrow(/EPOINT/);
+  });
+
+  it('EPOINT_SIMULATION_ALLOWED=true açarsız simulyasiyaya icazə verir', () => {
+    expect(() =>
+      assertProductionRuntimeConfig({
+        ...valid,
+        epointPublicKey: '',
+        epointPrivateKey: '',
+        epointSimulationAllowed: 'true',
+      }),
+    ).not.toThrow();
   });
 });

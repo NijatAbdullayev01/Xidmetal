@@ -55,6 +55,7 @@ async function bootstrap() {
     cardEncryptionKey: configService.get<string>('CARD_ENCRYPTION_KEY'),
     epointPublicKey: configService.get<string>('EPOINT_PUBLIC_KEY'),
     epointPrivateKey: configService.get<string>('EPOINT_PRIVATE_KEY'),
+    epointSimulationAllowed: configService.get<string>('EPOINT_SIMULATION_ALLOWED'),
   });
 
   if (nodeEnv === 'production' && !configService.get<string>('SENTRY_DSN')?.trim()) {

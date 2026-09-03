@@ -45,26 +45,14 @@ export function LandingHeader() {
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-brand-dark bg-brand text-brand-foreground">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex shrink-0 items-center" aria-label="Xidmətal ana səhifə">
-          <Logo className="h-10 w-auto" variant="transparent" />
+          <Logo priority />
         </Link>
 
-        <nav aria-label="Əsas naviqasiya" className="hidden items-center gap-1 lg:flex">
-          {NAV_LINKS.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              {link.label}
-            </a>
-          ))}
-        </nav>
-
         <div className="hidden items-center gap-2 lg:flex">
-          <ThemeToggle className="text-muted-foreground hover:bg-muted hover:text-foreground" />
+          <ThemeToggle className="text-brand-foreground hover:bg-brand-dark/20 hover:text-brand-foreground" />
           {authed ? (
             <Link
               href={dashboardHref}
@@ -78,10 +66,22 @@ export function LandingHeader() {
             </Link>
           ) : (
             <>
-              <Link href="/login" className={buttonStyles('ghost', 'md')}>
+              <Link
+                href="/login"
+                className={cn(
+                  buttonStyles('ghost', 'md'),
+                  'text-brand-foreground hover:bg-brand-dark/20 hover:text-brand-foreground',
+                )}
+              >
                 Daxil ol
               </Link>
-              <Link href="/register" className={buttonStyles('default', 'md')}>
+              <Link
+                href="/register"
+                className={cn(
+                  buttonStyles('default', 'md'),
+                  'bg-brand-foreground text-brand hover:bg-brand-foreground/90',
+                )}
+              >
                 Qeydiyyat
               </Link>
             </>
@@ -90,7 +90,7 @@ export function LandingHeader() {
 
         <button
           type="button"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-muted lg:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-brand-foreground transition-colors hover:bg-brand-dark/20 lg:hidden"
           onClick={() => setOpen((prev) => !prev)}
           aria-expanded={open}
           aria-controls="landing-mobile-menu"

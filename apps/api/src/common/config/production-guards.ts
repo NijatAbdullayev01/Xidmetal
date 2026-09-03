@@ -18,6 +18,7 @@ export type ProductionGuardEnv = {
   cardEncryptionKey?: string | null;
   epointPublicKey?: string | null;
   epointPrivateKey?: string | null;
+  epointSimulationAllowed?: string | null;
 };
 
 const WEAK_DB_FRAGMENTS = ['xidmetal_dev', ':xidmetal@'] as const;
@@ -136,10 +137,15 @@ export function assertProductionRuntimeConfig(env: ProductionGuardEnv): void {
 
   // Epoint açarları olmadan kart top-up "simulyasiya" rejiminə keçir — production-da
   // bu real ödəniş olmadan balans artırmaq deməkdir və qadağandır.
-  if (!env.epointPublicKey?.trim() || !env.epointPrivateKey?.trim()) {
-    missing.push(
-      'EPOINT_PUBLIC_KEY / EPOINT_PRIVATE_KEY (kart top-up production-da simulyasiya qadağandır)',
-    );
+  // Explicit opt-out: EPOINT_SIMULATION_ALLOWED=true (yalnız lokal/staging test üçün).
+  const epointSimulationAllowed =
+    env.epointSimulationAllowed?.trim().toLowerCase() === 'true';
+  if (!epointSimulationAllowed) {
+    if (!env.epointPublicKey?.trim() || !env.epointPrivateKey?.trim()) {
+      missing.push(
+        'EPOINT_PUBLIC_KEY / EPOINT_PRIVATE_KEY (kart top-up production-da simulyasiya qadağandır)',
+      );
+    }
   }
 
   if (missing.length > 0) {

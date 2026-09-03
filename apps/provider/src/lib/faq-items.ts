@@ -7,7 +7,7 @@ export const FAQ_ITEMS: {
   {
     question: 'Sifariş vermək üçün qeydiyyat lazımdır?',
     answer:
-      'Bəli, sifariş göndərmək üçün pulsuz hesab yaratmaq lazımdır. Bu, sifarişinizi izləməyinizə və xidmət verənlə əlaqə saxlamanıza imkan verir.',
+      'Bəli, sifariş göndərmək üçün ödənişsiz hesab yaratmaq lazımdır. Bu, sifarişinizi izləməyinizə və xidmət verənlə əlaqə saxlamanıza imkan verir.',
     href: '/how-it-works',
     hrefLabel: 'Necə işləyir?',
   },
@@ -31,7 +31,7 @@ export const FAQ_ITEMS: {
   {
     question: 'Xidmət verən olmaq istəyirəm, haradan başlamalıyam?',
     answer:
-      '«Xidmət verən ol» düyməsinə klikləyərək pulsuz qeydiyyatdan keçin. Ətraflı addım-addım təlimat üçün Xidmət verən bələdçisinə baxın.',
+      '«Xidmət verən ol» düyməsinə klikləyərək ödənişsiz qeydiyyatdan keçin. Ətraflı addım-addım təlimat üçün Xidmət verən bələdçisinə baxın.',
     href: '/provider/guide',
     hrefLabel: 'Xidmət verən bələdçisi',
   },
